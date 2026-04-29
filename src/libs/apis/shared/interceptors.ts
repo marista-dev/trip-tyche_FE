@@ -76,11 +76,6 @@ export const setupResponseInterceptor = (instance: AxiosInstance) => {
                     }
 
                     if (status === 403) {
-                        const { isGuest } = useUserStore.getState();
-                        if (isGuest) {
-                            showToast('게스트 모드에서는 사용할 수 없는 기능입니다.');
-                            return Promise.resolve();
-                        }
                         logout();
                         return Promise.resolve();
                     }
