@@ -10,7 +10,7 @@ export const ROUTES = {
         HOME: '/',
         TICKETS: '/tickets',
         SETTING: '/setting',
-        NOTIFICATION: (userId: UserId) => `notification/${userId}`,
+        NOTIFICATION: (userId: UserId) => `/notification/${userId}`,
         TRIP: {
             ROOT: (tripKey: TripKey) => `/trip/${tripKey}`,
             NEW: (tripKey: TripKey) => `/trip/${tripKey}/new`,
