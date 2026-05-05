@@ -171,6 +171,7 @@ const contentArea = css`
     flex: 1;
     display: flex;
     flex-direction: column;
+    justify-content: center;
     padding: 4px 4px 12px;
 `;
 
