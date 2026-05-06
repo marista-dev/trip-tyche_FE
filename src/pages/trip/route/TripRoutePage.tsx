@@ -15,6 +15,7 @@ import { easeInOutCubic } from '@/domains/route/easing';
 import { calculateDistance, getAnimationConfig, sortPinPointByDate } from '@/domains/route/utils';
 import { addStartDateAndEndDateToImageDates } from '@/libs/utils/media';
 import BackButton from '@/shared/components/common/Button/BackButton';
+import MapVignette from '@/domains/route/components/MapVignette';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import CharacterMarker from '@/shared/components/map/CharacterMarker';
 import ClusterMarker from '@/shared/components/map/ClusterMarker';
@@ -456,6 +457,7 @@ const TripRoutePage = () => {
     return (
         <div css={container}>
             <BackButton onClick={() => navigate(`${ROUTES.PATH.TICKETS}`)} />
+            <MapVignette />
 
             <Map
                 zoom={mapStatus.zoom}
