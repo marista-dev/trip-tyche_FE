@@ -467,7 +467,12 @@ const TripRoutePage = () => {
                 onClick={handleMapClick}
             >
                 <>
-                    <Polyline pinPoints={pinPoints} isCharacterVisible={isCharacterVisible} />
+                    <Polyline
+                        pinPoints={pinPoints}
+                        isCharacterVisible={isCharacterVisible}
+                        currentPinPointIndex={currentPinPointIndex}
+                        characterPosition={characterPosition}
+                    />
                     {renderMarkers()}
                     <MapControlButtons
                         isVisible={!isCharacterMoving}
