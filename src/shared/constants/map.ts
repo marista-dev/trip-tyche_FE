@@ -2,8 +2,12 @@ import { Libraries } from '@react-google-maps/api';
 
 import { MapOption } from '@/shared/types/map';
 
-// Goole Maps API Key
+// Google Maps API Key
 export const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+// Vector mapId — 비어 있으면 raster 맵 fallback (3D 빌딩·tilt 비활성)
+export const GOOGLE_MAPS_MAP_ID: string | undefined =
+    import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || undefined;
 
 // Goole Maps 로드를 위한 환경 설정
 export const GOOGLE_MAPS_CONFIG = {
