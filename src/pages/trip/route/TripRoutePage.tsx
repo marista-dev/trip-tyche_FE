@@ -61,6 +61,7 @@ const TripRoutePage = () => {
     const [isPlayingAnimation, setIsPlayingAnimation] = useState(false);
 
     const [currentTransportType, setCurrentTransportType] = useState('walking');
+    const [characterBearing, setCharacterBearing] = useState(0);
     const [showTravelMessage, setShowTravelMessage] = useState('');
 
     const { showToast } = useToastStore();
@@ -190,6 +191,10 @@ const TripRoutePage = () => {
         setIsCharacterMoving(true);
         setIsMapInteractive(false);
         const distance = calculateDistance(start.latitude, start.longitude, end.latitude, end.longitude);
+
+        // 이 구간의 진행 방향 (0=북, 90=동, 180=남, 270=서)
+        const rawBearing = (Math.atan2(end.longitude - start.longitude, end.latitude - start.latitude) * 180) / Math.PI;
+        setCharacterBearing((rawBearing + 360) % 360);
 
         const settings = getAnimationConfig(distance);
 
@@ -389,6 +394,7 @@ const TripRoutePage = () => {
                             }}
                             transportType={currentTransportType}
                             isMapRendered={isMapRendered}
+                            bearing={characterBearing}
                         />
                     )}
                     {showTravelMessage && <div css={travelMessageStyle}>{showTravelMessage}</div>}
