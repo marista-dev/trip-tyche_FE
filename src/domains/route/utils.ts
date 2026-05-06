@@ -112,13 +112,13 @@ export const getAnimationConfig = (distance: number) => {
             zoomLevel: ZOOM_SCALE.DEFAULT,
             duration: 1500,
         };
-    } else if (distance < 10) {
+    } else if (distance < 5) {
         return {
             transportType: 'walking',
             zoomLevel: ZOOM_SCALE.DEFAULT,
             duration: 3000,
         };
-    } else if (distance < 5) {
+    } else if (distance < 10) {
         return {
             transportType: 'car',
             zoomLevel: ZOOM_SCALE.DEFAULT - 1,
