@@ -74,6 +74,7 @@ const TripRoutePage = () => {
         handleMapZoomChanged,
         updateMapCenter,
         updateMapZoom,
+        moveCamera,
     } = useMapControl(ZOOM_SCALE.DEFAULT, characterPosition);
 
     const animationRef = useRef<number | null>(null);
@@ -192,8 +193,8 @@ const TripRoutePage = () => {
 
         const settings = getAnimationConfig(distance);
 
-        updateMapZoom(settings.zoomLevel);
-        updateMapCenter(start);
+        // 출발 전 적절한 줌으로 전환, tilt 초기화 (카메라 팔로우 시작)
+        moveCamera({ zoom: settings.zoomLevel, tilt: 0 });
 
         setCurrentTransportType(settings.transportType);
         setShowTravelMessage(
@@ -214,6 +215,8 @@ const TripRoutePage = () => {
             const newPosition = { latitude: newLat, longitude: newLng };
 
             setCharacterPosition(newPosition);
+            // 매 프레임 카메라가 캐릭터를 따라감 — React state 미경유로 re-render 없음
+            mapRef.current?.panTo({ lat: newLat, lng: newLng });
 
             if (rawProgress < 1) {
                 animationRef.current = requestAnimationFrame(animate);
@@ -225,7 +228,8 @@ const TripRoutePage = () => {
                 setShowTravelMessage('');
 
                 setCurrentTransportType('walking');
-                updateMapZoom(ZOOM_SCALE.DEFAULT);
+                // 도착 시 줌인 + 틸트 — 핀포인트 사진 카드를 극적으로 표시
+                moveCamera({ zoom: 17, tilt: 45 });
 
                 autoPlayTimeoutRef.current = setTimeout(() => {
                     if (isPlayingAnimation) {
@@ -242,7 +246,7 @@ const TripRoutePage = () => {
             setCharacterPosition(start);
             animationRef.current = requestAnimationFrame(animate);
         }, delay);
-    }, [currentPinPointIndex, pinPoints, isPlayingAnimation, isLastPinPoint, updateMapCenter, updateMapZoom]);
+    }, [currentPinPointIndex, pinPoints, isPlayingAnimation, isLastPinPoint, updateMapCenter, updateMapZoom, moveCamera, mapRef]);
 
     useEffect(() => {
         if (isPlayingAnimation && !isCharacterMoving) {
@@ -270,12 +274,13 @@ const TripRoutePage = () => {
 
     const showCharacterView = useCallback(() => {
         if (mapRef.current) {
-            if (characterPosition) {
-                updateMapCenter({ latitude: characterPosition.latitude, longitude: characterPosition.longitude });
-            }
-            updateMapZoom(ZOOM_SCALE.DEFAULT);
+            moveCamera({
+                center: characterPosition ?? undefined,
+                zoom: ZOOM_SCALE.DEFAULT,
+                tilt: 0,
+            });
         }
-    }, [mapRef, characterPosition, updateMapCenter, updateMapZoom]);
+    }, [mapRef, characterPosition, moveCamera]);
 
     const handleZoomChanged = () => {
         handleMapZoomChanged(() => {
