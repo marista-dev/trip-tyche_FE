@@ -11,6 +11,7 @@ import Polyline from '@/domains/route/components/Polyline';
 import { DURATION } from '@/domains/route/constants';
 import { useRoute } from '@/domains/route/hooks/queries';
 import { PinPoint } from '@/domains/route/types';
+import { easeInOutCubic } from '@/domains/route/easing';
 import { calculateDistance, getAnimationConfig, sortPinPointByDate } from '@/domains/route/utils';
 import { addStartDateAndEndDateToImageDates } from '@/libs/utils/media';
 import BackButton from '@/shared/components/common/Button/BackButton';
@@ -204,8 +205,8 @@ const TripRoutePage = () => {
                 startTimeRef.current = time;
             }
 
-            // 단순 선형 진행 (가속/감속 없음)
-            const progress = Math.min((time - startTimeRef.current) / settings.duration, 1);
+            const rawProgress = Math.min((time - startTimeRef.current) / settings.duration, 1);
+            const progress = easeInOutCubic(rawProgress);
 
             // 좌표 계산 - 직선 보간법 사용
             const newLat = start.latitude + (end.latitude - start.latitude) * progress;
@@ -214,7 +215,7 @@ const TripRoutePage = () => {
 
             setCharacterPosition(newPosition);
 
-            if (progress < 1) {
+            if (rawProgress < 1) {
                 animationRef.current = requestAnimationFrame(animate);
             } else {
                 startTimeRef.current = null;
