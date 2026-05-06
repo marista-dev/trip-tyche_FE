@@ -111,66 +111,88 @@ export const getAnimationConfig = (distance: number) => {
             transportType: 'walking',
             zoomLevel: ZOOM_SCALE.DEFAULT,
             duration: 1500,
+            tilt: 0,
+            headingDelta: 0,
         };
     } else if (distance < 5) {
         return {
             transportType: 'walking',
             zoomLevel: ZOOM_SCALE.DEFAULT,
             duration: 3000,
+            tilt: 0,
+            headingDelta: 0,
         };
     } else if (distance < 10) {
         return {
             transportType: 'car',
             zoomLevel: ZOOM_SCALE.DEFAULT - 1,
             duration: 5000,
+            tilt: 30,
+            headingDelta: 15,
         };
     } else if (distance < 50) {
         return {
             transportType: 'car',
             zoomLevel: ZOOM_SCALE.DEFAULT - 1,
             duration: 6000,
+            tilt: 30,
+            headingDelta: 15,
         };
     } else if (distance < 70) {
         return {
             transportType: 'car',
             zoomLevel: ZOOM_SCALE.DEFAULT - 1,
             duration: 7000,
+            tilt: 30,
+            headingDelta: 15,
         };
     } else if (distance < 100) {
         return {
             transportType: 'car',
             zoomLevel: ZOOM_SCALE.DEFAULT - 1,
             duration: 8000,
+            tilt: 30,
+            headingDelta: 15,
         };
     } else if (distance < 300) {
         return {
             transportType: 'plane',
             zoomLevel: 7,
             duration: 5000,
+            tilt: 45,
+            headingDelta: 30,
         };
     } else if (distance < 500) {
         return {
             transportType: 'plane',
             zoomLevel: 7,
             duration: 6000,
+            tilt: 45,
+            headingDelta: 30,
         };
     } else if (distance < 1000) {
         return {
             transportType: 'plane',
             zoomLevel: 6,
             duration: 7000,
+            tilt: 45,
+            headingDelta: 30,
         };
     } else if (distance < 7000) {
         return {
             transportType: 'plane',
             zoomLevel: 4,
             duration: 7000,
+            tilt: 45,
+            headingDelta: 30,
         };
     } else {
         return {
             transportType: 'plane',
             zoomLevel: 4,
             duration: 8000,
+            tilt: 45,
+            headingDelta: 30,
         };
     }
 };

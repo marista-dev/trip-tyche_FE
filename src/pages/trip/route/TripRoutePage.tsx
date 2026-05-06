@@ -193,8 +193,8 @@ const TripRoutePage = () => {
 
         const settings = getAnimationConfig(distance);
 
-        // 출발 전 적절한 줌으로 전환, tilt 초기화 (카메라 팔로우 시작)
-        moveCamera({ zoom: settings.zoomLevel, tilt: 0 });
+        // 출발 전 적절한 줌·틸트로 전환 (카메라 팔로우 시작)
+        moveCamera({ zoom: settings.zoomLevel, tilt: settings.tilt });
 
         setCurrentTransportType(settings.transportType);
         setShowTravelMessage(
