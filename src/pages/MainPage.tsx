@@ -47,8 +47,8 @@ const MainPage = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        sessionStorage.removeItem('recentPinPointId');
         sessionStorage.removeItem('imageDates');
+        sessionStorage.removeItem('cinematicResumeIdx');
     }, []);
 
     useEffect(() => {

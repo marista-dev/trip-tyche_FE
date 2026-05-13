@@ -40,8 +40,8 @@ export const GUIDE_MESSAGE = {
 
 export const MAP = {
     PHOTO_CARD_SIZE: {
-        WIDTH: 120,
-        HEIGHT: 120,
+        WIDTH: 128,
+        HEIGHT: 148,
     },
 };
 
