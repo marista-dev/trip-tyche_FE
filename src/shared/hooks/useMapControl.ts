@@ -31,16 +31,6 @@ export const useMapControl = (initialZoom: number, initialCenter: Location | nul
         }
     }, []);
 
-    const handleMapZoomChanged = useCallback((callback?: () => void) => {
-        if (mapRef.current) {
-            const newZoom = mapRef.current.getZoom();
-            if (newZoom) {
-                setZoom(newZoom);
-                callback?.();
-            }
-        }
-    }, []);
-
     // 단일 호출로 center/zoom/tilt/heading 동시 변경
     // vector mapId 없이는 moveCamera()가 없을 수 있으므로 feature detection 후 fallback
     const moveCamera = useCallback((options: MoveCameraOptions) => {
@@ -71,11 +61,6 @@ export const useMapControl = (initialZoom: number, initialCenter: Location | nul
         if (options.zoom !== undefined) setZoom(options.zoom);
     }, []);
 
-    const updateMapZoom = useCallback((newZoom: number, callback?: () => void) => {
-        moveCamera({ zoom: newZoom });
-        callback?.();
-    }, [moveCamera]);
-
     const updateMapCenter = useCallback((newCenter: Location) => {
         moveCamera({ center: newCenter });
     }, [moveCamera]);
@@ -90,8 +75,6 @@ export const useMapControl = (initialZoom: number, initialCenter: Location | nul
         isMapScriptLoadError,
         isMapRendered,
         handleMapRender,
-        handleMapZoomChanged,
-        updateMapZoom,
         updateMapCenter,
         moveCamera,
     };

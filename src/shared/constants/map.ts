@@ -13,6 +13,7 @@ export const GOOGLE_MAPS_MAP_ID: string | undefined =
 export const GOOGLE_MAPS_CONFIG = {
     googleMapsApiKey: GOOGLE_MAPS_API_KEY || '',
     libraries: ['places'] as Libraries,
+    version: 'weekly',
     language: 'ko',
     region: 'KR',
 } as const;
