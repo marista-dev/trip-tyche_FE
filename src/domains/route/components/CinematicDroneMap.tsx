@@ -100,6 +100,20 @@ const CinematicDroneMap = ({
         const checkAndStart = async () => {
             const rt = (map as google.maps.Map).getRenderingType?.();
             console.log('[CinematicDroneMap] renderingType =', rt);
+            console.log('[CinematicDroneMap] mapId =', GOOGLE_MAPS_MAP_ID || '(unset)');
+            console.log('[CinematicDroneMap] userAgent =', navigator.userAgent);
+            // WebGL2 capability 진단
+            try {
+                const c = document.createElement('canvas');
+                const gl = c.getContext('webgl2');
+                console.log('[CinematicDroneMap] WebGL2 =', !!gl);
+                if (gl) {
+                    console.log('[CinematicDroneMap] EXT_color_buffer_float =', !!gl.getExtension('EXT_color_buffer_float'));
+                    console.log('[CinematicDroneMap] GL_RENDERER =', gl.getParameter(gl.RENDERER));
+                }
+            } catch (e) {
+                console.log('[CinematicDroneMap] WebGL2 check failed', e);
+            }
             isVectorRef.current = rt === google.maps.RenderingType.VECTOR;
             if (!isVectorRef.current) {
                 console.warn('[CinematicDroneMap] Vector 미지원 — tilt/heading 비활성, 카메라 추적만 유지');
