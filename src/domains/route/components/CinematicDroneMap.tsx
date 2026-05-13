@@ -5,6 +5,7 @@ import { useGoogleMap } from '@react-google-maps/api';
 import { easeInOutCubic, easeOutQuad } from '@/domains/route/easing';
 import { PinPoint } from '@/domains/route/types';
 import { bearing as calcBearing, calculateDistance } from '@/domains/route/utils';
+import { GOOGLE_MAPS_MAP_ID } from '@/shared/constants/map';
 
 interface Props {
     pinPoints: PinPoint[];
@@ -165,6 +166,18 @@ const CinematicDroneMap = ({
 
             // PinPoint markers — AdvancedMarkerElement + PinElement
             // 도착 시 사진 원으로 변신 (handleArrival에서 content 교체)
+            // 단, mapId 없으면 AdvancedMarkerElement가 동작 안 함 → 기본 Marker로 폴백
+            if (!GOOGLE_MAPS_MAP_ID) {
+                console.warn('[CinematicDroneMap] GOOGLE_MAPS_MAP_ID 미설정 — 기본 Marker로 폴백');
+                pinPoints.forEach((p) => {
+                    const marker = new google.maps.Marker({
+                        position: { lat: p.latitude, lng: p.longitude },
+                        map,
+                    });
+                    markersRef.current.push(marker);
+                });
+                return;
+            }
             try {
                 const { AdvancedMarkerElement, PinElement } =
                     (await google.maps.importLibrary('marker')) as google.maps.MarkerLibrary;
