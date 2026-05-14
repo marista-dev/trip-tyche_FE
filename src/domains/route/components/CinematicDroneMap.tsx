@@ -47,8 +47,10 @@ function buildPhotoContent(mediaLink: string, onClick: () => void): HTMLElement 
 
 // 가까운 핀포인트(예: 같은 도시 내)는 줌 hold + 직진. 멀면 기존 wide-view 사이클.
 const HOLD_THRESHOLD_KM = 5;
-// dwell에서 360° 풀 회전 + 다음 bearing 정렬에 사용할 duration — 천천히 cinematic.
-const DWELL_ROTATE_MS = 12000;
+// dwell에서 180° 슬로우 회전 (cinematic showcase 전용, 다음 bearing 정렬은 별도 단계).
+const DWELL_ROTATE_MS = 8000;
+// 출발 직전 hold 모드에서 다음 핀포인트 방향으로 정렬할 때 사용할 duration.
+const ALIGN_BEFORE_DEPART_MS = 2000;
 
 type SegmentMode = 'hold' | 'wide';
 
@@ -251,29 +253,49 @@ const CinematicDroneMap = ({
                 setTimeout(resolve, ms);
             });
 
-        // 360° 풀 회전 + nextBearing이 있으면 끝에서 다음 핀포인트 방향으로 정렬.
-        // sweep = 360 + alignDelta (단일 모션) → 빙 돌고 미세조정 없이 자연스러운 한 동작.
-        const slowRotateAndAlign = (durationMs: number, nextBearing: number | null): Promise<void> => {
+        // Dwell용 슬로우 회전 — sweep만큼 한 방향으로 cinematic 회전 (정렬 X)
+        const slowRotate = (durationMs: number, sweepDegrees: number): Promise<void> => {
             return new Promise((resolve) => {
                 if (!isVectorRef.current) {
                     setTimeout(resolve, durationMs);
                     return;
                 }
                 const startHeading = map.getHeading() ?? 0;
-                let alignDelta = 0;
-                if (nextBearing !== null) {
-                    alignDelta = nextBearing - startHeading;
-                    if (alignDelta > 180) alignDelta -= 360;
-                    if (alignDelta < -180) alignDelta += 360;
-                }
-                const sweep = 360 + alignDelta;
                 const startTime = performance.now();
                 const tick = (now: number) => {
                     if (cancelledRef.current) { resolve(); return; }
                     const t = Math.min((now - startTime) / durationMs, 1);
                     const eased = easeInOutCubic(t);
                     map.moveCamera({
-                        heading: startHeading + sweep * eased,
+                        heading: startHeading + sweepDegrees * eased,
+                        tilt: 45,
+                    });
+                    if (t < 1) rafRef.current = requestAnimationFrame(tick);
+                    else resolve();
+                };
+                rafRef.current = requestAnimationFrame(tick);
+            });
+        };
+
+        // 다음 핀포인트 방향으로 최단 경로 회전 정렬 (출발 직전 hold 모드용)
+        const alignHeadingTo = (durationMs: number, targetHeading: number): Promise<void> => {
+            return new Promise((resolve) => {
+                if (!isVectorRef.current) {
+                    setTimeout(resolve, durationMs);
+                    return;
+                }
+                const startHeading = map.getHeading() ?? 0;
+                let delta = targetHeading - startHeading;
+                if (delta > 180) delta -= 360;
+                if (delta < -180) delta += 360;
+                if (Math.abs(delta) < 0.5) { resolve(); return; }
+                const startTime = performance.now();
+                const tick = (now: number) => {
+                    if (cancelledRef.current) { resolve(); return; }
+                    const t = Math.min((now - startTime) / durationMs, 1);
+                    const eased = easeInOutCubic(t);
+                    map.moveCamera({
+                        heading: startHeading + delta * eased,
                         tilt: 45,
                     });
                     if (t < 1) rafRef.current = requestAnimationFrame(tick);
@@ -505,13 +527,10 @@ const CinematicDroneMap = ({
             await sleep(400);
             if (cancelledRef.current) return;
 
-            // 4. 천천히 360° 풀 회전 + 다음 bearing 정렬
-            const next = pinPoints[arrivedIdx + 1];
-            const nextBearing = next
-                ? calcBearing(pinPoints[arrivedIdx], next)
-                : null;
-            await slowRotateAndAlign(DWELL_ROTATE_MS, nextBearing);
+            // 4. 천천히 180° cinematic 회전 (showcase 전용, 정렬은 출발 직전 단계에서)
+            await slowRotate(DWELL_ROTATE_MS, 180);
             if (cancelledRef.current) return;
+            const next = pinPoints[arrivedIdx + 1];
 
             // 5. 일시정지 상태면 사용자가 재개할 때까지 대기
             await waitWhilePaused();
@@ -533,7 +552,9 @@ const CinematicDroneMap = ({
             await sleep(250);
             if (cancelledRef.current) return;
 
-            // 9. 다음 segment 모드 미리 판정 — hold면 줌아웃 없이 바로 직진
+            // 9. 다음 segment 모드 미리 판정
+            //    - wide: zoomOutAndAlign이 줌아웃 + heading 정렬 동시 수행
+            //    - hold: 줌 유지 + 출발 직전에 명시적 alignment (천천히)
             const nextDistKm = calculateDistance(
                 pinPoints[arrivedIdx].latitude,
                 pinPoints[arrivedIdx].longitude,
@@ -541,10 +562,13 @@ const CinematicDroneMap = ({
                 next!.longitude,
             );
             const nextMode = getSegmentMode(nextDistKm);
+            const nextBearing = calcBearing(pinPoints[arrivedIdx], next!);
             if (nextMode === 'wide') {
                 await zoomOutAndAlign(arrivedIdx, 1800);
-                if (cancelledRef.current) return;
+            } else {
+                await alignHeadingTo(ALIGN_BEFORE_DEPART_MS, nextBearing);
             }
+            if (cancelledRef.current) return;
 
             flyToNext(arrivedIdx);
         };
