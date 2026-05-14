@@ -34,9 +34,16 @@ export const calculateDistance = (
 
 /**
  * 두 PinPoint 사이의 방위각(bearing) — 북쪽 기준 시계방향 0~360°
- * 짧은 거리에 대한 평면 근사 (Google Maps heading과 동일 형식)
+ * Spherical 공식 (위도에 따른 경도 거리 보정 포함). 국제선급 장거리에서도 정확.
+ * Google Maps heading과 동일 형식 (0°=북, 90°=동, 180°=남, 270°=서).
  */
 export const bearing = (start: PinPoint, end: PinPoint): number => {
-    const raw = (Math.atan2(end.longitude - start.longitude, end.latitude - start.latitude) * 180) / Math.PI;
-    return (raw + 360) % 360;
+    const RAD = Math.PI / 180;
+    const phi1 = start.latitude * RAD;
+    const phi2 = end.latitude * RAD;
+    const deltaLambda = (end.longitude - start.longitude) * RAD;
+    const y = Math.sin(deltaLambda) * Math.cos(phi2);
+    const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+    const deg = (Math.atan2(y, x) * 180) / Math.PI;
+    return (deg + 360) % 360;
 };

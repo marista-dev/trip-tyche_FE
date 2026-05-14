@@ -101,7 +101,7 @@ const CinematicDroneMap = ({
     const rafRef = useRef<number | null>(null);
     const drawnPolylineRef = useRef<google.maps.Polyline | null>(null);
     const remainingPolylineRef = useRef<google.maps.Polyline | null>(null);
-    const markersRef = useRef<Array<google.maps.Marker | google.maps.marker.AdvancedMarkerElement>>([]);
+    const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
     const pinContentsRef = useRef<HTMLElement[]>([]); // 핀 원본 보관 (복원용)
     const isVectorRef = useRef(false);
     // 직전 segment 모드 추적 — hold→hold면 도착 settle 짧게, zoomOutAndAlign 스킵
@@ -118,29 +118,13 @@ const CinematicDroneMap = ({
         if (!map || pinPoints.length < 2) return;
         cancelledRef.current = false;
 
-        // Vector 감지: tilesloaded 이후 체크
+        // Vector 모드 확정 후 투어 시작. Vector 미지원이면 onVectorUnavailable로 위임.
         const checkAndStart = async () => {
-            const rt = (map as google.maps.Map).getRenderingType?.();
-            console.log('[CinematicDroneMap] renderingType =', rt);
-            console.log('[CinematicDroneMap] mapId =', GOOGLE_MAPS_MAP_ID || '(unset)');
-            console.log('[CinematicDroneMap] userAgent =', navigator.userAgent);
-            // WebGL2 capability 진단
-            try {
-                const c = document.createElement('canvas');
-                const gl = c.getContext('webgl2');
-                console.log('[CinematicDroneMap] WebGL2 =', !!gl);
-                if (gl) {
-                    console.log('[CinematicDroneMap] EXT_color_buffer_float =', !!gl.getExtension('EXT_color_buffer_float'));
-                    console.log('[CinematicDroneMap] GL_RENDERER =', gl.getParameter(gl.RENDERER));
-                }
-            } catch (e) {
-                console.log('[CinematicDroneMap] WebGL2 check failed', e);
-            }
+            const rt = map.getRenderingType?.();
             isVectorRef.current = rt === google.maps.RenderingType.VECTOR;
             if (!isVectorRef.current) {
-                console.warn('[CinematicDroneMap] Vector 미지원 — tilt/heading 비활성, 카메라 추적만 유지');
-            } else {
-                console.log('[CinematicDroneMap] Vector 활성 — 드론 카메라 동작');
+                callbacksRef.current.onVectorUnavailable();
+                return;
             }
             await buildOverlays();
             startTour();
@@ -201,17 +185,10 @@ const CinematicDroneMap = ({
             });
 
             // PinPoint markers — AdvancedMarkerElement + PinElement
-            // 도착 시 사진 원으로 변신 (handleArrival에서 content 교체)
-            // 단, mapId 없으면 AdvancedMarkerElement가 동작 안 함 → 기본 Marker로 폴백
+            // 도착 시 사진 원으로 변신 (handleArrival에서 content 교체).
+            // mapId 미설정/marker lib 로드 실패 시 onVectorUnavailable로 위임 (deprecated Marker fallback 제거).
             if (!GOOGLE_MAPS_MAP_ID) {
-                console.warn('[CinematicDroneMap] GOOGLE_MAPS_MAP_ID 미설정 — 기본 Marker로 폴백');
-                pinPoints.forEach((p) => {
-                    const marker = new google.maps.Marker({
-                        position: { lat: p.latitude, lng: p.longitude },
-                        map,
-                    });
-                    markersRef.current.push(marker);
-                });
+                callbacksRef.current.onVectorUnavailable();
                 return;
             }
             try {
@@ -225,8 +202,7 @@ const CinematicDroneMap = ({
                         borderColor: '#0055d4',
                         glyphColor: '#ffffff',
                     });
-                    // PinElement 자체가 HTMLElement — `.element` 접근은 deprecated
-                    const pinEl = pin as unknown as HTMLElement;
+                    const pinEl = pin.element;
                     pinContentsRef.current.push(pinEl);
                     const marker = new AdvancedMarkerElement({
                         map,
@@ -235,15 +211,8 @@ const CinematicDroneMap = ({
                     });
                     markersRef.current.push(marker);
                 });
-            } catch (e) {
-                console.warn('[CinematicDroneMap] AdvancedMarkerElement load failed, fallback to default marker', e);
-                pinPoints.forEach((p) => {
-                    const marker = new google.maps.Marker({
-                        position: { lat: p.latitude, lng: p.longitude },
-                        map,
-                    });
-                    markersRef.current.push(marker);
-                });
+            } catch {
+                callbacksRef.current.onVectorUnavailable();
             }
         };
 
@@ -483,19 +452,18 @@ const CinematicDroneMap = ({
 
         const swapToPhoto = (idx: number) => {
             const marker = markersRef.current[idx];
-            if (!marker || !('content' in marker)) return;
-            const pinPoint = pinPoints[idx];
-            const photoEl = buildPhotoContent(pinPoint.mediaLink, () =>
+            if (!marker) return;
+            const photoEl = buildPhotoContent(pinPoints[idx].mediaLink, () =>
                 callbacksRef.current.onPhotoMarkerClick(idx),
             );
-            (marker as google.maps.marker.AdvancedMarkerElement).content = photoEl;
+            marker.content = photoEl;
         };
 
         const swapBackToPin = (idx: number) => {
             const marker = markersRef.current[idx];
             const pinEl = pinContentsRef.current[idx];
-            if (!marker || !('content' in marker) || !pinEl) return;
-            (marker as google.maps.marker.AdvancedMarkerElement).content = pinEl;
+            if (!marker || !pinEl) return;
+            marker.content = pinEl;
         };
 
         const waitWhilePaused = async () => {
@@ -595,7 +563,7 @@ const CinematicDroneMap = ({
         };
 
         // 렌더링 타입 확정 후 시작 — VECTOR/RASTER 둘 다 확정 상태
-        const rt = (map as google.maps.Map).getRenderingType?.();
+        const rt = map.getRenderingType?.();
         const isDetermined = rt === google.maps.RenderingType.VECTOR || rt === google.maps.RenderingType.RASTER;
         const listeners: google.maps.MapsEventListener[] = [];
         if (isDetermined) {
@@ -617,10 +585,7 @@ const CinematicDroneMap = ({
             if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
             drawnPolylineRef.current?.setMap(null);
             remainingPolylineRef.current?.setMap(null);
-            markersRef.current.forEach((m) => {
-                if ('setMap' in m) m.setMap(null);
-                else m.map = null;
-            });
+            markersRef.current.forEach((m) => { m.map = null; });
             markersRef.current = [];
             pinContentsRef.current = [];
         };
