@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { css, keyframes } from '@emotion/react';
-import { ChevronDown, ChevronLeft, ChevronUp, ImageOff } from 'lucide-react';
+import { css } from '@emotion/react';
+import { ChevronLeft, ImageOff } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { useMediaByDate } from '@/domains/media/hooks/queries';
@@ -34,6 +34,8 @@ const ImageByDatePage = () => {
     const mapRef = useRef<MapType | null>(null);
     const loadedImagesCount = useRef<number>(0);
     const imageRefs = useRef<(HTMLDivElement | null)[]>([]);
+    const carouselRef = useRef<HTMLDivElement | null>(null);
+    const thumbRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
     const { isMapScriptLoaded, isMapScriptLoadError } = useMapScript();
     const { data: imagesResult } = useMediaByDate(tripKey || '', date || '');
@@ -53,8 +55,10 @@ const ImageByDatePage = () => {
         }
     }, [imagesResult]);
 
+    // 가로 캐러셀 활성 인덱스 감지
     useEffect(() => {
         if (!images.length || !isAllImageLoad) return;
+        if (!carouselRef.current) return;
 
         const refs = imageRefs.current.filter(Boolean) as HTMLDivElement[];
         if (!refs.length) return;
@@ -69,12 +73,18 @@ const ImageByDatePage = () => {
                     setActiveIdx(idx);
                 }
             },
-            { threshold: 0.6 },
+            { root: carouselRef.current, threshold: 0.6 },
         );
 
         refs.forEach((ref) => observer.observe(ref));
         return () => observer.disconnect();
     }, [images, isAllImageLoad]);
+
+    // 활성 thumb를 자동으로 중앙 정렬
+    useEffect(() => {
+        const el = thumbRefs.current[activeIdx];
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }, [activeIdx]);
 
     useEffect(() => {
         const img = images[activeIdx];
@@ -103,7 +113,7 @@ const ImageByDatePage = () => {
 
     const scrollToIndex = useCallback((idx: number) => {
         const el = imageRefs.current[idx];
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     }, []);
 
     if (isMapScriptLoadError) {
@@ -163,52 +173,43 @@ const ImageByDatePage = () => {
                     <p css={emptyImageListDescription}>{`티켓 속 사진 관리에서\n새로운 사진을 등록해주세요`}</p>
                 </div>
             ) : (
-                <main css={imageListStyle}>
-                    {images.map((image, index) => {
-                        const prev = index > 0 ? images[index - 1] : null;
-                        const next = index < images.length - 1 ? images[index + 1] : null;
-                        return (
+                <>
+                    {images.length > 1 && (
+                        <div css={progressStrip} aria-hidden>
+                            {images.map((_, i) => (
+                                <span key={i} css={progressSegment(i, activeIdx)} />
+                            ))}
+                        </div>
+                    )}
+
+                    <main css={photoCarousel} ref={carouselRef}>
+                        {images.map((image, index) => (
                             <div
                                 key={image.mediaFileId}
                                 ref={(el) => (imageRefs.current[index] = el)}
                                 data-index={index}
                                 css={photoSlotStyle}
                             >
-                                {prev && (
-                                    <button
-                                        type='button'
-                                        css={[peekStack, topPeek]}
-                                        onClick={() => scrollToIndex(index - 1)}
-                                        aria-label='이전 사진'
-                                    >
-                                        <img src={prev.mediaLink} alt='' css={peekThumb} />
-                                        <ChevronDown size={12} strokeWidth={2.4} color='rgba(255,255,255,0.85)' />
-                                    </button>
-                                )}
                                 <ImageItem image={image} onImageLoad={handleImageLoad} />
-                                {next && (
-                                    <button
-                                        type='button'
-                                        css={[peekStack, bottomPeek]}
-                                        onClick={() => scrollToIndex(index + 1)}
-                                        aria-label='다음 사진'
-                                    >
-                                        <ChevronUp size={12} strokeWidth={2.4} color='rgba(255,255,255,0.85)' />
-                                        <img src={next.mediaLink} alt='' css={peekThumb} />
-                                    </button>
-                                )}
                             </div>
-                        );
-                    })}
-                </main>
-            )}
+                        ))}
+                    </main>
 
-            {images.length >= 5 && (
-                <div css={progressColumn} aria-hidden>
-                    {images.map((_, i) => (
-                        <span key={i} css={progressDot(i === activeIdx)} />
-                    ))}
-                </div>
+                    <div css={thumbStrip}>
+                        {images.map((img, i) => (
+                            <button
+                                key={img.mediaFileId}
+                                type='button'
+                                ref={(el) => (thumbRefs.current[i] = el)}
+                                css={thumbButton(i === activeIdx)}
+                                onClick={() => scrollToIndex(i)}
+                                aria-label={`사진 ${i + 1}`}
+                            >
+                                <img src={img.mediaLink} alt='' css={thumbImage} />
+                            </button>
+                        ))}
+                    </div>
+                </>
             )}
         </div>
     );
@@ -221,6 +222,7 @@ const container = css`
     background: #fafafa;
     position: relative;
     user-select: none;
+    overflow: hidden;
 `;
 
 const backButtonStyle = css`
@@ -323,12 +325,36 @@ const infoCardPlace = css`
     max-width: 180px;
 `;
 
-const imageListStyle = css`
+const progressStrip = css`
+    display: flex;
+    gap: 4px;
+    padding: 10px 14px 8px;
+    background: #fff;
+    flex-shrink: 0;
+`;
+
+const progressSegment = (idx: number, active: number) => css`
     flex: 1;
-    overflow-y: auto;
-    scroll-snap-type: y mandatory;
+    height: 3px;
+    border-radius: 2px;
+    background: ${idx === active
+        ? '#0ea5e9'
+        : idx < active
+        ? 'rgba(10, 10, 10, 0.42)'
+        : 'rgba(10, 10, 10, 0.1)'};
+    transition: background 240ms ease;
+`;
+
+const photoCarousel = css`
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
     scroll-behavior: smooth;
     overscroll-behavior: contain;
+    background: #0a0a0a;
     scrollbar-width: none;
     -ms-overflow-style: none;
     &::-webkit-scrollbar {
@@ -337,96 +363,57 @@ const imageListStyle = css`
 `;
 
 const photoSlotStyle = css`
-    position: relative;
+    flex: 0 0 100%;
+    width: 100%;
+    height: 100%;
     scroll-snap-align: center;
     scroll-snap-stop: always;
-    min-height: calc(100dvh - 200px - 56px - 14px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 12px 14px;
-    box-sizing: border-box;
+    position: relative;
     background: #0a0a0a;
 `;
 
-const bobDown = keyframes`
-    0%, 100% { transform: translate(-50%, 0); }
-    50%      { transform: translate(-50%, 3px); }
-`;
-
-const bobUp = keyframes`
-    0%, 100% { transform: translate(-50%, 0); }
-    50%      { transform: translate(-50%, -3px); }
-`;
-
-const peekStack = css`
-    position: absolute;
-    left: 50%;
+const thumbStrip = css`
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    padding: 6px 8px;
-    background: rgba(0, 0, 0, 0.42);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    gap: 6px;
+    padding: 10px 14px;
+    background: #0a0a0a;
+    overflow-x: auto;
+    overscroll-behavior: contain;
+    flex-shrink: 0;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    &::-webkit-scrollbar {
+        display: none;
+    }
+`;
+
+const thumbButton = (isActive: boolean) => css`
+    flex: 0 0 auto;
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+    overflow: hidden;
+    padding: 0;
+    background: transparent;
     cursor: pointer;
-    z-index: 4;
-    transform: translateX(-50%);
-    transition: background 180ms ease;
+    border: 2px solid ${isActive ? '#0ea5e9' : 'transparent'};
+    opacity: ${isActive ? 1 : 0.55};
+    transition: opacity 220ms ease, border 200ms ease, transform 200ms cubic-bezier(0.32, 0.72, 0, 1);
 
-    &:hover {
-        background: rgba(0, 0, 0, 0.55);
-    }
     &:active {
-        background: rgba(0, 0, 0, 0.65);
+        transform: scale(0.94);
     }
 `;
 
-const topPeek = css`
-    top: 16px;
-    animation: ${bobDown} 2.2s ease-in-out infinite;
-`;
-
-const bottomPeek = css`
-    bottom: 16px;
-    animation: ${bobUp} 2.2s ease-in-out infinite;
-`;
-
-const peekThumb = css`
-    width: 28px;
-    height: 28px;
+const thumbImage = css`
+    width: 100%;
+    height: 100%;
     object-fit: cover;
-    border-radius: 6px;
     display: block;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
-`;
-
-const progressColumn = css`
-    position: fixed;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    z-index: 20;
-    pointer-events: none;
-`;
-
-const progressDot = (active: boolean) => css`
-    width: ${active ? '3px' : '2px'};
-    height: ${active ? '14px' : '4px'};
-    border-radius: 2px;
-    background: ${active ? '#0ea5e9' : 'rgba(255, 255, 255, 0.5)'};
-    transition: width 220ms cubic-bezier(0.32, 0.72, 0, 1), height 220ms cubic-bezier(0.32, 0.72, 0, 1),
-        background 200ms ease;
 `;
 
 const emptyImageList = css`
-    height: 60%;
+    flex: 1;
     display: flex;
     flex-direction: column;
     justify-content: center;
