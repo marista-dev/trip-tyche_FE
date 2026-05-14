@@ -1,30 +1,39 @@
 import { css } from '@emotion/react';
 import { ChevronLeft } from 'lucide-react';
 
-import { COLORS } from '@/shared/constants/style';
-
+// Apple Glass — 반투명 다크 글래스 + 블러 + 미세 내부광 + 압축 피드백
 const BackButton = ({ onClick }: { onClick: () => void }) => {
     return (
-        <button css={buttonStyle} onClick={onClick}>
-            <ChevronLeft color={COLORS.TEXT.BLACK} size={24} strokeWidth={1.5} />
+        <button css={buttonStyle} onClick={onClick} aria-label='뒤로가기'>
+            <ChevronLeft color='#fff' size={20} strokeWidth={2.4} />
         </button>
     );
 };
 
 const buttonStyle = css`
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 30;
     width: 40px;
     height: 40px;
-    position: absolute;
-    z-index: 1;
-    top: 8px;
-    left: 8px;
-    border: 1px solid ${COLORS.BORDER};
-    border: none;
-    box-shadow:
-        rgba(50, 50, 93, 0.25) 13px 13px 30px -10px,
-        rgba(0, 0, 0, 0.8) 5px 8px 16px -10px;
-    border-radius: 4px;
+    border-radius: 50%;
+    background: rgba(10, 10, 12, 0.55);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    display: grid;
+    place-items: center;
     cursor: pointer;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.18) inset,
+        0 10px 24px -12px rgba(0, 0, 0, 0.55);
+    transition: transform 360ms cubic-bezier(0.32, 0.72, 0, 1), background 240ms ease;
+
+    &:active {
+        transform: scale(0.94);
+        background: rgba(10, 10, 12, 0.7);
+    }
 `;
 
 export default BackButton;
