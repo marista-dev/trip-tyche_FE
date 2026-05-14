@@ -71,12 +71,11 @@ function getSegmentZoom(distKm: number): number {
     return 14;
 }
 
-// 거리별 비행 중 줌 폭 — 단거리는 zoom 19까지 땡겨서 Vector 3D 건물 가시화.
-// (Math.min(z, 19) 캡으로 최종 줌이 19에서 정착)
+// 거리별 비행 중 줌 폭 — 단거리는 zoom 17 (Vector 3D 건물 시작 + 주변 경관 가시).
 function getZoomDelta(distKm: number): number {
     if (distKm >= 200) return 4;
     if (distKm >= 50) return 3;
-    return 5;
+    return 3;
 }
 
 function lerp(a: number, b: number, t: number): number {
@@ -493,8 +492,8 @@ const CinematicDroneMap = ({
             if (fromFlight) {
                 await sleep(lastModeRef.current === 'hold' ? 200 : 500);
             } else {
-                // 초기 진입 — intro zoom 13에서 19까지 (Vector 3D 건물 가시)
-                await zoomIn(1800, 6, 0);
+                // 초기 진입 — intro zoom 13 → 17 (3D 건물 시작 + 주변 경관 가시)
+                await zoomIn(1800, 4, 0);
             }
             if (cancelledRef.current) return;
 
