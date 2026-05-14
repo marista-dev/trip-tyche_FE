@@ -1,4 +1,4 @@
-import { RefObject, useState } from 'react';
+import { MutableRefObject, useState } from 'react';
 
 import { css } from '@emotion/react';
 
@@ -12,7 +12,7 @@ import { Location, MapType } from '@/shared/types/map';
 interface MultiMarkerMapProps {
     positions: Location[];
     activeIndex: number;
-    mapRef: RefObject<MapType | null>;
+    mapRef: MutableRefObject<MapType | null>;
     mapHeight?: string;
 }
 
