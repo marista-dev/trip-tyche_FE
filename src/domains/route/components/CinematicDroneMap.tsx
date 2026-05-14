@@ -466,10 +466,61 @@ const CinematicDroneMap = ({
             marker.content = pinEl;
         };
 
+        // 일시정지 진입 직전 카메라 snapshot → 재개 시 그 상태로 부드럽게 복원
+        type CameraSnap = { center: { lat: number; lng: number }; zoom: number; heading: number; tilt: number };
+
+        const captureCamera = (): CameraSnap | null => {
+            const c = map.getCenter();
+            if (!c) return null;
+            return {
+                center: { lat: c.lat(), lng: c.lng() },
+                zoom: map.getZoom() ?? 16,
+                heading: map.getHeading() ?? 0,
+                tilt: map.getTilt() ?? 45,
+            };
+        };
+
+        const restoreCamera = (snap: CameraSnap, durationMs: number): Promise<void> => {
+            return new Promise((resolve) => {
+                if (!isVectorRef.current) { resolve(); return; }
+                const startCenter = map.getCenter();
+                if (!startCenter) { resolve(); return; }
+                const startLat = startCenter.lat();
+                const startLng = startCenter.lng();
+                const startZoom = map.getZoom() ?? snap.zoom;
+                const startHeading = map.getHeading() ?? snap.heading;
+                const startTilt = map.getTilt() ?? snap.tilt;
+                let dh = snap.heading - startHeading;
+                if (dh > 180) dh -= 360;
+                if (dh < -180) dh += 360;
+                const startTime = performance.now();
+                const tick = (now: number) => {
+                    if (cancelledRef.current) { resolve(); return; }
+                    const t = Math.min((now - startTime) / durationMs, 1);
+                    const eased = easeInOutCubic(t);
+                    map.moveCamera({
+                        center: { lat: lerp(startLat, snap.center.lat, eased), lng: lerp(startLng, snap.center.lng, eased) },
+                        zoom: lerp(startZoom, snap.zoom, eased),
+                        heading: startHeading + dh * eased,
+                        tilt: lerp(startTilt, snap.tilt, eased),
+                    });
+                    if (t < 1) rafRef.current = requestAnimationFrame(tick);
+                    else resolve();
+                };
+                rafRef.current = requestAnimationFrame(tick);
+            });
+        };
+
         const waitWhilePaused = async () => {
+            if (!pausedRef.current) return;
+            // 사용자가 자유 탐색하기 직전 dwell state를 snapshot
+            const snap = captureCamera();
             while (pausedRef.current && !cancelledRef.current) {
                 await sleep(120);
             }
+            if (cancelledRef.current || !snap) return;
+            // 재개 시: 사용자가 움직인 카메라를 다시 dwell 상태로 부드럽게 복원
+            await restoreCamera(snap, 1200);
         };
 
         const handleArrival = async (arrivedIdx: number, fromFlight = false) => {

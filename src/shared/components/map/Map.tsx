@@ -36,6 +36,8 @@ const Map = ({ zoom, center, children, isInteractive = true, onLoad, onZoomChang
                     ...mapIdOption,
                     draggable: isInteractive,
                     scrollwheel: isInteractive,
+                    // greedy: 한 손가락 팬/핀치 줌 모두 허용. none: 모든 제스처 차단.
+                    gestureHandling: isInteractive ? 'greedy' : 'none',
                     tiltInteractionEnabled: !!GOOGLE_MAPS_MAP_ID,
                     headingInteractionEnabled: !!GOOGLE_MAPS_MAP_ID,
                 }}

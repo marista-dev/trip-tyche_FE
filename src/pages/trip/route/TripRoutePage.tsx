@@ -151,7 +151,7 @@ const TripRoutePage = () => {
             <Map
                 zoom={mapStatus.zoom}
                 center={mapStatus.center}
-                isInteractive={false}
+                isInteractive={isPaused}
                 onLoad={handleMapRender}
             >
                 <CinematicDroneMap
