@@ -45,6 +45,17 @@ function buildPhotoContent(mediaLink: string, onClick: () => void): HTMLElement 
     return wrapper;
 }
 
+// 가까운 핀포인트(예: 같은 도시 내)는 줌 hold + 직진. 멀면 기존 wide-view 사이클.
+const HOLD_THRESHOLD_KM = 5;
+// dwell에서 360° 풀 회전 + 다음 bearing 정렬에 사용할 duration
+const DWELL_ROTATE_MS = 8000;
+
+type SegmentMode = 'hold' | 'wide';
+
+function getSegmentMode(distKm: number): SegmentMode {
+    return distKm < HOLD_THRESHOLD_KM ? 'hold' : 'wide';
+}
+
 function getSegmentDuration(distKm: number): number {
     if (distKm >= 200) return 10000;
     if (distKm >= 50) return 8000;
@@ -58,6 +69,13 @@ function getSegmentZoom(distKm: number): number {
     if (distKm >= 200) return 8;
     if (distKm >= 50) return 11;
     return 14;
+}
+
+// 거리별 비행 중 줌 폭 — base가 작을수록(=멀수록) 강한 줌인으로 보정
+function getZoomDelta(distKm: number): number {
+    if (distKm >= 200) return 4;
+    if (distKm >= 50) return 3;
+    return 2;
 }
 
 function lerp(a: number, b: number, t: number): number {
@@ -84,6 +102,8 @@ const CinematicDroneMap = ({
     const markersRef = useRef<Array<google.maps.Marker | google.maps.marker.AdvancedMarkerElement>>([]);
     const pinContentsRef = useRef<HTMLElement[]>([]); // 핀 원본 보관 (복원용)
     const isVectorRef = useRef(false);
+    // 직전 segment 모드 추적 — hold→hold면 도착 settle 짧게, zoomOutAndAlign 스킵
+    const lastModeRef = useRef<SegmentMode>('wide');
     const pausedRef = useRef(isPaused);
     const callbacksRef = useRef({ onFlightStart, onDwellStart, onDwellEnd, onPhotoMarkerClick, onComplete, onVectorUnavailable });
 
@@ -231,20 +251,29 @@ const CinematicDroneMap = ({
                 setTimeout(resolve, ms);
             });
 
-        const slowRotate = (durationMs: number, sweepDegrees: number): Promise<void> => {
+        // 360° 풀 회전 + nextBearing이 있으면 끝에서 다음 핀포인트 방향으로 정렬.
+        // sweep = 360 + alignDelta (단일 모션) → 빙 돌고 미세조정 없이 자연스러운 한 동작.
+        const slowRotateAndAlign = (durationMs: number, nextBearing: number | null): Promise<void> => {
             return new Promise((resolve) => {
                 if (!isVectorRef.current) {
                     setTimeout(resolve, durationMs);
                     return;
                 }
                 const startHeading = map.getHeading() ?? 0;
+                let alignDelta = 0;
+                if (nextBearing !== null) {
+                    alignDelta = nextBearing - startHeading;
+                    if (alignDelta > 180) alignDelta -= 360;
+                    if (alignDelta < -180) alignDelta += 360;
+                }
+                const sweep = 360 + alignDelta;
                 const startTime = performance.now();
                 const tick = (now: number) => {
                     if (cancelledRef.current) { resolve(); return; }
                     const t = Math.min((now - startTime) / durationMs, 1);
                     const eased = easeInOutCubic(t);
                     map.moveCamera({
-                        heading: startHeading + sweepDegrees * eased,
+                        heading: startHeading + sweep * eased,
                         tilt: 45,
                     });
                     if (t < 1) rafRef.current = requestAnimationFrame(tick);
@@ -332,12 +361,64 @@ const CinematicDroneMap = ({
             const start = pinPoints[segIdx];
             const end = pinPoints[segIdx + 1];
             const distKm = calculateDistance(start.latitude, start.longitude, end.latitude, end.longitude);
-            const duration = getSegmentDuration(distKm);
-            const zoom = getSegmentZoom(distKm);
-            const targetHeading = calcBearing(start, end);
+            const mode = getSegmentMode(distKm);
+            lastModeRef.current = mode;
 
             // 카운터를 즉시 다음 PinPoint로 업데이트
             callbacksRef.current.onFlightStart(segIdx + 1);
+
+            // 점선 트레일 업데이트 (mode 공통)
+            const updateTrail = (curLat: number, curLng: number) => {
+                const drawnPath = [
+                    ...pinPoints.slice(0, segIdx + 1).map((p) => ({ lat: p.latitude, lng: p.longitude })),
+                    { lat: curLat, lng: curLng },
+                ];
+                drawnPolylineRef.current?.setPath(drawnPath);
+                remainingPolylineRef.current?.setPath(
+                    pinPoints.slice(segIdx + 1).map((p) => ({ lat: p.latitude, lng: p.longitude })),
+                );
+            };
+
+            // === HOLD 모드 — 줌/heading 유지, center만 lerp (직진) ===
+            if (mode === 'hold') {
+                // heading은 직전 slowRotateAndAlign이 nextBearing으로 이미 정렬해둠
+                const heldZoom = map.getZoom() ?? 16;
+                const heldHeading = map.getHeading() ?? 0;
+                const duration = Math.max(distKm * 800, 1500);
+
+                let startTime: number | null = null;
+                const animate = (now: number) => {
+                    if (cancelledRef.current) return;
+                    if (!startTime) startTime = now;
+                    const rawT = Math.min((now - startTime) / duration, 1);
+                    const t = easeInOutCubic(rawT);
+                    const curLat = lerp(start.latitude, end.latitude, t);
+                    const curLng = lerp(start.longitude, end.longitude, t);
+
+                    if (isVectorRef.current) {
+                        map.moveCamera({
+                            center: { lat: curLat, lng: curLng },
+                            tilt: 45,
+                            heading: heldHeading,
+                            zoom: heldZoom,
+                        });
+                    } else {
+                        map.panTo({ lat: curLat, lng: curLng });
+                    }
+                    updateTrail(curLat, curLng);
+
+                    if (rawT < 1) rafRef.current = requestAnimationFrame(animate);
+                    else handleArrival(segIdx + 1, true);
+                };
+                rafRef.current = requestAnimationFrame(animate);
+                return;
+            }
+
+            // === WIDE 모드 — 기존 로직, 단 zoomCurve rawT^3, zoomDelta 차등화 ===
+            const duration = getSegmentDuration(distKm);
+            const zoom = getSegmentZoom(distKm);
+            const delta = getZoomDelta(distKm);
+            const targetHeading = calcBearing(start, end);
 
             let startTime: number | null = null;
 
@@ -351,10 +432,9 @@ const CinematicDroneMap = ({
                 const curLat = lerp(start.latitude, end.latitude, t);
                 const curLng = lerp(start.longitude, end.longitude, t);
 
-                // 비행 내내 점진적으로 줌 +3 — 대부분 wide view 유지, 마지막 25%에서 급격히 close-up
-                // rawT^5 곡선: rawT=0.5→+0.09, rawT=0.7→+0.5, rawT=0.85→+1.3, rawT=0.95→+2.3, rawT=1.0→+3
-                const zoomCurve = Math.pow(rawT, 5);
-                const curZoom = lerp(zoom, Math.min(zoom + 3, 19), zoomCurve);
+                // rawT^3 곡선: rawT^5보다 일찍(약 70%부터) 줌인 시작 → 도착감 명확
+                const zoomCurve = Math.pow(rawT, 3);
+                const curZoom = lerp(zoom, Math.min(zoom + delta, 19), zoomCurve);
 
                 if (isVectorRef.current) {
                     map.moveCamera({
@@ -367,16 +447,7 @@ const CinematicDroneMap = ({
                     map.panTo({ lat: curLat, lng: curLng });
                     if (Math.abs((map.getZoom() ?? 0) - curZoom) > 0.05) map.setZoom(curZoom);
                 }
-
-                // 점선 트레일 업데이트
-                const drawnPath = [
-                    ...pinPoints.slice(0, segIdx + 1).map((p) => ({ lat: p.latitude, lng: p.longitude })),
-                    { lat: curLat, lng: curLng },
-                ];
-                drawnPolylineRef.current?.setPath(drawnPath);
-                remainingPolylineRef.current?.setPath(
-                    pinPoints.slice(segIdx + 1).map((p) => ({ lat: p.latitude, lng: p.longitude })),
-                );
+                updateTrail(curLat, curLng);
 
                 if (rawT < 1) {
                     rafRef.current = requestAnimationFrame(animate);
@@ -414,15 +485,18 @@ const CinematicDroneMap = ({
         const handleArrival = async (arrivedIdx: number, fromFlight = false) => {
             if (cancelledRef.current) return;
 
-            // 1. 줌인 — 비행으로 도착하면 이미 +3 줌 상태(짧은 settle만), 초기 진입이면 zoomIn 실행
+            // 1. settle / 줌인
+            //    - 초기 진입(fromFlight=false): 첫 핀포인트 zoomIn(+3)
+            //    - 비행 도착(fromFlight=true): 이미 도착 줌 상태이므로 settle만
+            //      hold 모드로 도착했으면 더 짧게(200ms), wide면 줌인 완료감을 위해 500ms
             if (fromFlight) {
-                await sleep(300);
+                await sleep(lastModeRef.current === 'hold' ? 200 : 500);
             } else {
                 await zoomIn(1800, 3, 0);
             }
             if (cancelledRef.current) return;
 
-            // 2. 줌이 땡겨졌으니 하단 바 노출
+            // 2. 하단 바 노출
             callbacksRef.current.onDwellStart(arrivedIdx);
 
             // 3. 핀 → 사진 원
@@ -430,8 +504,12 @@ const CinematicDroneMap = ({
             await sleep(400);
             if (cancelledRef.current) return;
 
-            // 4. 천천히 120° 회전 (4.5초)
-            await slowRotate(4500, 120);
+            // 4. 천천히 360° 풀 회전 + 다음 bearing 정렬
+            const next = pinPoints[arrivedIdx + 1];
+            const nextBearing = next
+                ? calcBearing(pinPoints[arrivedIdx], next)
+                : null;
+            await slowRotateAndAlign(DWELL_ROTATE_MS, nextBearing);
             if (cancelledRef.current) return;
 
             // 5. 일시정지 상태면 사용자가 재개할 때까지 대기
@@ -453,8 +531,19 @@ const CinematicDroneMap = ({
             swapBackToPin(arrivedIdx);
             await sleep(250);
             if (cancelledRef.current) return;
-            await zoomOutAndAlign(arrivedIdx, 1800);
-            if (cancelledRef.current) return;
+
+            // 9. 다음 segment 모드 미리 판정 — hold면 줌아웃 없이 바로 직진
+            const nextDistKm = calculateDistance(
+                pinPoints[arrivedIdx].latitude,
+                pinPoints[arrivedIdx].longitude,
+                next!.latitude,
+                next!.longitude,
+            );
+            const nextMode = getSegmentMode(nextDistKm);
+            if (nextMode === 'wide') {
+                await zoomOutAndAlign(arrivedIdx, 1800);
+                if (cancelledRef.current) return;
+            }
 
             flyToNext(arrivedIdx);
         };
