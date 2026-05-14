@@ -64,3 +64,38 @@ const convertLocationToAddress = async (latitude: number, longitude: number): Pr
         return '위치 정보 없음';
     }
 };
+
+// 0.5km 단위 분간이 가능한 동네/소구역 수준 역지오코딩
+export const getNeighborhoodFromLocation = async (location: Location): Promise<string> => {
+    const { latitude, longitude } = location;
+    const cacheKey = `nbhd-${latitude}-${longitude}`;
+
+    if (latitude === 0 && longitude === 0) return '';
+    if (addressCache.has(cacheKey)) return addressCache.get(cacheKey)!;
+
+    try {
+        const geocoder = new google.maps.Geocoder();
+        const results = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
+            geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (r, s) => {
+                s === 'OK' && r ? resolve(r) : reject(new Error(`Geocoding failed: ${s}`));
+            });
+        });
+
+        // 우선순위: 소구역2 > 소구역1 > 동네 > 도로명
+        for (const type of ['sublocality_level_2', 'sublocality_level_1', 'neighborhood', 'route']) {
+            for (const result of results) {
+                const comp = result.address_components.find((c) => c.types.includes(type));
+                if (comp) {
+                    addressCache.set(cacheKey, comp.long_name);
+                    return comp.long_name;
+                }
+            }
+        }
+
+        const fallback = results[0]?.formatted_address ?? '주소 특정 불가 지역';
+        addressCache.set(cacheKey, fallback);
+        return fallback;
+    } catch {
+        return '위치 정보 없음';
+    }
+};
