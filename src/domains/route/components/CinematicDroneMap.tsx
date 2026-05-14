@@ -47,8 +47,8 @@ function buildPhotoContent(mediaLink: string, onClick: () => void): HTMLElement 
 
 // 가까운 핀포인트(예: 같은 도시 내)는 줌 hold + 직진. 멀면 기존 wide-view 사이클.
 const HOLD_THRESHOLD_KM = 5;
-// dwell에서 360° 풀 회전 + 다음 bearing 정렬에 사용할 duration
-const DWELL_ROTATE_MS = 8000;
+// dwell에서 360° 풀 회전 + 다음 bearing 정렬에 사용할 duration — 천천히 cinematic.
+const DWELL_ROTATE_MS = 12000;
 
 type SegmentMode = 'hold' | 'wide';
 
@@ -71,11 +71,12 @@ function getSegmentZoom(distKm: number): number {
     return 14;
 }
 
-// 거리별 비행 중 줌 폭 — base가 작을수록(=멀수록) 강한 줌인으로 보정
+// 거리별 비행 중 줌 폭 — 단거리는 zoom 19까지 땡겨서 Vector 3D 건물 가시화.
+// (Math.min(z, 19) 캡으로 최종 줌이 19에서 정착)
 function getZoomDelta(distKm: number): number {
     if (distKm >= 200) return 4;
     if (distKm >= 50) return 3;
-    return 2;
+    return 5;
 }
 
 function lerp(a: number, b: number, t: number): number {
@@ -492,7 +493,8 @@ const CinematicDroneMap = ({
             if (fromFlight) {
                 await sleep(lastModeRef.current === 'hold' ? 200 : 500);
             } else {
-                await zoomIn(1800, 3, 0);
+                // 초기 진입 — intro zoom 13에서 19까지 (Vector 3D 건물 가시)
+                await zoomIn(1800, 6, 0);
             }
             if (cancelledRef.current) return;
 
