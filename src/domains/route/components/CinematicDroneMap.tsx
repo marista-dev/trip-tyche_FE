@@ -104,7 +104,7 @@ const CinematicDroneMap = ({
     const drawnPolylineRef = useRef<google.maps.Polyline | null>(null);
     const remainingPolylineRef = useRef<google.maps.Polyline | null>(null);
     const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
-    const pinContentsRef = useRef<HTMLElement[]>([]); // 핀 원본 보관 (복원용)
+    const pinContentsRef = useRef<google.maps.marker.PinElement[]>([]); // 핀 원본 보관 (복원용)
     const isVectorRef = useRef(false);
     // 직전 segment 모드 추적 — hold→hold면 도착 settle 짧게, zoomOutAndAlign 스킵
     const lastModeRef = useRef<SegmentMode>('wide');
@@ -204,12 +204,11 @@ const CinematicDroneMap = ({
                         borderColor: '#0055d4',
                         glyphColor: '#ffffff',
                     });
-                    const pinEl = pin.element;
-                    pinContentsRef.current.push(pinEl);
+                    pinContentsRef.current.push(pin);
                     const marker = new AdvancedMarkerElement({
                         map,
                         position: { lat: p.latitude, lng: p.longitude },
-                        content: pinEl,
+                        content: pin,
                     });
                     markersRef.current.push(marker);
                 });
@@ -463,9 +462,9 @@ const CinematicDroneMap = ({
 
         const swapBackToPin = (idx: number) => {
             const marker = markersRef.current[idx];
-            const pinEl = pinContentsRef.current[idx];
-            if (!marker || !pinEl) return;
-            marker.content = pinEl;
+            const pin = pinContentsRef.current[idx];
+            if (!marker || !pin) return;
+            marker.content = pin;
         };
 
         // 일시정지 진입 직전 카메라 snapshot → 재개 시 그 상태로 부드럽게 복원
