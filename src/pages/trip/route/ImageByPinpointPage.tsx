@@ -384,8 +384,8 @@ const thumbStrip = css`
     position: absolute;
     left: 0;
     right: 0;
-    bottom: calc(28px + env(safe-area-inset-bottom, 0px));
-    padding: 0 16px;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    padding: 8px 20px;
     display: flex;
     gap: 6px;
     overflow-x: auto;

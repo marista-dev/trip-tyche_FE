@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const DOUBLE_TAP_THRESHOLD_MS = 320;
 const ZOOM_OUT = 1;
@@ -13,25 +13,35 @@ interface UseDoubleTapZoomReturn {
 export const useDoubleTapZoom = (onZoomChange?: (zoom: number) => void): UseDoubleTapZoomReturn => {
     const [zoom, setZoom] = useState<number>(ZOOM_OUT);
     const lastTapRef = useRef<number>(0);
+    const callbackRef = useRef(onZoomChange);
+
+    useEffect(() => {
+        callbackRef.current = onZoomChange;
+    }, [onZoomChange]);
 
     const handleTap = useCallback(() => {
         const now = Date.now();
         if (now - lastTapRef.current < DOUBLE_TAP_THRESHOLD_MS) {
-            const nextZoom = zoom === ZOOM_OUT ? ZOOM_IN : ZOOM_OUT;
-            setZoom(nextZoom);
-            onZoomChange?.(nextZoom);
+            setZoom((prev) => {
+                const next = prev === ZOOM_OUT ? ZOOM_IN : ZOOM_OUT;
+                callbackRef.current?.(next);
+                return next;
+            });
             lastTapRef.current = 0;
             return;
         }
         lastTapRef.current = now;
-    }, [zoom, onZoomChange]);
+    }, []);
 
     const resetZoom = useCallback(() => {
-        if (zoom !== ZOOM_OUT) {
-            setZoom(ZOOM_OUT);
-            onZoomChange?.(ZOOM_OUT);
-        }
-    }, [zoom, onZoomChange]);
+        setZoom((prev) => {
+            if (prev !== ZOOM_OUT) {
+                callbackRef.current?.(ZOOM_OUT);
+                return ZOOM_OUT;
+            }
+            return prev;
+        });
+    }, []);
 
     return { zoom, handleTap, resetZoom };
 };
