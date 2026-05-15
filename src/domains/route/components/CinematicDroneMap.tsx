@@ -51,6 +51,8 @@ const HOLD_THRESHOLD_KM = 5;
 const DWELL_ROTATE_MS = 8000;
 // 출발 직전 hold 모드에서 다음 핀포인트 방향으로 정렬할 때 사용할 duration.
 const ALIGN_BEFORE_DEPART_MS = 2000;
+// 도착 시 도달할 3D 건물 가시 zoom (Vector 3D 활성 시작점). 비행이 더 낮은 줌으로 끝나면 추가 zoomIn으로 보정.
+const ARRIVAL_3D_ZOOM = 17;
 
 type SegmentMode = 'hold' | 'wide';
 
@@ -115,7 +117,7 @@ const CinematicDroneMap = ({
     }, [onFlightStart, onDwellStart, onDwellEnd, onPhotoMarkerClick, onComplete, onVectorUnavailable]);
 
     useEffect(() => {
-        if (!map || pinPoints.length < 2) return;
+        if (!map || pinPoints.length < 1) return;
         cancelledRef.current = false;
 
         // Vector 모드 확정 후 투어 시작. Vector 미지원이면 onVectorUnavailable로 위임.
@@ -527,13 +529,22 @@ const CinematicDroneMap = ({
             if (cancelledRef.current) return;
 
             // 1. settle / 줌인
-            //    - 초기 진입(fromFlight=false): 첫 핀포인트 zoomIn(+3)
-            //    - 비행 도착(fromFlight=true): 이미 도착 줌 상태이므로 settle만
-            //      hold 모드로 도착했으면 더 짧게(200ms), wide면 줌인 완료감을 위해 500ms
+            //    - 초기 진입(fromFlight=false): 첫 핀포인트 zoomIn 17까지
+            //    - 비행 도착(fromFlight=true):
+            //      · hold→hold: 이미 zoom 유지 중, 짧게 settle
+            //      · wide 도착: 비행은 낮은 zoom(8~14)에서 끝남 → 3D 가시 zoom(17)까지 추가 zoomIn
             if (fromFlight) {
-                await sleep(lastModeRef.current === 'hold' ? 200 : 500);
+                if (lastModeRef.current === 'hold') {
+                    await sleep(200);
+                } else {
+                    const currentZoom = map.getZoom() ?? 16;
+                    if (currentZoom < ARRIVAL_3D_ZOOM) {
+                        await zoomIn(1800, ARRIVAL_3D_ZOOM - currentZoom, 0);
+                    } else {
+                        await sleep(500);
+                    }
+                }
             } else {
-                // 초기 진입 — intro zoom 13 → 17 (3D 건물 시작 + 주변 경관 가시)
                 await zoomIn(1800, 4, 0);
             }
             if (cancelledRef.current) return;
