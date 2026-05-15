@@ -15,6 +15,7 @@ interface GestureBindings {
     onPointerMove: (e: ReactPointerEvent<HTMLElement>) => void;
     onPointerUp: (e: ReactPointerEvent<HTMLElement>) => void;
     onPointerCancel: (e: ReactPointerEvent<HTMLElement>) => void;
+    reset: () => void;
 }
 
 export const useGestureRouter = ({
@@ -146,5 +147,14 @@ export const useGestureRouter = ({
         [clearLongPress, clearSingleTap],
     );
 
-    return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel };
+    const reset = useCallback(() => {
+        downAtRef.current = null;
+        longPressFiredRef.current = false;
+        movedTooFarRef.current = false;
+        clearLongPress();
+        clearSingleTap();
+        lastTapAtRef.current = 0;
+    }, [clearLongPress, clearSingleTap]);
+
+    return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, reset };
 };

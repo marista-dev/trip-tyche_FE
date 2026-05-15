@@ -7,7 +7,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMediaByPinPoint } from '@/domains/media/hooks/queries';
 import { useAutoAdvance } from '@/domains/media/hooks/useAutoAdvance';
 import { useGestureRouter } from '@/domains/media/hooks/useGestureRouter';
-import { getNeighborhoodFromLocation } from '@/libs/utils/map';
+import { getPreciseLocationFromCoordinate } from '@/libs/utils/map';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import { ROUTES } from '@/shared/constants/route';
 import { useMapScript } from '@/shared/hooks/useMapScript';
@@ -15,8 +15,13 @@ import { useMapScript } from '@/shared/hooks/useMapScript';
 const PER_PHOTO_MS = 5000;
 const ZOOM_OUT = 1;
 const ZOOM_IN = 2.2;
+const ZOOM_MAX = 4;
+const ZOOM_SNAP_THRESHOLD = 1.15;
 const SWIPE_TOLERANCE_PX = 10;
 const SWIPE_RESUME_DELAY_MS = 320;
+const HINT_SESSION_KEY = 'tt:imageByPinpoint:hintShown';
+const HINT_AUTO_FADE_MS = 4500;
+const HINT_UNMOUNT_DELAY_MS = 400;
 const ACCENT = '#ffffff';
 const LETTERBOX_BG = '#0a0a0a';
 
@@ -32,29 +37,37 @@ const ImageByPinpointPage = () => {
 
     const advance = useAutoAdvance(count, PER_PHOTO_MS);
     const { goTo: advanceGoTo } = advance;
-    const [chromeShown, setChromeShown] = useState<boolean>(true);
     const [zoom, setZoom] = useState<number>(ZOOM_OUT);
+    const [isPinching, setIsPinching] = useState<boolean>(false);
     const [placeName, setPlaceName] = useState<string>('');
 
     const carouselRef = useRef<HTMLDivElement | null>(null);
     const imageRefs = useRef<(HTMLDivElement | null)[]>([]);
     const thumbRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-    const chromeShownRef = useRef(chromeShown);
     const swipedRef = useRef<boolean>(false);
     const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
     const wasPlayingBeforeSwipeRef = useRef<boolean>(false);
+    const wasPlayingBeforeZoomRef = useRef<boolean>(false);
+    const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+    const pinchStartRef = useRef<{ dist: number; zoom: number } | null>(null);
 
-    useEffect(() => {
-        chromeShownRef.current = chromeShown;
-    }, [chromeShown]);
+    const [hintMounted, setHintMounted] = useState<boolean>(() => {
+        if (typeof window === 'undefined') return false;
+        try {
+            return !window.sessionStorage.getItem(HINT_SESSION_KEY);
+        } catch {
+            return true;
+        }
+    });
+    const [hintVisible, setHintVisible] = useState<boolean>(hintMounted);
 
     const activeImage = images[advance.index];
 
     useEffect(() => {
         if (!images.length || !isMapScriptLoaded) return;
         const first = images[0];
-        getNeighborhoodFromLocation({ latitude: first.latitude, longitude: first.longitude })
+        getPreciseLocationFromCoordinate({ latitude: first.latitude, longitude: first.longitude })
             .then(setPlaceName)
             .catch(() => setPlaceName(''));
     }, [images, isMapScriptLoaded]);
@@ -96,44 +109,91 @@ const ImageByPinpointPage = () => {
         setZoom(ZOOM_OUT);
     }, [advance.index]);
 
-    const handleSingleTap = useCallback(() => {
-        setChromeShown((prev) => {
-            const next = !prev;
-            advance.setPlaying(next);
-            return next;
+    useEffect(() => {
+        if (!hintMounted) return;
+        const fadeId = window.setTimeout(() => setHintVisible(false), HINT_AUTO_FADE_MS);
+        return () => clearTimeout(fadeId);
+    }, [hintMounted]);
+
+    useEffect(() => {
+        if (hintVisible || !hintMounted) return;
+        const unmountId = window.setTimeout(() => setHintMounted(false), HINT_UNMOUNT_DELAY_MS);
+        return () => clearTimeout(unmountId);
+    }, [hintVisible, hintMounted]);
+
+    const dismissHint = useCallback(() => {
+        setHintVisible((prev) => {
+            if (prev) {
+                try {
+                    window.sessionStorage.setItem(HINT_SESSION_KEY, '1');
+                } catch {
+                    // ignore
+                }
+            }
+            return false;
         });
+    }, []);
+
+    const handleSingleTap = useCallback(() => {
+        advance.setPlaying(!advance.playing);
     }, [advance]);
 
     const handleDoubleTap = useCallback(() => {
         setZoom((prev) => {
             const next = prev === ZOOM_OUT ? ZOOM_IN : ZOOM_OUT;
             if (next > ZOOM_OUT) {
+                wasPlayingBeforeZoomRef.current = advance.playing;
                 advance.setPlaying(false);
             } else {
-                advance.setPlaying(chromeShownRef.current);
+                advance.setPlaying(wasPlayingBeforeZoomRef.current);
             }
             return next;
         });
     }, [advance]);
 
-    const handleLongPress = useCallback(() => {
-        advance.setPlaying(!advance.playing);
-    }, [advance]);
-
     const gesture = useGestureRouter({
         onSingleTap: handleSingleTap,
         onDoubleTap: handleDoubleTap,
-        onLongPress: handleLongPress,
         enabled: count > 0,
     });
 
     const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+        dismissHint();
+        pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        if (pointersRef.current.size >= 2) {
+            const points = [...pointersRef.current.values()];
+            const dist = Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+            pinchStartRef.current = { dist, zoom };
+            wasPlayingBeforeZoomRef.current = advance.playing;
+            advance.setPlaying(false);
+            setIsPinching(true);
+            gesture.reset();
+            swipedRef.current = false;
+            pointerStartRef.current = null;
+            return;
+        }
+
         swipedRef.current = false;
         pointerStartRef.current = { x: e.clientX, y: e.clientY };
         gesture.onPointerDown(e);
     };
 
     const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (!pointersRef.current.has(e.pointerId)) return;
+        pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        if (isPinching && pinchStartRef.current && pointersRef.current.size >= 2) {
+            const points = [...pointersRef.current.values()];
+            const dist = Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+            const ratio = dist / pinchStartRef.current.dist;
+            const next = Math.min(ZOOM_MAX, Math.max(0.7, pinchStartRef.current.zoom * ratio));
+            setZoom(next);
+            return;
+        }
+
+        if (isPinching) return;
+
         if (!swipedRef.current && pointerStartRef.current) {
             const dx = e.clientX - pointerStartRef.current.x;
             const dy = e.clientY - pointerStartRef.current.y;
@@ -147,15 +207,39 @@ const ImageByPinpointPage = () => {
     };
 
     const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+        pointersRef.current.delete(e.pointerId);
+
+        if (isPinching) {
+            if (pointersRef.current.size < 2) {
+                setIsPinching(false);
+                pinchStartRef.current = null;
+                setZoom((prev) => {
+                    if (prev < ZOOM_SNAP_THRESHOLD) {
+                        advance.setPlaying(wasPlayingBeforeZoomRef.current);
+                        return ZOOM_OUT;
+                    }
+                    return Math.min(ZOOM_MAX, prev);
+                });
+            }
+            return;
+        }
+
         const wasSwipe = swipedRef.current;
         gesture.onPointerUp(e);
         pointerStartRef.current = null;
-        if (wasSwipe && wasPlayingBeforeSwipeRef.current && chromeShownRef.current) {
+        if (wasSwipe && wasPlayingBeforeSwipeRef.current) {
             window.setTimeout(() => advance.setPlaying(true), SWIPE_RESUME_DELAY_MS);
         }
     };
 
     const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+        pointersRef.current.delete(e.pointerId);
+        if (isPinching && pointersRef.current.size < 2) {
+            setIsPinching(false);
+            pinchStartRef.current = null;
+            setZoom(ZOOM_OUT);
+            advance.setPlaying(wasPlayingBeforeZoomRef.current);
+        }
         gesture.onPointerCancel(e);
         pointerStartRef.current = null;
         swipedRef.current = false;
@@ -193,13 +277,14 @@ const ImageByPinpointPage = () => {
     }
 
     const time = activeImage?.recordDate.split('T')[1]?.slice(0, 5) ?? '';
-    const chromeVisible = chromeShown && zoom === ZOOM_OUT;
+    const carouselLocked = zoom !== ZOOM_OUT || isPinching;
+    const chromeVisible = zoom <= 1.05 && !isPinching;
 
     return (
         <div css={pageContainer}>
             <div
                 ref={carouselRef}
-                css={carouselStyle(zoom !== ZOOM_OUT)}
+                css={carouselStyle(carouselLocked)}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
@@ -262,6 +347,23 @@ const ImageByPinpointPage = () => {
                     ))}
                 </div>
             )}
+
+            {hintMounted && (
+                <div css={hintToast(hintVisible)} aria-hidden>
+                    <div css={hintRow}>
+                        <span css={hintBadge}>↔</span>
+                        <span>좌우 스와이프로 이동</span>
+                    </div>
+                    <div css={hintRow}>
+                        <span css={hintBadge}>탭</span>
+                        <span>한 번 탭 = 일시정지</span>
+                    </div>
+                    <div css={hintRow}>
+                        <span css={hintBadge}>⊕</span>
+                        <span>더블탭 · 핀치로 확대</span>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -277,17 +379,17 @@ const pageContainer = css`
     overscroll-behavior: contain;
 `;
 
-const carouselStyle = (zoomed: boolean) => css`
+const carouselStyle = (locked: boolean) => css`
     position: absolute;
     inset: 0;
     display: flex;
-    overflow-x: ${zoomed ? 'hidden' : 'auto'};
+    overflow-x: ${locked ? 'hidden' : 'auto'};
     overflow-y: hidden;
     scroll-snap-type: x mandatory;
     scroll-behavior: smooth;
     overscroll-behavior: contain;
     background: ${LETTERBOX_BG};
-    touch-action: ${zoomed ? 'none' : 'pan-x'};
+    touch-action: ${locked ? 'none' : 'pan-x'};
     scrollbar-width: none;
     -ms-overflow-style: none;
     z-index: 1;
@@ -450,7 +552,7 @@ const captionText = css`
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 60%;
+    max-width: 70%;
 `;
 
 const captionDot = css`
@@ -518,6 +620,56 @@ const thumbImage = css`
     height: 100%;
     object-fit: cover;
     display: block;
+`;
+
+const hintToast = (visible: boolean) => css`
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    padding: 16px 22px;
+    border-radius: 18px;
+    background: rgba(0, 0, 0, 0.68);
+    backdrop-filter: blur(18px) saturate(180%);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    color: rgba(255, 255, 255, 0.95);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    text-align: left;
+    z-index: 20;
+    pointer-events: none;
+    opacity: ${visible ? 1 : 0};
+    transform: translate(-50%, ${visible ? '-50%' : '-46%'});
+    transition:
+        opacity 360ms cubic-bezier(0.22, 1, 0.36, 1),
+        transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.5);
+`;
+
+const hintRow = css`
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+`;
+
+const hintBadge = css`
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 22px;
+    padding: 0 7px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0;
 `;
 
 const emptyWrap = css`
