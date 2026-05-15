@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { css } from '@emotion/react';
 import { ImageOff, MapPin, X } from 'lucide-react';
@@ -6,15 +6,17 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import { useMediaByPinPoint } from '@/domains/media/hooks/queries';
 import { useAutoAdvance } from '@/domains/media/hooks/useAutoAdvance';
-import { useAutoHideStrip } from '@/domains/media/hooks/useAutoHideStrip';
-import { useDoubleTapZoom } from '@/domains/media/hooks/useDoubleTapZoom';
+import { useGestureRouter } from '@/domains/media/hooks/useGestureRouter';
 import { getNeighborhoodFromLocation } from '@/libs/utils/map';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import { ROUTES } from '@/shared/constants/route';
 import { useMapScript } from '@/shared/hooks/useMapScript';
 
 const PER_PHOTO_MS = 5000;
-const STRIP_HIDE_AFTER_MS = 3000;
+const ZOOM_OUT = 1;
+const ZOOM_IN = 2.2;
+const SWIPE_TOLERANCE_PX = 10;
+const SWIPE_RESUME_DELAY_MS = 320;
 const ACCENT = '#ffffff';
 const LETTERBOX_BG = '#0a0a0a';
 
@@ -29,14 +31,23 @@ const ImageByPinpointPage = () => {
     const count = images.length;
 
     const advance = useAutoAdvance(count, PER_PHOTO_MS);
-    const { zoom, handleTap, resetZoom } = useDoubleTapZoom((nextZoom) => {
-        advance.setPlaying(nextZoom === 1);
-    });
-    const { shown: stripShown, notifyActivity } = useAutoHideStrip(advance.index, STRIP_HIDE_AFTER_MS);
-
-    const stripRef = useRef<HTMLDivElement | null>(null);
-    const thumbRefs = useRef<(HTMLButtonElement | null)[]>([]);
+    const { goTo: advanceGoTo } = advance;
+    const [chromeShown, setChromeShown] = useState<boolean>(true);
+    const [zoom, setZoom] = useState<number>(ZOOM_OUT);
     const [placeName, setPlaceName] = useState<string>('');
+
+    const carouselRef = useRef<HTMLDivElement | null>(null);
+    const imageRefs = useRef<(HTMLDivElement | null)[]>([]);
+    const thumbRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+    const chromeShownRef = useRef(chromeShown);
+    const swipedRef = useRef<boolean>(false);
+    const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+    const wasPlayingBeforeSwipeRef = useRef<boolean>(false);
+
+    useEffect(() => {
+        chromeShownRef.current = chromeShown;
+    }, [chromeShown]);
 
     const activeImage = images[advance.index];
 
@@ -49,13 +60,106 @@ const ImageByPinpointPage = () => {
     }, [images, isMapScriptLoaded]);
 
     useEffect(() => {
-        const el = thumbRefs.current[advance.index];
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        if (count === 0 || !carouselRef.current) return;
+        const root = carouselRef.current;
+        const refs = imageRefs.current.filter(Boolean) as HTMLDivElement[];
+        if (!refs.length) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                const mostVisible = entries
+                    .filter((e) => e.isIntersecting)
+                    .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+                if (!mostVisible) return;
+                const idx = Number((mostVisible.target as HTMLElement).dataset.index);
+                advanceGoTo(idx);
+            },
+            { root, threshold: 0.6 },
+        );
+
+        refs.forEach((ref) => observer.observe(ref));
+        return () => observer.disconnect();
+    }, [count, advanceGoTo]);
+
+    useEffect(() => {
+        if (swipedRef.current) return;
+        const el = imageRefs.current[advance.index];
+        if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     }, [advance.index]);
 
     useEffect(() => {
-        resetZoom();
-    }, [advance.index, resetZoom]);
+        const el = thumbRefs.current[advance.index];
+        if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }, [advance.index]);
+
+    useEffect(() => {
+        setZoom(ZOOM_OUT);
+    }, [advance.index]);
+
+    const handleSingleTap = useCallback(() => {
+        setChromeShown((prev) => {
+            const next = !prev;
+            advance.setPlaying(next);
+            return next;
+        });
+    }, [advance]);
+
+    const handleDoubleTap = useCallback(() => {
+        setZoom((prev) => {
+            const next = prev === ZOOM_OUT ? ZOOM_IN : ZOOM_OUT;
+            if (next > ZOOM_OUT) {
+                advance.setPlaying(false);
+            } else {
+                advance.setPlaying(chromeShownRef.current);
+            }
+            return next;
+        });
+    }, [advance]);
+
+    const handleLongPress = useCallback(() => {
+        advance.setPlaying(!advance.playing);
+    }, [advance]);
+
+    const gesture = useGestureRouter({
+        onSingleTap: handleSingleTap,
+        onDoubleTap: handleDoubleTap,
+        onLongPress: handleLongPress,
+        enabled: count > 0,
+    });
+
+    const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+        swipedRef.current = false;
+        pointerStartRef.current = { x: e.clientX, y: e.clientY };
+        gesture.onPointerDown(e);
+    };
+
+    const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (!swipedRef.current && pointerStartRef.current) {
+            const dx = e.clientX - pointerStartRef.current.x;
+            const dy = e.clientY - pointerStartRef.current.y;
+            if (Math.hypot(dx, dy) > SWIPE_TOLERANCE_PX) {
+                swipedRef.current = true;
+                wasPlayingBeforeSwipeRef.current = advance.playing;
+                advance.setPlaying(false);
+            }
+        }
+        gesture.onPointerMove(e);
+    };
+
+    const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+        const wasSwipe = swipedRef.current;
+        gesture.onPointerUp(e);
+        pointerStartRef.current = null;
+        if (wasSwipe && wasPlayingBeforeSwipeRef.current && chromeShownRef.current) {
+            window.setTimeout(() => advance.setPlaying(true), SWIPE_RESUME_DELAY_MS);
+        }
+    };
+
+    const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+        gesture.onPointerCancel(e);
+        pointerStartRef.current = null;
+        swipedRef.current = false;
+    };
 
     const handleClose = () => {
         navigate(ROUTES.PATH.TRIP.ROOT(tripKey!), {
@@ -88,90 +192,74 @@ const ImageByPinpointPage = () => {
         );
     }
 
-    const time = activeImage.recordDate.split('T')[1]?.slice(0, 5) ?? '';
+    const time = activeImage?.recordDate.split('T')[1]?.slice(0, 5) ?? '';
+    const chromeVisible = chromeShown && zoom === ZOOM_OUT;
 
     return (
-        <div css={pageContainer} onPointerMove={notifyActivity} onTouchStart={notifyActivity}>
-            {/* Photo area (letterbox, contain fit, double-tap zoom) */}
+        <div css={pageContainer}>
             <div
-                css={photoArea}
-                onClick={handleTap}
-                role='img'
-                aria-label={`핀포인트 사진 ${advance.index + 1} / ${count}`}
+                ref={carouselRef}
+                css={carouselStyle(zoom !== ZOOM_OUT)}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerCancel}
             >
-                <div key={advance.index} css={photoInner} style={{ transform: `scale(${zoom})` }}>
-                    <img src={activeImage.mediaLink} alt='' css={photoImage} draggable={false} />
-                </div>
+                {images.map((img, i) => (
+                    <div key={img.mediaFileId} ref={(el) => (imageRefs.current[i] = el)} data-index={i} css={slotStyle}>
+                        <img
+                            src={img.mediaLink}
+                            alt=''
+                            css={photoImage}
+                            style={{
+                                transform: i === advance.index ? `scale(${zoom})` : 'scale(1)',
+                            }}
+                            draggable={false}
+                        />
+                    </div>
+                ))}
             </div>
 
-            {/* Prev / next tap zones */}
-            {count > 1 && (
-                <>
-                    <button
-                        type='button'
-                        css={[tapZoneBase, tapZoneLeft]}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            advance.prev();
-                        }}
-                        aria-label='이전 사진'
-                    />
-                    <button
-                        type='button'
-                        css={[tapZoneBase, tapZoneRight]}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            advance.next();
-                        }}
-                        aria-label='다음 사진'
-                    />
-                </>
-            )}
+            <div css={topGradient(chromeVisible)} aria-hidden />
+            <div css={bottomGradient(chromeVisible)} aria-hidden />
 
-            {/* Gradients */}
-            <div css={topGradient} aria-hidden />
-            <div css={bottomGradient} aria-hidden />
-
-            {/* Top chrome */}
-            <header css={topChrome}>
+            <header css={topChrome(chromeVisible)}>
                 <div css={indexPill}>
                     <span css={indexPillDot(advance.playing)} aria-hidden />
                     <span css={indexPillText}>
                         {advance.index + 1} / {count}
                     </span>
                 </div>
-                <button type='button' css={closeButton} onClick={handleClose} aria-label='닫기'>
+                <button type='button' css={closeButton(chromeVisible)} onClick={handleClose} aria-label='닫기'>
                     <X size={17} color={ACCENT} strokeWidth={2.4} />
                 </button>
             </header>
 
-            {/* Caption */}
-            <div css={captionWrap(stripShown)}>
+            <div css={captionWrap(chromeVisible)}>
                 <MapPin size={11} color={ACCENT} fill={ACCENT} strokeWidth={0} />
                 {placeName && <span css={captionText}>{placeName.toUpperCase()}</span>}
                 {placeName && <span css={captionDot}>·</span>}
                 <span css={captionTime}>{time}</span>
             </div>
 
-            {/* Auto-hide thumbnail strip */}
-            {count > 1 && stripShown && (
-                <div css={thumbStrip} ref={stripRef}>
-                    {images.map((img, i) => {
-                        const isActive = i === advance.index;
-                        return (
-                            <button
-                                key={img.mediaFileId}
-                                type='button'
-                                ref={(el) => (thumbRefs.current[i] = el)}
-                                onClick={() => advance.goTo(i)}
-                                css={thumbButton(isActive)}
-                                aria-label={`사진 ${i + 1}로 이동`}
-                                aria-current={isActive}
-                            >
-                                <img src={img.mediaLink} alt='' css={thumbImage} />
-                            </button>
-                        );
-                    })}
+            {count > 1 && (
+                <div css={thumbStripWrap(chromeVisible)}>
+                    {images.map((img, i) => (
+                        <button
+                            key={img.mediaFileId}
+                            type='button'
+                            ref={(el) => (thumbRefs.current[i] = el)}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                advance.goTo(i);
+                            }}
+                            css={thumbButton(i === advance.index)}
+                            aria-label={`사진 ${i + 1}로 이동`}
+                            aria-current={i === advance.index}
+                        >
+                            <img src={img.mediaLink} alt='' css={thumbImage} />
+                        </button>
+                    ))}
                 </div>
             )}
         </div>
@@ -186,34 +274,39 @@ const pageContainer = css`
     background: #000;
     color: #fff;
     user-select: none;
-    touch-action: manipulation;
     overscroll-behavior: contain;
 `;
 
-const photoArea = css`
+const carouselStyle = (zoomed: boolean) => css`
     position: absolute;
     inset: 0;
+    display: flex;
+    overflow-x: ${zoomed ? 'hidden' : 'auto'};
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    overscroll-behavior: contain;
     background: ${LETTERBOX_BG};
-    cursor: pointer;
+    touch-action: ${zoomed ? 'none' : 'pan-x'};
+    scrollbar-width: none;
+    -ms-overflow-style: none;
     z-index: 1;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
 `;
 
-const photoInner = css`
-    position: absolute;
-    inset: 0;
+const slotStyle = css`
+    flex: 0 0 100%;
+    width: 100%;
+    height: 100%;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+    position: relative;
     display: grid;
     place-items: center;
-    transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
-    animation: ibpcFade 320ms ease-out;
-
-    @keyframes ibpcFade {
-        0% {
-            opacity: 0;
-        }
-        100% {
-            opacity: 1;
-        }
-    }
+    background: ${LETTERBOX_BG};
 `;
 
 const photoImage = css`
@@ -223,36 +316,10 @@ const photoImage = css`
     display: block;
     pointer-events: none;
     -webkit-user-drag: none;
+    transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
 `;
 
-const tapZoneBase = css`
-    position: absolute;
-    top: 90px;
-    bottom: 180px;
-    width: 32%;
-    z-index: 5;
-    background: transparent;
-    border: none;
-    padding: 0;
-    margin: 0;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-
-    &:focus-visible {
-        outline: 2px solid rgba(255, 255, 255, 0.3);
-        outline-offset: -4px;
-    }
-`;
-
-const tapZoneLeft = css`
-    left: 0;
-`;
-
-const tapZoneRight = css`
-    right: 0;
-`;
-
-const topGradient = css`
+const topGradient = (shown: boolean) => css`
     position: absolute;
     top: 0;
     left: 0;
@@ -261,9 +328,11 @@ const topGradient = css`
     background: linear-gradient(180deg, rgba(0, 0, 0, 0.5), transparent);
     z-index: 3;
     pointer-events: none;
+    opacity: ${shown ? 1 : 0};
+    transition: opacity 200ms ease;
 `;
 
-const bottomGradient = css`
+const bottomGradient = (shown: boolean) => css`
     position: absolute;
     bottom: 0;
     left: 0;
@@ -272,9 +341,11 @@ const bottomGradient = css`
     background: linear-gradient(0deg, rgba(0, 0, 0, 0.85), transparent);
     z-index: 3;
     pointer-events: none;
+    opacity: ${shown ? 1 : 0};
+    transition: opacity 200ms ease;
 `;
 
-const topChrome = css`
+const topChrome = (shown: boolean) => css`
     position: absolute;
     top: max(20px, env(safe-area-inset-top, 0px));
     padding-top: 16px;
@@ -284,6 +355,9 @@ const topChrome = css`
     justify-content: space-between;
     align-items: center;
     z-index: 10;
+    pointer-events: none;
+    opacity: ${shown ? 1 : 0};
+    transition: opacity 200ms ease;
 `;
 
 const indexPill = css`
@@ -299,6 +373,7 @@ const indexPill = css`
     font-weight: 700;
     letter-spacing: 0.4px;
     border: 1px solid rgba(255, 255, 255, 0.08);
+    pointer-events: none;
 `;
 
 const indexPillDot = (playing: boolean) => css`
@@ -314,7 +389,7 @@ const indexPillText = css`
     color: rgba(255, 255, 255, 0.92);
 `;
 
-const closeButton = css`
+const closeButtonBase = css`
     width: 40px;
     height: 40px;
     border-radius: 50%;
@@ -339,8 +414,13 @@ const closeButton = css`
     }
 `;
 
+const closeButton = (shown: boolean) => css`
+    ${closeButtonBase};
+    pointer-events: ${shown ? 'auto' : 'none'};
+`;
+
 const topRightCloseButton = css`
-    ${closeButton};
+    ${closeButtonBase};
     position: absolute;
     top: max(20px, env(safe-area-inset-top, 0px));
     margin-top: 16px;
@@ -348,11 +428,11 @@ const topRightCloseButton = css`
     z-index: 10;
 `;
 
-const captionWrap = (stripShown: boolean) => css`
+const captionWrap = (shown: boolean) => css`
     position: absolute;
     left: 24px;
     right: 24px;
-    bottom: ${stripShown ? 130 : 50}px;
+    bottom: 130px;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -361,8 +441,9 @@ const captionWrap = (stripShown: boolean) => css`
     letter-spacing: 1.6px;
     color: rgba(255, 255, 255, 0.85);
     z-index: 8;
-    transition: bottom 300ms ease;
     pointer-events: none;
+    opacity: ${shown ? 1 : 0};
+    transition: opacity 200ms ease;
 `;
 
 const captionText = css`
@@ -380,7 +461,7 @@ const captionTime = css`
     font-variant-numeric: tabular-nums;
 `;
 
-const thumbStrip = css`
+const thumbStripWrap = (shown: boolean) => css`
     position: absolute;
     left: 0;
     right: 0;
@@ -393,22 +474,13 @@ const thumbStrip = css`
     scrollbar-width: none;
     -ms-overflow-style: none;
     z-index: 10;
-    animation: ibpcStripIn 280ms ease-out;
     align-items: center;
+    opacity: ${shown ? 1 : 0};
+    pointer-events: ${shown ? 'auto' : 'none'};
+    transition: opacity 200ms ease;
 
     &::-webkit-scrollbar {
         display: none;
-    }
-
-    @keyframes ibpcStripIn {
-        0% {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        100% {
-            opacity: 1;
-            transform: translateY(0);
-        }
     }
 `;
 
