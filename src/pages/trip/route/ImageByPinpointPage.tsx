@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { css } from '@emotion/react';
-import { ImageOff, MapPin, X } from 'lucide-react';
+import { ImageOff, Info, MapPin, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { useMediaByPinPoint } from '@/domains/media/hooks/queries';
@@ -19,7 +19,6 @@ const ZOOM_MAX = 4;
 const ZOOM_SNAP_THRESHOLD = 1.15;
 const SWIPE_TOLERANCE_PX = 10;
 const SWIPE_RESUME_DELAY_MS = 320;
-const HINT_SESSION_KEY = 'tt:imageByPinpoint:hintShown';
 const HINT_AUTO_FADE_MS = 4500;
 const HINT_UNMOUNT_DELAY_MS = 400;
 const ACCENT = '#ffffff';
@@ -40,6 +39,7 @@ const ImageByPinpointPage = () => {
     const [zoom, setZoom] = useState<number>(ZOOM_OUT);
     const [isPinching, setIsPinching] = useState<boolean>(false);
     const [placeName, setPlaceName] = useState<string>('');
+    const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
     const carouselRef = useRef<HTMLDivElement | null>(null);
     const imageRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -51,16 +51,10 @@ const ImageByPinpointPage = () => {
     const wasPlayingBeforeZoomRef = useRef<boolean>(false);
     const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
     const pinchStartRef = useRef<{ dist: number; zoom: number } | null>(null);
+    const panStartRef = useRef<{ px: number; py: number; panX: number; panY: number } | null>(null);
 
-    const [hintMounted, setHintMounted] = useState<boolean>(() => {
-        if (typeof window === 'undefined') return false;
-        try {
-            return !window.sessionStorage.getItem(HINT_SESSION_KEY);
-        } catch {
-            return true;
-        }
-    });
-    const [hintVisible, setHintVisible] = useState<boolean>(hintMounted);
+    const [hintMounted, setHintMounted] = useState<boolean>(false);
+    const [hintVisible, setHintVisible] = useState<boolean>(false);
 
     const activeImage = images[advance.index];
 
@@ -107,7 +101,12 @@ const ImageByPinpointPage = () => {
 
     useEffect(() => {
         setZoom(ZOOM_OUT);
+        setPan({ x: 0, y: 0 });
     }, [advance.index]);
+
+    useEffect(() => {
+        if (zoom <= ZOOM_OUT) setPan({ x: 0, y: 0 });
+    }, [zoom]);
 
     useEffect(() => {
         if (!hintMounted) return;
@@ -122,16 +121,12 @@ const ImageByPinpointPage = () => {
     }, [hintVisible, hintMounted]);
 
     const dismissHint = useCallback(() => {
-        setHintVisible((prev) => {
-            if (prev) {
-                try {
-                    window.sessionStorage.setItem(HINT_SESSION_KEY, '1');
-                } catch {
-                    // ignore
-                }
-            }
-            return false;
-        });
+        setHintVisible(false);
+    }, []);
+
+    const showHint = useCallback(() => {
+        setHintMounted(true);
+        window.requestAnimationFrame(() => setHintVisible(true));
     }, []);
 
     const handleSingleTap = useCallback(() => {
@@ -171,6 +166,17 @@ const ImageByPinpointPage = () => {
             gesture.reset();
             swipedRef.current = false;
             pointerStartRef.current = null;
+            panStartRef.current = null;
+            return;
+        }
+
+        if (zoom > ZOOM_OUT) {
+            panStartRef.current = {
+                px: e.clientX,
+                py: e.clientY,
+                panX: pan.x,
+                panY: pan.y,
+            };
             return;
         }
 
@@ -193,6 +199,20 @@ const ImageByPinpointPage = () => {
         }
 
         if (isPinching) return;
+
+        if (panStartRef.current && zoom > ZOOM_OUT) {
+            const dx = e.clientX - panStartRef.current.px;
+            const dy = e.clientY - panStartRef.current.py;
+            const slot = carouselRef.current;
+            if (slot) {
+                const maxX = (slot.clientWidth * (zoom - 1)) / 2;
+                const maxY = (slot.clientHeight * (zoom - 1)) / 2;
+                const newX = Math.max(-maxX, Math.min(maxX, panStartRef.current.panX + dx));
+                const newY = Math.max(-maxY, Math.min(maxY, panStartRef.current.panY + dy));
+                setPan({ x: newX, y: newY });
+            }
+            return;
+        }
 
         if (!swipedRef.current && pointerStartRef.current) {
             const dx = e.clientX - pointerStartRef.current.x;
@@ -224,6 +244,11 @@ const ImageByPinpointPage = () => {
             return;
         }
 
+        if (panStartRef.current) {
+            panStartRef.current = null;
+            return;
+        }
+
         const wasSwipe = swipedRef.current;
         gesture.onPointerUp(e);
         pointerStartRef.current = null;
@@ -242,6 +267,7 @@ const ImageByPinpointPage = () => {
         }
         gesture.onPointerCancel(e);
         pointerStartRef.current = null;
+        panStartRef.current = null;
         swipedRef.current = false;
     };
 
@@ -297,7 +323,10 @@ const ImageByPinpointPage = () => {
                             alt=''
                             css={photoImage}
                             style={{
-                                transform: i === advance.index ? `scale(${zoom})` : 'scale(1)',
+                                transform:
+                                    i === advance.index
+                                        ? `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`
+                                        : 'scale(1)',
                             }}
                             draggable={false}
                         />
@@ -315,9 +344,14 @@ const ImageByPinpointPage = () => {
                         {advance.index + 1} / {count}
                     </span>
                 </div>
-                <button type='button' css={closeButton(chromeVisible)} onClick={handleClose} aria-label='닫기'>
-                    <X size={17} color={ACCENT} strokeWidth={2.4} />
-                </button>
+                <div css={topRightGroup}>
+                    <button type='button' css={iconButton(chromeVisible)} onClick={showHint} aria-label='도움말'>
+                        <Info size={17} color={ACCENT} strokeWidth={2.4} />
+                    </button>
+                    <button type='button' css={iconButton(chromeVisible)} onClick={handleClose} aria-label='닫기'>
+                        <X size={17} color={ACCENT} strokeWidth={2.4} />
+                    </button>
+                </div>
             </header>
 
             <div css={captionWrap(chromeVisible)}>
@@ -516,9 +550,15 @@ const closeButtonBase = css`
     }
 `;
 
-const closeButton = (shown: boolean) => css`
+const iconButton = (shown: boolean) => css`
     ${closeButtonBase};
     pointer-events: ${shown ? 'auto' : 'none'};
+`;
+
+const topRightGroup = css`
+    display: flex;
+    align-items: center;
+    gap: 8px;
 `;
 
 const topRightCloseButton = css`
