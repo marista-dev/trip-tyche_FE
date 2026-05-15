@@ -45,12 +45,6 @@ export const MAP = {
     },
 };
 
-export const IMAGE_CAROUSEL_STATE = {
-    AUTO: 'auto',
-    PAUSED: 'paused',
-    ZOOMED: 'zoomed',
-} as const;
-
 export const EMPTY_ITEM = {
     IMAGE: (category: string) => {
         switch (category) {
