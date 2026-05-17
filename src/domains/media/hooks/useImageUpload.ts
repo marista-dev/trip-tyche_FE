@@ -13,9 +13,11 @@ import { filterWithoutDateMediaFile, filterWithoutLocationMediaFile } from '@/do
 import { mediaAPI } from '@/libs/apis';
 import { convertHeicToJpg, extractMetadataFromImage, removeDuplicateImages } from '@/libs/utils/image';
 
-// 브라우저(특히 Safari)의 동일 origin 동시 연결 제한(HTTP/1.1 기준 ~6)에 맞춤.
-// 첫 progress 이후에만 stall timer가 시작되므로 queue 대기 자체는 false-positive를 일으키지 않는다.
-const MAX_CONCURRENT_S3_UPLOADS = 6;
+// HTTP/2 엔드포인트(OCI compat S3 포함)는 단일 TCP 위에서 100+ stream을 동시 처리 가능 →
+// 사실상 "한 번에 다 시작"이 throughput 최대. HTTP/1.1로 떨어지는 환경에선 브라우저가 6개씩
+// 자동으로 queue 처리하므로 큰 숫자여도 안전(progress-aware stall timer 덕분에 queue abort 없음).
+// 영구 실패는 retryFailedUploads로 부분 재업로드 가능하므로 공격적인 동시성을 채택한다.
+const MAX_CONCURRENT_S3_UPLOADS = 200;
 
 // 일시적 네트워크 단절(iOS '네트워크 연결이 유실되었습니다' 등)을 자동 흡수하기 위한 per-file 재시도.
 const UPLOAD_RETRY_ATTEMPTS = 2; // 첫 시도 + 2회 재시도 = 최대 3회
