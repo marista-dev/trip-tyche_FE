@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { useParams } from 'react-router-dom';
 
@@ -90,114 +90,123 @@ export const useImageUpload = () => {
 
     const { tripKey } = useParams();
 
-    const extractMetaData = async (images: FileList): Promise<FileList> => {
+    const extractMetaData = useCallback(async (images: FileList): Promise<FileList> => {
         setCurrentProcess('metadata');
         const imagesWithoutHeic = await convertHeicToJpg(images);
         const uniqueImages = removeDuplicateImages(imagesWithoutHeic);
         return uniqueImages;
-    };
+    }, []);
 
-    const submitMetadata = async (images: ClientImageFile[], presignedUrls: PresignedUrlResponse[]) => {
-        const metaDatas = presignedUrls.map((url: PresignedUrlResponse, index: number) => {
-            const { recordDate, latitude, longitude } = images[index];
-            return {
-                fileKey: url.fileKey,
-                latitude: latitude || DEFAULT_METADATA.LOCATION,
-                longitude: longitude || DEFAULT_METADATA.LOCATION,
-                recordDate: recordDate || DEFAULT_METADATA.DATE,
-            };
-        });
-        await mediaAPI.createMediaFileMetadata(tripKey!, metaDatas);
-    };
+    const submitMetadata = useCallback(
+        async (images: ClientImageFile[], presignedUrls: PresignedUrlResponse[]) => {
+            const metaDatas = presignedUrls.map((url: PresignedUrlResponse, index: number) => {
+                const { recordDate, latitude, longitude } = images[index];
+                return {
+                    fileKey: url.fileKey,
+                    latitude: latitude || DEFAULT_METADATA.LOCATION,
+                    longitude: longitude || DEFAULT_METADATA.LOCATION,
+                    recordDate: recordDate || DEFAULT_METADATA.DATE,
+                };
+            });
+            await mediaAPI.createMediaFileMetadata(tripKey!, metaDatas);
+        },
+        [tripKey],
+    );
 
     // 지정한 인덱스만 업로드 → (이미 끝난 단계가 아닐 경우) 메타등록 → postUploadTask 순차 실행.
     // 초기 업로드와 retry 양쪽에서 재사용. ctx의 플래그로 idempotency를 보장한다.
-    const buildUploadChain = (ctx: UploadContext, indicesToUpload: number[]): Promise<void> =>
-        (async () => {
-            if (indicesToUpload.length > 0) {
-                await runWithPool(indicesToUpload, MAX_CONCURRENT_S3_UPLOADS, async (index: number) => {
-                    try {
-                        await uploadWithRetry(ctx.presignedUrls[index].presignedPutUrl, ctx.fileArray[index]);
-                        ctx.failedIndices.delete(index);
-                        setUploadStats((s) => ({ ...s, succeeded: s.succeeded + 1 }));
-                    } catch {
-                        ctx.failedIndices.add(index);
-                        setUploadStats((s) => ({ ...s, failed: s.failed + 1 }));
-                        // 던지지 않음 — 풀이 끝까지 돌며 모든 실패를 누적하고, 끝난 뒤 한 번에 판단
-                    }
-                });
-            }
-            if (ctx.failedIndices.size > 0) {
-                throw new Error(`${ctx.failedIndices.size}장 업로드 실패`);
-            }
-            if (!ctx.metadataSubmitted) {
-                await submitMetadata(ctx.imagesWithMetadata, ctx.presignedUrls);
-                ctx.metadataSubmitted = true;
-            }
-            if (ctx.postUploadTask && !ctx.postUploadTaskCompleted) {
-                await ctx.postUploadTask();
-                ctx.postUploadTaskCompleted = true;
-            }
-        })();
+    const buildUploadChain = useCallback(
+        (ctx: UploadContext, indicesToUpload: number[]): Promise<void> =>
+            (async () => {
+                if (indicesToUpload.length > 0) {
+                    await runWithPool(indicesToUpload, MAX_CONCURRENT_S3_UPLOADS, async (index: number) => {
+                        try {
+                            await uploadWithRetry(ctx.presignedUrls[index].presignedPutUrl, ctx.fileArray[index]);
+                            ctx.failedIndices.delete(index);
+                            setUploadStats((s) => ({ ...s, succeeded: s.succeeded + 1 }));
+                        } catch {
+                            ctx.failedIndices.add(index);
+                            setUploadStats((s) => ({ ...s, failed: s.failed + 1 }));
+                            // 던지지 않음 — 풀이 끝까지 돌며 모든 실패를 누적하고, 끝난 뒤 한 번에 판단
+                        }
+                    });
+                }
+                if (ctx.failedIndices.size > 0) {
+                    throw new Error(`${ctx.failedIndices.size}장 업로드 실패`);
+                }
+                if (!ctx.metadataSubmitted) {
+                    await submitMetadata(ctx.imagesWithMetadata, ctx.presignedUrls);
+                    ctx.metadataSubmitted = true;
+                }
+                if (ctx.postUploadTask && !ctx.postUploadTaskCompleted) {
+                    await ctx.postUploadTask();
+                    ctx.postUploadTaskCompleted = true;
+                }
+            })(),
+        [submitMetadata],
+    );
 
     // postUploadTask는 S3 업로드 + 메타등록 이후에 같은 체인으로 묶어 실행할 작업(예: status 전환).
     // 실패 시 step3의 waitForBackgroundUpload에서 함께 surface되어 retry UI로 노출된다.
-    const uploadImagesToS3 = async (uniqueFiles: FileList, postUploadTask?: () => Promise<unknown>) => {
-        const setRejected = (err: unknown) => {
-            const failed = Promise.reject(err instanceof Error ? err : new Error(String(err)));
-            failed.catch(() => {});
-            bgUploadPromiseRef.current = failed;
-            uploadContextRef.current = null;
-        };
-
-        try {
-            const fileArray = Array.from(uniqueFiles);
-            const imageNames = fileArray.map((file) => ({ fileName: file.name }));
-
-            const [imagesWithMetadata, presignedResult] = await Promise.all([
-                extractMetadataFromImage(uniqueFiles, setProgress),
-                mediaAPI.requestPresignedUrls(tripKey!, imageNames),
-            ]);
-
-            if (!presignedResult.success) {
-                setRejected(new Error(presignedResult.error));
-                return;
-            }
-            const presignedUrls = presignedResult.data;
-
-            setImages(imagesWithMetadata);
-            setImageCategories({
-                withAll: { count: imagesWithMetadata.length || 0 },
-                withoutLocation: { count: filterWithoutLocationMediaFile(imagesWithMetadata).length || 0 },
-                withoutDate: { count: filterWithoutDateMediaFile(imagesWithMetadata).length || 0 },
-            });
-
-            // 업로드 진행 상태를 step3에 노출하기 위한 카운터 초기화
-            setUploadStats({ total: presignedUrls.length, succeeded: 0, failed: 0 });
-
-            const ctx: UploadContext = {
-                fileArray,
-                presignedUrls,
-                imagesWithMetadata,
-                postUploadTask,
-                failedIndices: new Set(),
-                metadataSubmitted: false,
-                postUploadTaskCompleted: false,
+    const uploadImagesToS3 = useCallback(
+        async (uniqueFiles: FileList, postUploadTask?: () => Promise<unknown>) => {
+            const setRejected = (err: unknown) => {
+                const failed = Promise.reject(err instanceof Error ? err : new Error(String(err)));
+                failed.catch(() => {});
+                bgUploadPromiseRef.current = failed;
+                uploadContextRef.current = null;
             };
-            uploadContextRef.current = ctx;
 
-            const allIndices = Array.from({ length: presignedUrls.length }, (_, i) => i);
-            const rawUpload = buildUploadChain(ctx, allIndices);
-            bgUploadPromiseRef.current = rawUpload;
-            rawUpload.catch(() => {});
-        } catch (err) {
-            setRejected(err);
-        }
-    };
+            try {
+                const fileArray = Array.from(uniqueFiles);
+                const imageNames = fileArray.map((file) => ({ fileName: file.name }));
+
+                const [imagesWithMetadata, presignedResult] = await Promise.all([
+                    extractMetadataFromImage(uniqueFiles, setProgress),
+                    mediaAPI.requestPresignedUrls(tripKey!, imageNames),
+                ]);
+
+                if (!presignedResult.success) {
+                    setRejected(new Error(presignedResult.error));
+                    return;
+                }
+                const presignedUrls = presignedResult.data;
+
+                setImages(imagesWithMetadata);
+                setImageCategories({
+                    withAll: { count: imagesWithMetadata.length || 0 },
+                    withoutLocation: { count: filterWithoutLocationMediaFile(imagesWithMetadata).length || 0 },
+                    withoutDate: { count: filterWithoutDateMediaFile(imagesWithMetadata).length || 0 },
+                });
+
+                // 업로드 진행 상태를 step3에 노출하기 위한 카운터 초기화
+                setUploadStats({ total: presignedUrls.length, succeeded: 0, failed: 0 });
+
+                const ctx: UploadContext = {
+                    fileArray,
+                    presignedUrls,
+                    imagesWithMetadata,
+                    postUploadTask,
+                    failedIndices: new Set(),
+                    metadataSubmitted: false,
+                    postUploadTaskCompleted: false,
+                };
+                uploadContextRef.current = ctx;
+
+                const allIndices = Array.from({ length: presignedUrls.length }, (_, i) => i);
+                const rawUpload = buildUploadChain(ctx, allIndices);
+                bgUploadPromiseRef.current = rawUpload;
+                rawUpload.catch(() => {});
+            } catch (err) {
+                setRejected(err);
+            }
+        },
+        [tripKey, buildUploadChain],
+    );
 
     // step3 retry 버튼이 호출. 실패한 인덱스만 다시 업로드 → 남은 chain(메타등록/status 전환)을 이어서 실행.
     // bgUploadPromiseRef를 새 promise로 교체하므로, 호출 직후 waitForBackgroundUpload는 새 진행 상태를 await한다.
-    const retryFailedUploads = (): void => {
+    const retryFailedUploads = useCallback((): void => {
         const ctx = uploadContextRef.current;
         if (!ctx) return;
 
@@ -208,11 +217,13 @@ export const useImageUpload = () => {
         const newUpload = buildUploadChain(ctx, toRetry);
         bgUploadPromiseRef.current = newUpload;
         newUpload.catch(() => {});
-    };
+    }, [buildUploadChain]);
 
-    const waitForBackgroundUpload = async () => {
+    // 함수 identity가 매 render마다 바뀌면 step3의 runPhases deps가 흔들려 useEffect가 무한 fire됨.
+    // (TripCreateCompleteStep#runPhases가 deps로 사용 → bg 진행 중 setUploadStats가 발화할 때마다 PUT 폭주 위험)
+    const waitForBackgroundUpload = useCallback(async () => {
         if (bgUploadPromiseRef.current) await bgUploadPromiseRef.current;
-    };
+    }, []);
 
     return {
         images,
