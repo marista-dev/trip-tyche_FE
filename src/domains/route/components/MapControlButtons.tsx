@@ -1,5 +1,5 @@
 import { css } from '@emotion/react';
-import { CalendarDays, Pause, Play, RotateCcw } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Pause, Play, RotateCcw } from 'lucide-react';
 
 import { COLORS } from '@/shared/constants/style';
 
@@ -14,6 +14,8 @@ interface MapControlButtonsProps {
         handleDateViewClick: () => void;
         handleRestart: () => void;
         handlePauseToggle: () => void;
+        handlePrevPin: () => void;
+        handleNextPin: () => void;
     };
 }
 
@@ -51,6 +53,10 @@ const MapControlButtons = ({
         actionHandler = handler.handlePauseToggle;
     }
 
+    const showNav = isPaused && !isComplete;
+    const isFirst = currentPinPointIndex <= 0;
+    const isLast = currentPinPointIndex >= totalPinPoints - 1;
+
     return (
         <div css={barStyle}>
             {/* 날짜별 보기 */}
@@ -62,6 +68,18 @@ const MapControlButtons = ({
                 <CalendarDays size={18} />
             </button>
 
+            {/* 일시정지 중에만 — 이전 핀 */}
+            {showNav && (
+                <button
+                    css={navBtnStyle}
+                    onClick={handler.handlePrevPin}
+                    disabled={isFirst}
+                    aria-label="이전 핀"
+                >
+                    <ChevronLeft size={16} />
+                </button>
+            )}
+
             {/* 중앙 진행 정보 */}
             <div css={infoStyle}>
                 <span css={progressStyle}>
@@ -70,6 +88,18 @@ const MapControlButtons = ({
                 </span>
                 {formattedDate && <span css={dateStyle}>{formattedDate}</span>}
             </div>
+
+            {/* 일시정지 중에만 — 다음 핀 */}
+            {showNav && (
+                <button
+                    css={navBtnStyle}
+                    onClick={handler.handleNextPin}
+                    disabled={isLast}
+                    aria-label="다음 핀"
+                >
+                    <ChevronRight size={16} />
+                </button>
+            )}
 
             {/* 일시정지 / 재생 / 다시 재생 — 상태 기반 */}
             <button
@@ -118,6 +148,31 @@ const iconBtnStyle = css`
 
     &:active {
         background: rgba(255, 255, 255, 0.18);
+    }
+`;
+
+const navBtnStyle = css`
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    color: rgba(255, 255, 255, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+    -webkit-tap-highlight-color: transparent;
+
+    &:active:not(:disabled) {
+        background: rgba(255, 255, 255, 0.16);
+    }
+
+    &:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
     }
 `;
 

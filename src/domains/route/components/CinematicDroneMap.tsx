@@ -11,6 +11,8 @@ interface Props {
     pinPoints: PinPoint[];
     startFromIdx: number;
     isPaused: boolean;
+    /** true면 인트로 zoom 13 단계 스킵 + 즉시 ARRIVAL_3D_ZOOM에서 시작 (prev/next 점프). */
+    isJump?: boolean;
     onFlightStart: (targetIdx: number) => void;
     onDwellStart: (idx: number) => void;
     onDwellEnd: () => void;
@@ -47,10 +49,12 @@ function buildPhotoContent(mediaLink: string, onClick: () => void): HTMLElement 
 
 // 가까운 핀포인트(예: 같은 도시 내)는 줌 hold + 직진. 멀면 기존 wide-view 사이클.
 const HOLD_THRESHOLD_KM = 5;
-// dwell에서 180° 슬로우 회전 (cinematic showcase 전용, 다음 bearing 정렬은 별도 단계).
-const DWELL_ROTATE_MS = 8000;
-// 출발 직전 hold 모드에서 다음 핀포인트 방향으로 정렬할 때 사용할 duration.
-const ALIGN_BEFORE_DEPART_MS = 2000;
+// 출발 직전 다음 핀포인트 방향으로 정렬할 때 사용할 duration — dwell 시간을 채우는 역할.
+const ALIGN_BEFORE_DEPART_MS = 4500;
+// wide 모드에서 줌아웃 + heading 정렬을 한 번에 처리할 때 사용할 duration.
+const ZOOM_OUT_AND_ALIGN_MS = 2500;
+// 마지막 핀(다음 segment 없음)에서 사진을 구경할 시간.
+const LAST_PIN_HOLD_MS = 2000;
 // 도착 시 도달할 3D 건물 가시 zoom (Vector 3D 활성 시작점). 비행이 더 낮은 줌으로 끝나면 추가 zoomIn으로 보정.
 const ARRIVAL_3D_ZOOM = 17;
 
@@ -90,6 +94,7 @@ const CinematicDroneMap = ({
     pinPoints,
     startFromIdx,
     isPaused,
+    isJump = false,
     onFlightStart,
     onDwellStart,
     onDwellEnd,
@@ -186,6 +191,13 @@ const CinematicDroneMap = ({
                 ],
             });
 
+            // 점프 mount: startFromIdx까지의 경로는 "지나간" 것으로 표시
+            if (startFromIdx > 0) {
+                drawnPolylineRef.current.setPath(
+                    pinPoints.slice(0, startFromIdx + 1).map((p) => ({ lat: p.latitude, lng: p.longitude })),
+                );
+            }
+
             // PinPoint markers — AdvancedMarkerElement + PinElement
             // 도착 시 사진 원으로 변신 (handleArrival에서 content 교체).
             // mapId 미설정/marker lib 로드 실패 시 onVectorUnavailable로 위임 (deprecated Marker fallback 제거).
@@ -222,30 +234,6 @@ const CinematicDroneMap = ({
                 if (cancelledRef.current) { resolve(); return; }
                 setTimeout(resolve, ms);
             });
-
-        // Dwell용 슬로우 회전 — sweep만큼 한 방향으로 cinematic 회전 (정렬 X)
-        const slowRotate = (durationMs: number, sweepDegrees: number): Promise<void> => {
-            return new Promise((resolve) => {
-                if (!isVectorRef.current) {
-                    setTimeout(resolve, durationMs);
-                    return;
-                }
-                const startHeading = map.getHeading() ?? 0;
-                const startTime = performance.now();
-                const tick = (now: number) => {
-                    if (cancelledRef.current) { resolve(); return; }
-                    const t = Math.min((now - startTime) / durationMs, 1);
-                    const eased = easeInOutCubic(t);
-                    map.moveCamera({
-                        heading: startHeading + sweepDegrees * eased,
-                        tilt: 45,
-                    });
-                    if (t < 1) rafRef.current = requestAnimationFrame(tick);
-                    else resolve();
-                };
-                rafRef.current = requestAnimationFrame(tick);
-            });
-        };
 
         // 다음 핀포인트 방향으로 최단 경로 회전 정렬 (출발 직전 hold 모드용)
         const alignHeadingTo = (durationMs: number, targetHeading: number): Promise<void> => {
@@ -373,7 +361,7 @@ const CinematicDroneMap = ({
 
             // === HOLD 모드 — 줌/heading 유지, center만 lerp (직진) ===
             if (mode === 'hold') {
-                // heading은 직전 slowRotateAndAlign이 nextBearing으로 이미 정렬해둠
+                // heading은 직전 alignHeadingTo가 nextBearing으로 이미 정렬해둠
                 const heldZoom = map.getZoom() ?? 16;
                 const heldHeading = map.getHeading() ?? 0;
                 const duration = Math.max(distKm * 800, 1500);
@@ -544,7 +532,14 @@ const CinematicDroneMap = ({
                     }
                 }
             } else {
-                await zoomIn(1800, 4, 0);
+                // 초기 진입 — 현재 zoom 기반 동적 delta. 이미 17 이상(점프 mount)이면 짧은 settle만.
+                const currentZoom = map.getZoom() ?? 13;
+                const delta = Math.max(0, ARRIVAL_3D_ZOOM - currentZoom);
+                if (delta > 0) {
+                    await zoomIn(1800, delta, 0);
+                } else {
+                    await sleep(500);
+                }
             }
             if (cancelledRef.current) return;
 
@@ -556,17 +551,15 @@ const CinematicDroneMap = ({
             await sleep(400);
             if (cancelledRef.current) return;
 
-            // 4. 천천히 180° cinematic 회전 (showcase 전용, 정렬은 출발 직전 단계에서)
-            await slowRotate(DWELL_ROTATE_MS, 180);
-            if (cancelledRef.current) return;
+            // 4. (180° showcase 회전 제거 — 출발 직전 alignment 단계가 dwell 시간을 채움)
             const next = pinPoints[arrivedIdx + 1];
 
             // 5. 일시정지 상태면 사용자가 재개할 때까지 대기
             await waitWhilePaused();
             if (cancelledRef.current) return;
 
-            // 6. 짧은 hold
-            await sleep(500);
+            // 6. 짧은 hold (마지막 핀이면 사진 구경 시간을 더 길게)
+            await sleep(next ? 500 : LAST_PIN_HOLD_MS);
             if (cancelledRef.current) return;
 
             // 7. 마지막 PinPoint면 종료 (바는 visible 유지 — restart 버튼 표시 위해)
@@ -593,7 +586,7 @@ const CinematicDroneMap = ({
             const nextMode = getSegmentMode(nextDistKm);
             const nextBearing = calcBearing(pinPoints[arrivedIdx], next!);
             if (nextMode === 'wide') {
-                await zoomOutAndAlign(arrivedIdx, 1800);
+                await zoomOutAndAlign(arrivedIdx, ZOOM_OUT_AND_ALIGN_MS);
             } else {
                 await alignHeadingTo(ALIGN_BEFORE_DEPART_MS, nextBearing);
             }
@@ -604,7 +597,27 @@ const CinematicDroneMap = ({
 
         const startTour = async () => {
             const first = pinPoints[startFromIdx];
-            // 인트로: 첫 PinPoint 위에 넓은 시야로 시작 (zoom 13)
+
+            // 점프 mount: intro zoom 13 스킵, 즉시 3D 줌(17)에서 시작
+            if (isJump) {
+                if (isVectorRef.current) {
+                    map.moveCamera({
+                        center: { lat: first.latitude, lng: first.longitude },
+                        zoom: ARRIVAL_3D_ZOOM,
+                        tilt: 45,
+                        heading: 0,
+                    });
+                } else {
+                    map.panTo({ lat: first.latitude, lng: first.longitude });
+                    map.setZoom(ARRIVAL_3D_ZOOM);
+                }
+                await sleep(50);
+                if (cancelledRef.current) return;
+                handleArrival(startFromIdx);
+                return;
+            }
+
+            // 일반 mount: 인트로 wide view에서 시작
             if (isVectorRef.current) {
                 map.moveCamera({
                     center: { lat: first.latitude, lng: first.longitude },
@@ -619,7 +632,6 @@ const CinematicDroneMap = ({
             await sleep(1200);
             if (cancelledRef.current) return;
 
-            // 첫 PinPoint도 도착 시퀀스를 거침 (생략되지 않음)
             handleArrival(startFromIdx);
         };
 

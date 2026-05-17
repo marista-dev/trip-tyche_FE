@@ -55,6 +55,10 @@ const TripRoutePage = () => {
     const [progressIdx, setProgressIdx] = useState(initialResumeIdx);
     const [isDwelling, setIsDwelling] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
+    // 점프(prev/next) 시 startFromIdx로 사용. null이면 일반 모드(restart/초기 진입).
+    const [jumpStartIdx, setJumpStartIdx] = useState<number | null>(null);
+    // true면 CinematicDroneMap이 인트로 wide view 스킵하고 즉시 3D zoom에서 시작.
+    const [isJumpMode, setIsJumpMode] = useState(false);
 
     useEffect(() => {
         if (result?.success) {
@@ -121,8 +125,30 @@ const TripRoutePage = () => {
         setIsComplete(false);
         setIsDwelling(false);
         setIsPaused(false);
+        setJumpStartIdx(null);
+        setIsJumpMode(false);
         setTourKey((k) => k + 1);
     }, []);
+
+    // 점프 핸들러 — 줌인 상태 유지하며 즉시 prev/next 핀으로 이동, 일시정지 유지.
+    const jumpTo = useCallback((target: number) => {
+        setProgressIdx(target);
+        setIsDwelling(false);
+        setIsPaused(true);
+        setJumpStartIdx(target);
+        setIsJumpMode(true);
+        setTourKey((k) => k + 1);
+    }, []);
+
+    const handlePrevPin = useCallback(() => {
+        if (progressIdx <= 0) return;
+        jumpTo(progressIdx - 1);
+    }, [progressIdx, jumpTo]);
+
+    const handleNextPin = useCallback(() => {
+        if (progressIdx >= pinPoints.length - 1) return;
+        jumpTo(progressIdx + 1);
+    }, [progressIdx, pinPoints.length, jumpTo]);
 
     const handleDateViewClick = useCallback(() => {
         const dates = addStartDateAndEndDateToImageDates(tripStartDate, tripEndDate, imageDates);
@@ -141,7 +167,7 @@ const TripRoutePage = () => {
         return null;
     }
 
-    const startFromIdx = tourKey === 0 ? initialResumeIdx : 0;
+    const startFromIdx = jumpStartIdx !== null ? jumpStartIdx : (tourKey === 0 ? initialResumeIdx : 0);
     const currentPinPointDate = pinPoints[progressIdx]?.recordDate;
 
     return (
@@ -159,6 +185,7 @@ const TripRoutePage = () => {
                     pinPoints={pinPoints}
                     startFromIdx={startFromIdx}
                     isPaused={isPaused}
+                    isJump={isJumpMode}
                     onFlightStart={handleFlightStart}
                     onDwellStart={handleDwellStart}
                     onDwellEnd={handleDwellEnd}
@@ -179,6 +206,8 @@ const TripRoutePage = () => {
                     handleDateViewClick,
                     handleRestart,
                     handlePauseToggle,
+                    handlePrevPin,
+                    handleNextPin,
                 }}
             />
         </div>
