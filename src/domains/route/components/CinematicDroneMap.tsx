@@ -235,7 +235,8 @@ const CinematicDroneMap = ({
                 setTimeout(resolve, ms);
             });
 
-        // 다음 핀포인트 방향으로 최단 경로 회전 정렬 (출발 직전 hold 모드용)
+        // 다음 핀포인트 방향으로 최단 경로 회전 정렬. pausedRef 변경 시 즉시 종료(중간 heading 유지).
+        // 호출자가 pausedRef.current를 다시 체크해서 retry/wait 처리.
         const alignHeadingTo = (durationMs: number, targetHeading: number): Promise<void> => {
             return new Promise((resolve) => {
                 if (!isVectorRef.current) {
@@ -250,6 +251,7 @@ const CinematicDroneMap = ({
                 const startTime = performance.now();
                 const tick = (now: number) => {
                     if (cancelledRef.current) { resolve(); return; }
+                    if (pausedRef.current) { resolve(); return; }
                     const t = Math.min((now - startTime) / durationMs, 1);
                     const eased = easeInOutCubic(t);
                     map.moveCamera({
@@ -556,7 +558,8 @@ const CinematicDroneMap = ({
             }
 
             // 8. 줌 17 유지 + 사진 visible 상태에서 다음 핀 방향으로 천천히 정렬 (mode 무관)
-            //    — 사용자가 사진과 3D 건물을 충분히 볼 시간 확보
+            //    — 사용자가 사진과 3D 건물을 충분히 볼 시간 확보.
+            //    alignHeadingTo는 pause-aware: 일시정지 누르면 즉시 중단 → waitWhilePaused 후 재시도.
             const nextDistKm = calculateDistance(
                 pinPoints[arrivedIdx].latitude,
                 pinPoints[arrivedIdx].longitude,
@@ -565,8 +568,14 @@ const CinematicDroneMap = ({
             );
             const nextMode = getSegmentMode(nextDistKm);
             const nextBearing = calcBearing(pinPoints[arrivedIdx], next!);
-            await alignHeadingTo(ALIGN_BEFORE_DEPART_MS, nextBearing);
-            if (cancelledRef.current) return;
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+                await alignHeadingTo(ALIGN_BEFORE_DEPART_MS, nextBearing);
+                if (cancelledRef.current) return;
+                if (!pausedRef.current) break;
+                await waitWhilePaused();
+                if (cancelledRef.current) return;
+            }
 
             // 9. 다음 구간 준비 — 바 숨김 + 사진 → 핀
             callbacksRef.current.onDwellEnd();
