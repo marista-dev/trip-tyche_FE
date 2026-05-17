@@ -4,6 +4,8 @@ import { createPortal } from 'react-dom';
 import { css } from '@emotion/react';
 import { ChevronRight, Edit, Image, Share2, Trash2 } from 'lucide-react';
 
+import { getIataFromCountryString } from '@/domains/trip/airport';
+import { TICKET } from '@/domains/trip/constants';
 import { COLORS } from '@/shared/constants/style';
 
 interface ActionSheetTrip {
@@ -78,7 +80,7 @@ const TripTicketActionSheet = ({
 
     if (!mounted) return null;
 
-    const destination = trip.country.split('/')[1] || '—';
+    const destinationIata = getIataFromCountryString(trip.country);
 
     const actions = isOwner && !isGuest
         ? [
@@ -210,7 +212,7 @@ const TripTicketActionSheet = ({
                                 margin-bottom: 3px;
                             `}
                         >
-                            한국 → {destination}
+                            {TICKET.DEPARTURE_IATA} → {destinationIata}
                         </div>
                         <div
                             css={css`

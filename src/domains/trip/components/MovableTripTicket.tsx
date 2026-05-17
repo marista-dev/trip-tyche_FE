@@ -1,6 +1,7 @@
 import { css } from '@emotion/react';
 
 import characterImg from '@/assets/images/character-icon.png';
+import { getIataFromCountryString } from '@/domains/trip/airport';
 import { TICKET } from '@/domains/trip/constants';
 import { Trip } from '@/domains/trip/types';
 import useUserStore from '@/domains/user/stores/useUserStore';
@@ -17,7 +18,7 @@ const MovableTripTicket = ({ trip }: IntroTicketProps) => {
     const userInfo = useUserStore((state) => state.userInfo);
 
     const userNickname = userInfo?.nickname || '';
-    const destination = country?.split('/')[1] || '';
+    const destinationIata = getIataFromCountryString(country);
 
     const { ticketStyle, handlers } = useTicket3DEffect();
 
@@ -52,7 +53,7 @@ const MovableTripTicket = ({ trip }: IntroTicketProps) => {
 
             <main css={contentStyle}>
                 <div css={citiesStyle}>
-                    <p css={countryNameStyle}>{TICKET.DEFAULT_COUNTY}</p>
+                    <p css={countryNameStyle}>{TICKET.DEPARTURE_IATA}</p>
                     <div css={dotsAndCharacterContainer}>
                         <div css={pointDots}>
                             <div css={startPointDot} />
@@ -63,7 +64,7 @@ const MovableTripTicket = ({ trip }: IntroTicketProps) => {
                             <div css={characterShadow}></div>
                         </div>
                     </div>
-                    <p css={countryNameStyle}>{destination}</p>
+                    <p css={countryNameStyle}>{destinationIata}</p>
                 </div>
 
                 <div css={titleSection}>

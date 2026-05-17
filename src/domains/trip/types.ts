@@ -28,4 +28,5 @@ export interface Country {
     nameKo: string;
     nameEn: string;
     value: string;
+    iata: string;
 }

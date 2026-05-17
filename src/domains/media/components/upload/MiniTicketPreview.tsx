@@ -1,6 +1,8 @@
 import { css } from '@emotion/react';
 import { Plane } from 'lucide-react';
 
+import { getIataFromCountryString } from '@/domains/trip/airport';
+import { TICKET } from '@/domains/trip/constants';
 import { TripInfo } from '@/domains/trip/types';
 import { COLORS } from '@/shared/constants/style';
 
@@ -27,16 +29,6 @@ const formatShort = (iso: string) => {
 
 const seededHue = (seed: string) => (seed.charCodeAt(0) || 65) % 360;
 
-const parseCountry = (country: string) => {
-    if (!country) return { emoji: '🌍', nameKo: '여행지', code3: 'TRP' };
-    const parts = country.split('/');
-    const emoji = parts[0] || '🌍';
-    const nameKo = parts[1] || '여행지';
-    const nameEn = parts[2] || 'TRIP';
-    const code3 = nameEn.replace(/\s/g, '').slice(0, 3).toUpperCase();
-    return { emoji, nameKo, code3 };
-};
-
 const calcDuration = (start: string, end: string, isDayTrip: boolean) => {
     if (isDayTrip) return '당일치기';
     if (!start || !end) return '—';
@@ -57,7 +49,7 @@ const MiniTicketPreview = ({
     sample = false,
     isDayTrip = false,
 }: MiniTicketPreviewProps) => {
-    const { code3 } = parseCountry(trip.country);
+    const destinationIata = getIataFromCountryString(trip.country);
     const hue = seededHue(trip.tripTitle || trip.country || 'A');
     const fallbackBg = `linear-gradient(135deg, oklch(0.7 0.08 ${hue}) 0%, oklch(0.35 0.08 ${(hue + 40) % 360}) 100%)`;
 
@@ -88,11 +80,11 @@ const MiniTicketPreview = ({
                 <span css={notchLeft} />
                 <span css={notchRight} />
                 <div css={routeRow}>
-                    <div css={iata}>ICN</div>
+                    <div css={iata}>{TICKET.DEPARTURE_IATA}</div>
                     <div css={dashLine} />
                     <Plane size={13} color='#fff' />
                     <div css={dashLine} />
-                    <div css={iataRight}>{code3}</div>
+                    <div css={iataRight}>{destinationIata}</div>
                 </div>
                 <div css={metaRow}>
                     <div>

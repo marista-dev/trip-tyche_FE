@@ -4,6 +4,7 @@ import { css } from '@emotion/react';
 
 import characterImg from '@/assets/images/character-icon.png';
 import { SharedTripDetail } from '@/domains/share/types';
+import { getIataFromCountryString } from '@/domains/trip/airport';
 import { TICKET } from '@/domains/trip/constants';
 import { formatToDot } from '@/libs/utils/date';
 import { COLORS, FONT_SIZES } from '@/shared/constants/style';
@@ -18,7 +19,7 @@ const SharedTicket = ({ trip, userNickname }: IntroTicketProps) => {
     const [isAnimating, setIsAnimating] = useState(false);
 
     const countryEmoji = country.split('/')[0] || '';
-    const destination = country.split('/')[1] || '';
+    const destinationIata = getIataFromCountryString(country);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -54,7 +55,7 @@ const SharedTicket = ({ trip, userNickname }: IntroTicketProps) => {
 
                 <div css={contentStyle}>
                     <div css={citiesStyle}>
-                        <p css={countryNameStyle}>{TICKET.DEFAULT_COUNTY}</p>
+                        <p css={countryNameStyle}>{TICKET.DEPARTURE_IATA}</p>
                         <div css={dotsAndCharacterContainer}>
                             <div css={pointDots}>
                                 <div css={startPointDot} />
@@ -65,7 +66,7 @@ const SharedTicket = ({ trip, userNickname }: IntroTicketProps) => {
                                 <div css={characterShadow}></div>
                             </div>
                         </div>
-                        <p css={countryNameStyle}>{destination}</p>
+                        <p css={countryNameStyle}>{destinationIata}</p>
                     </div>
 
                     <div css={titleStyle}>

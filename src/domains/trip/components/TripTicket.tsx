@@ -5,7 +5,9 @@ import { Plus, Trash } from 'lucide-react';
 
 import ShareModal from '@/domains/share/components/ShareModal';
 import { useTripImages } from '@/domains/media/hooks/queries';
+import { getIataFromCountryString } from '@/domains/trip/airport';
 import TripTicketActionSheet from '@/domains/trip/components/TripTicketActionSheet';
+import { TICKET } from '@/domains/trip/constants';
 import { Trip } from '@/domains/trip/types';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import { formatHyphenToDot, formatToDot } from '@/libs/utils/date';
@@ -53,7 +55,7 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
     if (isCompletedTrip === undefined) return null;
 
     const isOwner = userInfo?.nickname === ownerNickname;
-    const destination = isCompletedTrip ? country?.split('/')[1] || '' : '트립티케';
+    const destinationIata = isCompletedTrip ? getIataFromCountryString(country) : 'TYC';
     const formattedStartDate = isCompletedTrip ? formatToDot(startDate) : '—';
     const formattedEndDate = isCompletedTrip ? formatToDot(endDate) : '—';
     const sharedPeople = [ownerNickname || '', ...(sharedUsersNicknames || [])];
@@ -129,7 +131,7 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
 
                     {/* Route row */}
                     <div css={routeRowStyle}>
-                        <div css={routeCodeStyle}>한국</div>
+                        <div css={routeCodeStyle}>{TICKET.DEPARTURE_IATA}</div>
                         <div css={routeLineStyle}>
                             <div css={dashedLineStyle} />
                             <div css={dashedLineStyle} />
@@ -146,7 +148,7 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
                                 </svg>
                             )}
                         </div>
-                        <div css={[routeCodeStyle, css`text-align: right;`]}>{destination}</div>
+                        <div css={[routeCodeStyle, css`text-align: right;`]}>{destinationIata}</div>
                     </div>
 
                     {/* Meta row */}
