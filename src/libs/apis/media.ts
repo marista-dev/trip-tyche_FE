@@ -35,12 +35,28 @@ export const mediaAPI = {
         }
     },
     // S3 스토리지로 미디어 파일 업로드
+    // raw axios.put은 기본 timeout이 없어 느린/끊긴 네트워크에서 영원히 pending 상태가 됨.
+    // onUploadProgress가 30초 동안 한 번도 발생하지 않으면 stall로 간주하고 abort한다.
     uploadToS3: async (presignedUrl: string, file: File) => {
-        await axios.put(presignedUrl, file, {
-            headers: {
-                'Content-Type': file.type,
-            },
-        });
+        const STALL_TIMEOUT_MS = 30_000;
+        const controller = new AbortController();
+        let stallTimer: ReturnType<typeof setTimeout> | null = null;
+        const resetStallTimer = () => {
+            if (stallTimer) clearTimeout(stallTimer);
+            stallTimer = setTimeout(() => controller.abort(), STALL_TIMEOUT_MS);
+        };
+        resetStallTimer();
+        try {
+            await axios.put(presignedUrl, file, {
+                headers: {
+                    'Content-Type': file.type,
+                },
+                signal: controller.signal,
+                onUploadProgress: resetStallTimer,
+            });
+        } finally {
+            if (stallTimer) clearTimeout(stallTimer);
+        }
     },
     // 미디어 파일 메타데이터 등록 (fileKey, latitude, longitude, recordDate)
     createMediaFileMetadata: async (

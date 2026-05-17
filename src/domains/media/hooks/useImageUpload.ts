@@ -32,7 +32,15 @@ export const useImageUpload = () => {
         return uniqueImages;
     };
 
-    const uploadImagesToS3 = async (uniqueFiles: FileList) => {
+    // postUploadTask는 S3 업로드 + 메타등록 이후에 같은 체인으로 묶어 실행할 작업(예: status 전환).
+    // 실패 시 step3의 waitForBackgroundUpload에서 함께 surface되어 retry UI로 노출된다.
+    const uploadImagesToS3 = async (uniqueFiles: FileList, postUploadTask?: () => Promise<unknown>) => {
+        const setRejected = (err: unknown) => {
+            const failed = Promise.reject(err instanceof Error ? err : new Error(String(err)));
+            failed.catch(() => {});
+            bgUploadPromiseRef.current = failed;
+        };
+
         try {
             const fileArray = Array.from(uniqueFiles);
             const imageNames = fileArray.map((file) => ({ fileName: file.name }));
@@ -42,7 +50,10 @@ export const useImageUpload = () => {
                 mediaAPI.requestPresignedUrls(tripKey!, imageNames),
             ]);
 
-            if (!presignedResult.success) throw new Error(presignedResult.error);
+            if (!presignedResult.success) {
+                setRejected(new Error(presignedResult.error));
+                return;
+            }
             const presignedUrls = presignedResult.data;
 
             setImages(imagesWithMetadata);
@@ -53,17 +64,18 @@ export const useImageUpload = () => {
             });
 
             // S3 업로드 완료 후 메타데이터 등록 (순서 보장 — 워커가 originals/ 접근 전 파일 존재 보장)
-            const rawUpload = Promise.all(
+            let rawUpload: Promise<void> = Promise.all(
                 presignedUrls.map((urlInfo: PresignedUrlResponse, index: number) =>
                     mediaAPI.uploadToS3(urlInfo.presignedPutUrl, fileArray[index]),
                 ),
-            )
-                .then(() => submitMetadata(imagesWithMetadata, presignedUrls))
-                .then(() => {});
+            ).then(() => submitMetadata(imagesWithMetadata, presignedUrls));
+            if (postUploadTask) {
+                rawUpload = rawUpload.then(() => postUploadTask()).then(() => undefined);
+            }
             bgUploadPromiseRef.current = rawUpload;
             rawUpload.catch(() => {});
-        } catch {
-            // presigned URL 요청 또는 메타데이터 POST 실패
+        } catch (err) {
+            setRejected(err);
         }
     };
 
