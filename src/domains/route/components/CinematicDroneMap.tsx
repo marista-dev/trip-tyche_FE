@@ -51,8 +51,8 @@ function buildPhotoContent(mediaLink: string, onClick: () => void): HTMLElement 
 const HOLD_THRESHOLD_KM = 5;
 // 출발 직전 다음 핀포인트 방향으로 정렬할 때 사용할 duration — dwell 시간을 채우는 역할.
 const ALIGN_BEFORE_DEPART_MS = 4500;
-// wide 모드에서 줌아웃 + heading 정렬을 한 번에 처리할 때 사용할 duration.
-const ZOOM_OUT_AND_ALIGN_MS = 2500;
+// wide 모드 출발 직전 줌 17 → base zoom으로 천천히 줌아웃할 때 사용할 duration.
+const ZOOM_OUT_MS = 2000;
 // 마지막 핀(다음 segment 없음)에서 사진을 구경할 시간.
 const LAST_PIN_HOLD_MS = 2000;
 // 도착 시 도달할 3D 건물 가시 zoom (Vector 3D 활성 시작점). 비행이 더 낮은 줌으로 끝나면 추가 zoomIn으로 보정.
@@ -111,7 +111,7 @@ const CinematicDroneMap = ({
     const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
     const pinContentsRef = useRef<google.maps.marker.PinElement[]>([]); // 핀 원본 보관 (복원용)
     const isVectorRef = useRef(false);
-    // 직전 segment 모드 추적 — hold→hold면 도착 settle 짧게, zoomOutAndAlign 스킵
+    // 직전 segment 모드 추적 — hold→hold면 도착 settle 짧게, wide면 줌인 보정 필요
     const lastModeRef = useRef<SegmentMode>('wide');
     const pausedRef = useRef(isPaused);
     const callbacksRef = useRef({ onFlightStart, onDwellStart, onDwellEnd, onPhotoMarkerClick, onComplete, onVectorUnavailable });
@@ -291,19 +291,10 @@ const CinematicDroneMap = ({
             });
         };
 
-        const zoomOutAndAlign = (currentIdx: number, durationMs: number): Promise<void> => {
+        // wide 모드 출발 직전 줌아웃 — heading은 이미 alignHeadingTo가 정렬해뒀으므로 변경 없음.
+        const zoomOut = (durationMs: number, targetZoom: number): Promise<void> => {
             return new Promise((resolve) => {
-                const cur = pinPoints[currentIdx];
-                const next = pinPoints[currentIdx + 1];
-                const distKm = calculateDistance(cur.latitude, cur.longitude, next.latitude, next.longitude);
-                const targetZoom = getSegmentZoom(distKm);
-                const targetHeading = calcBearing(cur, next);
-                const startZoom = map.getZoom() ?? 18;
-                const startHeading = map.getHeading() ?? 0;
-                // 최단 각도 회전
-                let delta = targetHeading - startHeading;
-                if (delta > 180) delta -= 360;
-                if (delta < -180) delta += 360;
+                const startZoom = map.getZoom() ?? 17;
                 const startTime = performance.now();
                 const tick = (now: number) => {
                     if (cancelledRef.current) { resolve(); return; }
@@ -311,11 +302,7 @@ const CinematicDroneMap = ({
                     const eased = easeInOutCubic(t);
                     const z = lerp(startZoom, targetZoom, eased);
                     if (isVectorRef.current) {
-                        map.moveCamera({
-                            zoom: z,
-                            tilt: 45,
-                            heading: startHeading + delta * eased,
-                        });
+                        map.moveCamera({ zoom: z, tilt: 45 });
                     } else {
                         map.setZoom(z);
                     }
@@ -568,15 +555,8 @@ const CinematicDroneMap = ({
                 return;
             }
 
-            // 8. 다음 구간으로 — 바 숨김
-            callbacksRef.current.onDwellEnd();
-            swapBackToPin(arrivedIdx);
-            await sleep(250);
-            if (cancelledRef.current) return;
-
-            // 9. 다음 segment 모드 미리 판정
-            //    - wide: zoomOutAndAlign이 줌아웃 + heading 정렬 동시 수행
-            //    - hold: 줌 유지 + 출발 직전에 명시적 alignment (천천히)
+            // 8. 줌 17 유지 + 사진 visible 상태에서 다음 핀 방향으로 천천히 정렬 (mode 무관)
+            //    — 사용자가 사진과 3D 건물을 충분히 볼 시간 확보
             const nextDistKm = calculateDistance(
                 pinPoints[arrivedIdx].latitude,
                 pinPoints[arrivedIdx].longitude,
@@ -585,12 +565,20 @@ const CinematicDroneMap = ({
             );
             const nextMode = getSegmentMode(nextDistKm);
             const nextBearing = calcBearing(pinPoints[arrivedIdx], next!);
-            if (nextMode === 'wide') {
-                await zoomOutAndAlign(arrivedIdx, ZOOM_OUT_AND_ALIGN_MS);
-            } else {
-                await alignHeadingTo(ALIGN_BEFORE_DEPART_MS, nextBearing);
-            }
+            await alignHeadingTo(ALIGN_BEFORE_DEPART_MS, nextBearing);
             if (cancelledRef.current) return;
+
+            // 9. 다음 구간 준비 — 바 숨김 + 사진 → 핀
+            callbacksRef.current.onDwellEnd();
+            swapBackToPin(arrivedIdx);
+            await sleep(250);
+            if (cancelledRef.current) return;
+
+            // 10. wide 모드만 줌아웃 (heading은 이미 정렬됨). hold면 줌 유지하고 바로 직진.
+            if (nextMode === 'wide') {
+                await zoomOut(ZOOM_OUT_MS, getSegmentZoom(nextDistKm));
+                if (cancelledRef.current) return;
+            }
 
             flyToNext(arrivedIdx);
         };
