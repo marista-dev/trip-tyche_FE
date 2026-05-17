@@ -43,8 +43,15 @@ const TripImageUploadPage = () => {
     const { isModalOpen, closeModal } = useBrowserCheck();
 
     const { isFormComplete } = useTripFormValidation(tripForm);
-    const { images, progress, uploadStats, extractMetaData, uploadImagesToS3, waitForBackgroundUpload } =
-        useImageUpload();
+    const {
+        images,
+        progress,
+        uploadStats,
+        extractMetaData,
+        uploadImagesToS3,
+        retryFailedUploads,
+        waitForBackgroundUpload,
+    } = useImageUpload();
 
     const showToast = useToastStore((state) => state.showToast);
     const userInfo = useUserStore((state) => state.userInfo);
@@ -156,6 +163,7 @@ const TripImageUploadPage = () => {
                         ownerNickname={userInfo?.nickname}
                         photoCount={images?.length}
                         uploadStats={uploadStats}
+                        onRetryUpload={retryFailedUploads}
                     />
                 );
         }

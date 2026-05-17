@@ -62,6 +62,18 @@ export interface UploadStats {
     failed: number;
 }
 
+// 업로드 chain의 재시도 단계를 추적하기 위한 컨텍스트.
+// 실패한 인덱스만 다시 업로드 → 이미 끝난 단계(메타등록/status 전환)는 건너뛴다.
+interface UploadContext {
+    fileArray: File[];
+    presignedUrls: PresignedUrlResponse[];
+    imagesWithMetadata: ClientImageFile[];
+    postUploadTask?: () => Promise<unknown>;
+    failedIndices: Set<number>;
+    metadataSubmitted: boolean;
+    postUploadTaskCompleted: boolean;
+}
+
 export const useImageUpload = () => {
     const [images, setImages] = useState<ClientImageFile[]>();
     const [imageCategories, setImageCategories] = useState<MediaFileCategories>();
@@ -72,6 +84,7 @@ export const useImageUpload = () => {
     });
     const [uploadStats, setUploadStats] = useState<UploadStats>({ total: 0, succeeded: 0, failed: 0 });
     const bgUploadPromiseRef = useRef<Promise<void> | null>(null);
+    const uploadContextRef = useRef<UploadContext | null>(null);
 
     const { tripKey } = useParams();
 
@@ -82,6 +95,49 @@ export const useImageUpload = () => {
         return uniqueImages;
     };
 
+    const submitMetadata = async (images: ClientImageFile[], presignedUrls: PresignedUrlResponse[]) => {
+        const metaDatas = presignedUrls.map((url: PresignedUrlResponse, index: number) => {
+            const { recordDate, latitude, longitude } = images[index];
+            return {
+                fileKey: url.fileKey,
+                latitude: latitude || DEFAULT_METADATA.LOCATION,
+                longitude: longitude || DEFAULT_METADATA.LOCATION,
+                recordDate: recordDate || DEFAULT_METADATA.DATE,
+            };
+        });
+        await mediaAPI.createMediaFileMetadata(tripKey!, metaDatas);
+    };
+
+    // 지정한 인덱스만 업로드 → (이미 끝난 단계가 아닐 경우) 메타등록 → postUploadTask 순차 실행.
+    // 초기 업로드와 retry 양쪽에서 재사용. ctx의 플래그로 idempotency를 보장한다.
+    const buildUploadChain = (ctx: UploadContext, indicesToUpload: number[]): Promise<void> =>
+        (async () => {
+            if (indicesToUpload.length > 0) {
+                await runWithPool(indicesToUpload, MAX_CONCURRENT_S3_UPLOADS, async (index: number) => {
+                    try {
+                        await uploadWithRetry(ctx.presignedUrls[index].presignedPutUrl, ctx.fileArray[index]);
+                        ctx.failedIndices.delete(index);
+                        setUploadStats((s) => ({ ...s, succeeded: s.succeeded + 1 }));
+                    } catch {
+                        ctx.failedIndices.add(index);
+                        setUploadStats((s) => ({ ...s, failed: s.failed + 1 }));
+                        // 던지지 않음 — 풀이 끝까지 돌며 모든 실패를 누적하고, 끝난 뒤 한 번에 판단
+                    }
+                });
+            }
+            if (ctx.failedIndices.size > 0) {
+                throw new Error(`${ctx.failedIndices.size}장 업로드 실패`);
+            }
+            if (!ctx.metadataSubmitted) {
+                await submitMetadata(ctx.imagesWithMetadata, ctx.presignedUrls);
+                ctx.metadataSubmitted = true;
+            }
+            if (ctx.postUploadTask && !ctx.postUploadTaskCompleted) {
+                await ctx.postUploadTask();
+                ctx.postUploadTaskCompleted = true;
+            }
+        })();
+
     // postUploadTask는 S3 업로드 + 메타등록 이후에 같은 체인으로 묶어 실행할 작업(예: status 전환).
     // 실패 시 step3의 waitForBackgroundUpload에서 함께 surface되어 retry UI로 노출된다.
     const uploadImagesToS3 = async (uniqueFiles: FileList, postUploadTask?: () => Promise<unknown>) => {
@@ -89,6 +145,7 @@ export const useImageUpload = () => {
             const failed = Promise.reject(err instanceof Error ? err : new Error(String(err)));
             failed.catch(() => {});
             bgUploadPromiseRef.current = failed;
+            uploadContextRef.current = null;
         };
 
         try {
@@ -116,24 +173,19 @@ export const useImageUpload = () => {
             // 업로드 진행 상태를 step3에 노출하기 위한 카운터 초기화
             setUploadStats({ total: presignedUrls.length, succeeded: 0, failed: 0 });
 
-            // S3 업로드 완료 후 메타데이터 등록 (순서 보장 — 워커가 originals/ 접근 전 파일 존재 보장)
-            // 각 파일은 uploadWithRetry로 최대 3회 시도 → 일시적 단절 자동 흡수
-            let rawUpload: Promise<void> = runWithPool(
+            const ctx: UploadContext = {
+                fileArray,
                 presignedUrls,
-                MAX_CONCURRENT_S3_UPLOADS,
-                async (urlInfo: PresignedUrlResponse, index: number) => {
-                    try {
-                        await uploadWithRetry(urlInfo.presignedPutUrl, fileArray[index]);
-                        setUploadStats((s) => ({ ...s, succeeded: s.succeeded + 1 }));
-                    } catch (e) {
-                        setUploadStats((s) => ({ ...s, failed: s.failed + 1 }));
-                        throw e;
-                    }
-                },
-            ).then(() => submitMetadata(imagesWithMetadata, presignedUrls));
-            if (postUploadTask) {
-                rawUpload = rawUpload.then(() => postUploadTask()).then(() => undefined);
-            }
+                imagesWithMetadata,
+                postUploadTask,
+                failedIndices: new Set(),
+                metadataSubmitted: false,
+                postUploadTaskCompleted: false,
+            };
+            uploadContextRef.current = ctx;
+
+            const allIndices = Array.from({ length: presignedUrls.length }, (_, i) => i);
+            const rawUpload = buildUploadChain(ctx, allIndices);
             bgUploadPromiseRef.current = rawUpload;
             rawUpload.catch(() => {});
         } catch (err) {
@@ -141,17 +193,19 @@ export const useImageUpload = () => {
         }
     };
 
-    const submitMetadata = async (images: ClientImageFile[], presignedUrls: PresignedUrlResponse[]) => {
-        const metaDatas = presignedUrls.map((url: PresignedUrlResponse, index: number) => {
-            const { recordDate, latitude, longitude } = images[index];
-            return {
-                fileKey: url.fileKey,
-                latitude: latitude || DEFAULT_METADATA.LOCATION,
-                longitude: longitude || DEFAULT_METADATA.LOCATION,
-                recordDate: recordDate || DEFAULT_METADATA.DATE,
-            };
-        });
-        await mediaAPI.createMediaFileMetadata(tripKey!, metaDatas);
+    // step3 retry 버튼이 호출. 실패한 인덱스만 다시 업로드 → 남은 chain(메타등록/status 전환)을 이어서 실행.
+    // bgUploadPromiseRef를 새 promise로 교체하므로, 호출 직후 waitForBackgroundUpload는 새 진행 상태를 await한다.
+    const retryFailedUploads = (): void => {
+        const ctx = uploadContextRef.current;
+        if (!ctx) return;
+
+        const toRetry = Array.from(ctx.failedIndices);
+        // 실패 카운터만 초기화 → 진행률이 신선하게 보임. succeeded는 누적 유지.
+        setUploadStats((s) => ({ ...s, failed: 0 }));
+
+        const newUpload = buildUploadChain(ctx, toRetry);
+        bgUploadPromiseRef.current = newUpload;
+        newUpload.catch(() => {});
     };
 
     const waitForBackgroundUpload = async () => {
@@ -166,6 +220,7 @@ export const useImageUpload = () => {
         uploadStats,
         extractMetaData,
         uploadImagesToS3,
+        retryFailedUploads,
         waitForBackgroundUpload,
     };
 };

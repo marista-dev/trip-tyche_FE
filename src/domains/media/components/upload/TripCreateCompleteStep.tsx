@@ -22,6 +22,7 @@ interface TripCreateCompleteStepProps {
     ownerNickname?: string;
     photoCount?: number;
     uploadStats?: UploadStats;
+    onRetryUpload?: () => void;
 }
 
 const ERROR_UPLOAD_MSG = '일부 사진 업로드에 실패했습니다. 다시 시도해 주세요.';
@@ -45,6 +46,7 @@ const TripCreateCompleteStep = ({
     ownerNickname,
     photoCount,
     uploadStats,
+    onRetryUpload,
 }: TripCreateCompleteStepProps) => {
     const [phase, setPhase] = useState<Phase>(0);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -96,6 +98,9 @@ const TripCreateCompleteStep = ({
     const handleRetry = () => {
         setErrorMsg(null);
         setPhase(0);
+        // 실패한 파일만 재업로드 → 새 bg promise를 ref에 설치한 뒤 runPhases가 그것을 await.
+        // onRetryUpload가 없거나 컨텍스트가 사라진 경우엔 기존 bg promise를 다시 await(= 같은 에러).
+        onRetryUpload?.();
         void runPhases();
     };
 
