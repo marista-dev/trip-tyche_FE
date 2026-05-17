@@ -20,7 +20,9 @@ export const toResult = async <T>(
         if (error instanceof AxiosError) {
             const errorResponse = error?.response?.data;
             onError?.();
-            return { success: false, error: errorResponse.message };
+            // 네트워크 단절(ERR_NETWORK)처럼 응답 자체가 없는 경우 errorResponse가 undefined가 되므로
+            // .message 직접 접근하면 TypeError로 toResult 자체가 reject되어 unhandled rejection 발생.
+            return { success: false, error: errorResponse?.message ?? MESSAGE.ERROR.UNKNOWN };
         }
         return { success: false, error: MESSAGE.ERROR.UNKNOWN };
     } finally {

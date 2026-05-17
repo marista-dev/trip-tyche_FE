@@ -25,6 +25,7 @@ import ConfirmModal from '@/shared/components/common/Modal/ConfirmModal';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import { ROUTES } from '@/shared/constants/route';
 import { COLORS } from '@/shared/constants/style';
+import { MESSAGE } from '@/shared/constants/ui';
 import useBrowserCheck from '@/shared/hooks/useBrowserCheck';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
@@ -101,12 +102,17 @@ const TripImageUploadPage = () => {
     const handleTripFormSubmit = async () => {
         if (!tripKey) return;
 
-        const result = await mutateAsync({ tripKey, tripForm });
-        if (result.success) {
-            // Step3에서 waitForBackgroundUpload + finalize를 순차 처리한다.
-            setStep('done');
-        } else {
-            showToast(result.error);
+        try {
+            const result = await mutateAsync({ tripKey, tripForm });
+            if (result.success) {
+                // Step3에서 waitForBackgroundUpload + finalize를 순차 처리한다.
+                setStep('done');
+            } else {
+                showToast(result.error);
+            }
+        } catch {
+            // toResult가 정상 동작하면 여기까지 오지 않지만, 다른 경로(react-query 내부 throw 등) 안전망.
+            showToast(MESSAGE.ERROR.UNKNOWN);
         }
     };
 

@@ -36,7 +36,9 @@ export const mediaAPI = {
     },
     // S3 스토리지로 미디어 파일 업로드
     // raw axios.put은 기본 timeout이 없어 느린/끊긴 네트워크에서 영원히 pending 상태가 됨.
-    // onUploadProgress가 30초 동안 한 번도 발생하지 않으면 stall로 간주하고 abort한다.
+    // 첫 onUploadProgress(=실제 전송 시작) 이후, 30초간 progress가 없으면 stall로 간주하고 abort.
+    // 브라우저 queue 대기 중인 요청은 progress 이벤트가 없으므로 타이머를 사전 시작하지 않는다
+    // (Safari 2-connection 제한 + 다수 파일 환경에서 queue request를 false-positive abort하던 버그 회피).
     uploadToS3: async (presignedUrl: string, file: File) => {
         const STALL_TIMEOUT_MS = 30_000;
         const controller = new AbortController();
@@ -45,7 +47,6 @@ export const mediaAPI = {
             if (stallTimer) clearTimeout(stallTimer);
             stallTimer = setTimeout(() => controller.abort(), STALL_TIMEOUT_MS);
         };
-        resetStallTimer();
         try {
             await axios.put(presignedUrl, file, {
                 headers: {
