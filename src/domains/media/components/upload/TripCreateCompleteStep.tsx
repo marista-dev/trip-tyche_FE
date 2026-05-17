@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import MiniTicketPreview from '@/domains/media/components/upload/MiniTicketPreview';
 import PassportStamp from '@/domains/media/components/upload/PassportStamp';
 import { fadeUp, ink, slamEntry } from '@/domains/media/components/upload/tripUploadAnimations';
+import { UploadStats } from '@/domains/media/hooks/useImageUpload';
 import { TripInfo } from '@/domains/trip/types';
 import Button from '@/shared/components/common/Button';
 import { ROUTES } from '@/shared/constants/route';
@@ -20,6 +21,7 @@ interface TripCreateCompleteStepProps {
     coverPhotoUrl?: string;
     ownerNickname?: string;
     photoCount?: number;
+    uploadStats?: UploadStats;
 }
 
 const ERROR_UPLOAD_MSG = '일부 사진 업로드에 실패했습니다. 다시 시도해 주세요.';
@@ -42,6 +44,7 @@ const TripCreateCompleteStep = ({
     coverPhotoUrl,
     ownerNickname,
     photoCount,
+    uploadStats,
 }: TripCreateCompleteStepProps) => {
     const [phase, setPhase] = useState<Phase>(0);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -49,6 +52,10 @@ const TripCreateCompleteStep = ({
     const navigate = useNavigate();
 
     const stampDate = toStampDate(tripInfo.startDate) || toStampDate();
+
+    const showUploadProgress = !!uploadStats && uploadStats.total > 0;
+    const uploadCompleted = uploadStats ? uploadStats.succeeded + uploadStats.failed : 0;
+    const uploadInFlight = showUploadProgress && uploadCompleted < uploadStats!.total;
 
     /** waitForBackgroundUpload → finalize → phase2 시퀀스. cancellation token으로 unmount 안전성 확보. */
     const runPhases = useCallback(
@@ -100,6 +107,16 @@ const TripCreateCompleteStep = ({
                         <div key={phase} css={phaseTextWrap}>
                             <div css={kicker}>{phase === 0 ? '티켓 확인 중' : '색상 적용 중'}</div>
                             <h2 css={waitingTitle}>{phase === 0 ? '잠시만 기다려 주세요' : '티켓을 완성하는 중...'}</h2>
+                            {phase === 0 && showUploadProgress && (
+                                <p css={uploadProgressLine}>
+                                    {uploadInFlight
+                                        ? `이미지 ${uploadCompleted} / ${uploadStats!.total} 업로드 중...`
+                                        : `이미지 ${uploadStats!.total}장 업로드 완료`}
+                                    {uploadStats!.failed > 0 && (
+                                        <span css={uploadFailedHint}> · {uploadStats!.failed}장 재시도 실패</span>
+                                    )}
+                                </p>
+                            )}
                         </div>
                     ) : (
                         <div css={phaseTextWrap}>
@@ -214,6 +231,19 @@ const doneSubtitle = css`
     color: #94a3b8;
     margin-top: 5px;
     font-weight: 500;
+`;
+
+const uploadProgressLine = css`
+    margin-top: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+    letter-spacing: 0.2px;
+`;
+
+const uploadFailedHint = css`
+    color: #ef4444;
+    font-weight: 700;
 `;
 
 const ticketArea = css`
