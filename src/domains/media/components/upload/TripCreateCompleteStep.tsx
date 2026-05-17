@@ -17,6 +17,7 @@ type Phase = 0 | 1 | 2;
 interface TripCreateCompleteStepProps {
     tripInfo: TripInfo;
     waitForBackgroundUpload: () => Promise<void>;
+    onUpdateForm?: () => Promise<{ success: boolean; error?: string }>;
     onFinalize: () => Promise<{ success: boolean; error?: string } | void>;
     coverPhotoUrl?: string;
     ownerNickname?: string;
@@ -26,6 +27,7 @@ interface TripCreateCompleteStepProps {
 }
 
 const ERROR_UPLOAD_MSG = '일부 사진 업로드에 실패했습니다. 다시 시도해 주세요.';
+const ERROR_FORM_MSG = '여행 정보 저장에 실패했습니다.';
 const ERROR_FINALIZE_MSG = '티켓 발급에 실패했습니다.';
 
 /** YY·MM·DD 포맷. iso가 비었거나 invalid면 빈 문자열 반환. */
@@ -41,6 +43,7 @@ const toStampDate = (iso?: string) => {
 const TripCreateCompleteStep = ({
     tripInfo,
     waitForBackgroundUpload,
+    onUpdateForm,
     onFinalize,
     coverPhotoUrl,
     ownerNickname,
@@ -59,13 +62,27 @@ const TripCreateCompleteStep = ({
     const uploadCompleted = uploadStats ? uploadStats.succeeded + uploadStats.failed : 0;
     const uploadInFlight = showUploadProgress && uploadCompleted < uploadStats!.total;
 
-    /** waitForBackgroundUpload → finalize → phase2 시퀀스. cancellation token으로 unmount 안전성 확보. */
+    /** waitForBackgroundUpload → updateForm → finalize → phase2 시퀀스. cancellation token으로 unmount 안전성 확보. */
     const runPhases = useCallback(
         async (signal?: { cancelled: boolean }) => {
             const aborted = () => signal?.cancelled === true;
             try {
                 await waitForBackgroundUpload();
                 if (aborted()) return;
+
+                // 페이지 전환은 즉시 일어났으므로, 백엔드 trip 정보 PUT은 여기서 await.
+                // 실패 시 retry 가능(handleRetry가 runPhases를 다시 호출 → handleUpdateForm이 mutateAsync 재발사).
+                if (onUpdateForm) {
+                    const updateResult = await onUpdateForm();
+                    if (aborted()) return;
+                    if (!updateResult.success) {
+                        const msg = updateResult.error || ERROR_FORM_MSG;
+                        setErrorMsg(msg);
+                        showToast(msg);
+                        return;
+                    }
+                }
+
                 setPhase(1);
 
                 const result = await onFinalize();
@@ -84,7 +101,7 @@ const TripCreateCompleteStep = ({
                 showToast(ERROR_UPLOAD_MSG);
             }
         },
-        [waitForBackgroundUpload, onFinalize, showToast],
+        [waitForBackgroundUpload, onUpdateForm, onFinalize, showToast],
     );
 
     useEffect(() => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { css } from '@emotion/react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -22,12 +22,10 @@ import { toResult } from '@/libs/apis/shared/utils';
 import Button from '@/shared/components/common/Button';
 import Header from '@/shared/components/common/Header';
 import ConfirmModal from '@/shared/components/common/Modal/ConfirmModal';
-import Indicator from '@/shared/components/common/Spinner/Indicator';
 import { ROUTES } from '@/shared/constants/route';
 import { COLORS } from '@/shared/constants/style';
 import { MESSAGE } from '@/shared/constants/ui';
 import useBrowserCheck from '@/shared/hooks/useBrowserCheck';
-import { useToastStore } from '@/shared/stores/useToastStore';
 
 const stepIndex = (step: ImageUploadStepType): 0 | 1 | 2 => {
     if (step === 'info') return 1;
@@ -53,10 +51,13 @@ const TripImageUploadPage = () => {
         waitForBackgroundUpload,
     } = useImageUpload();
 
-    const showToast = useToastStore((state) => state.showToast);
     const userInfo = useUserStore((state) => state.userInfo);
 
-    const { mutateAsync, isPending: isSubmitting } = useTripFormSubmit();
+    const { mutateAsync } = useTripFormSubmit();
+
+    // 사용자가 '여행 등록하기'를 누른 순간의 tripForm을 lock.
+    // step3 phase0에서 handleUpdateForm이 이 ref를 사용해 PUT 호출 → retry 시에도 같은 값 사용.
+    const submittedTripFormRef = useRef<TripInfo | null>(null);
 
     const { tripKey } = useParams();
     const { pathname } = useLocation();
@@ -93,6 +94,19 @@ const TripImageUploadPage = () => {
         [tripKey],
     );
 
+    // step3 phase0에서 호출. 매 호출마다 mutateAsync를 새로 발사 → retry 시 자동으로 재시도된다.
+    // PUT은 idempotent하므로 중복 호출이 안전.
+    const handleUpdateForm = useCallback(async () => {
+        if (!tripKey || !submittedTripFormRef.current) {
+            return { success: false, error: 'tripKey가 없습니다.' };
+        }
+        try {
+            return await mutateAsync({ tripKey, tripForm: submittedTripFormRef.current });
+        } catch {
+            return { success: false, error: MESSAGE.ERROR.UNKNOWN };
+        }
+    }, [mutateAsync, tripKey]);
+
     const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const selectedImages = event.target.files;
         if (!selectedImages || selectedImages.length === 0) return;
@@ -107,21 +121,12 @@ const TripImageUploadPage = () => {
         setStep('info');
     };
 
-    const handleTripFormSubmit = async () => {
+    const handleTripFormSubmit = () => {
         if (!tripKey) return;
-
-        try {
-            const result = await mutateAsync({ tripKey, tripForm });
-            if (result.success) {
-                // Step3에서 waitForBackgroundUpload + finalize를 순차 처리한다.
-                setStep('done');
-            } else {
-                showToast(result.error);
-            }
-        } catch {
-            // toResult가 정상 동작하면 여기까지 오지 않지만, 다른 경로(react-query 내부 throw 등) 안전망.
-            showToast(MESSAGE.ERROR.UNKNOWN);
-        }
+        // 백엔드 PUT은 step3 phase0에서 handleUpdateForm으로 await됨.
+        // 여기선 즉시 전환 → 사용자는 업로드 진행률을 바로 보고, 실패 시 step3 retry 버튼 활용.
+        submittedTripFormRef.current = tripForm;
+        setStep('done');
     };
 
     const isCreateDone = step === 'done';
@@ -158,6 +163,7 @@ const TripImageUploadPage = () => {
                     <TripCreateCompleteStep
                         tripInfo={tripForm}
                         waitForBackgroundUpload={waitForBackgroundUpload}
+                        onUpdateForm={handleUpdateForm}
                         onFinalize={handleFinalize}
                         coverPhotoUrl={coverPhotoUrl}
                         ownerNickname={userInfo?.nickname}
@@ -171,7 +177,6 @@ const TripImageUploadPage = () => {
 
     return (
         <div css={page}>
-            {isSubmitting && <Indicator text='잠시만 기다려 주세요…' />}
             <Header
                 title={`새로운 ${isEdit ? '사진' : '여행'} 등록`}
                 isBackButton
