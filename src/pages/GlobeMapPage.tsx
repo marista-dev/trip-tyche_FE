@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { css, keyframes } from '@emotion/react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
@@ -152,6 +153,7 @@ interface SelectedMark {
     nameEn: string;
     emoji: string;
     trips: TripSummary[];
+    origin: { x: number; y: number };
 }
 
 const EMPTY_TRIPS: TripSummary[] = [];
@@ -218,6 +220,7 @@ const GlobeMapPage = () => {
     const showToast = useToastStore((s) => s.showToast);
     const mountRef = useRef<HTMLDivElement>(null);
     const pinsRef = useRef<THREE.Mesh[]>([]);
+    const hitMeshesRef = useRef<THREE.Mesh[]>([]);
     const controlsRef = useRef<OrbitControls | null>(null);
 
     const [dotsReady, setDotsReady] = useState(false);
@@ -394,6 +397,7 @@ const GlobeMapPage = () => {
             addMesh(bluePos, ACCENT_HEX);
 
             pinsRef.current = [];
+            hitMeshesRef.current = [];
             countriesMap.forEach(({ trips: ct, nameKo, emoji }, nameEn) => {
                 const coords = CENTROIDS[nameEn];
                 if (!coords) return;
@@ -408,6 +412,20 @@ const GlobeMapPage = () => {
                 pin.userData = { nameEn, nameKo, emoji, trips: ct };
                 scene.add(pin);
                 pinsRef.current.push(pin);
+
+                /* invisible hit mesh — expands click hit area ~2.7x without changing visuals */
+                const hitMesh = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.075, 8, 8),
+                    new THREE.MeshBasicMaterial({
+                        transparent: true,
+                        opacity: 0,
+                        depthWrite: false,
+                    }),
+                );
+                hitMesh.position.copy(pos);
+                hitMesh.userData = { nameEn, nameKo, emoji, trips: ct, pin };
+                scene.add(hitMesh);
+                hitMeshesRef.current.push(hitMesh);
 
                 const ring = new THREE.Mesh(
                     new THREE.RingGeometry(0.038, 0.06, 32),
@@ -479,10 +497,14 @@ const GlobeMapPage = () => {
             const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
             const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
             ray.setFromCamera(new THREE.Vector2(x, y), camera);
-            const hits = ray.intersectObjects(pinsRef.current);
+            const hits = ray.intersectObjects(hitMeshesRef.current);
             if (hits.length > 0) {
-                const { nameEn, nameKo, emoji, trips: t } = hits[0].object.userData;
-                setSelected({ nameEn, nameKo, emoji, trips: t });
+                const { nameEn, nameKo, emoji, trips: t, pin } = hits[0].object.userData;
+                // project pin's 3D world position to viewport pixels for ticket origin
+                const proj = (pin as THREE.Mesh).position.clone().project(camera);
+                const originX = ((proj.x + 1) / 2) * rect.width + rect.left;
+                const originY = ((-proj.y + 1) / 2) * rect.height + rect.top;
+                setSelected({ nameEn, nameKo, emoji, trips: t, origin: { x: originX, y: originY } });
                 controls.autoRotate = false;
                 disarmCtaRef.current();
             } else {
@@ -659,18 +681,41 @@ const GlobeMapPage = () => {
                 </button>
             )}
 
-            {/* Floating ticket card */}
-            {selected && (
-                <div css={floatingBackdrop} onClick={closeCard}>
-                    <div onClick={(e) => e.stopPropagation()}>
-                        <TicketCard
-                            trip={selected.trips[0]}
-                            country={selected}
-                            onPress={() => navigate(ROUTES.PATH.TRIP.ROOT(selected.trips[0].tripKey!))}
-                        />
-                    </div>
-                </div>
-            )}
+            {/* Floating ticket card — emerges from clicked pin's screen position */}
+            <AnimatePresence>
+                {selected && (
+                    <motion.div
+                        key={selected.nameEn}
+                        css={floatingBackdrop}
+                        onClick={closeCard}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.18 }}
+                    >
+                        <motion.div
+                            onClick={(e) => e.stopPropagation()}
+                            initial={{
+                                x: selected.origin.x - window.innerWidth / 2,
+                                y: selected.origin.y - (window.innerHeight - 96 - 96),
+                                scale: 0.05,
+                                opacity: 0,
+                                rotate: -8,
+                            }}
+                            animate={{ x: 0, y: 0, scale: 1, opacity: 1, rotate: 0 }}
+                            exit={{ scale: 0.3, opacity: 0, transition: { duration: 0.18 } }}
+                            transition={{ type: 'spring', stiffness: 220, damping: 26, mass: 0.9 }}
+                            style={{ transformOrigin: 'center center' }}
+                        >
+                            <TicketCard
+                                trip={selected.trips[0]}
+                                country={selected}
+                                onPress={() => navigate(ROUTES.PATH.TRIP.ROOT(selected.trips[0].tripKey!))}
+                            />
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Loading */}
             {!dotsReady && (
@@ -1021,7 +1066,7 @@ const ticketEntrySub = css`
     color: #94a3b8;
 `;
 
-/* floating backdrop */
+/* floating backdrop — opacity animated by framer-motion */
 const floatingBackdrop = css`
     position: absolute;
     inset: 0;
@@ -1030,15 +1075,13 @@ const floatingBackdrop = css`
     align-items: flex-end;
     justify-content: center;
     padding: 0 20px 96px;
-    animation: ${fadeIn} 200ms ease;
 `;
 
-/* ticket card */
+/* ticket card — entry animation handled by framer-motion wrapper */
 const ticketWrap = css`
     display: flex;
     width: 270px;
     filter: drop-shadow(0 16px 40px rgba(0, 0, 0, 0.2));
-    animation: ${cardUp} 420ms cubic-bezier(0.22, 1, 0.36, 1);
     cursor: pointer;
 `;
 
