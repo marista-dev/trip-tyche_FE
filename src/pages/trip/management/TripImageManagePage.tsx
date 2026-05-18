@@ -126,25 +126,31 @@ const TripImageManagePage = () => {
 
         const createdUrls: string[] = [];
 
-        try {
-            setUploadPhase('extracting');
-            const uniqueFiles = await extractMetaData(files);
-
-            // file.lastModified 기준으로 placeholder를 올바른 날짜 그룹에 즉시 배치.
-            // EXIF 정확도보다 빠른 sync 처리 우선 — 업로드 완료 후 invalidate되며 실제 데이터로 자연 교체.
-            const nextPending: Record<string, PendingPhoto[]> = {};
-            Array.from(uniqueFiles).forEach((file, idx) => {
-                const stamp = Number.isFinite(file.lastModified) ? file.lastModified : Date.now();
-                const d = new Date(stamp);
-                const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                const previewUrl = URL.createObjectURL(file);
+        // INSTANT: extractMetaData(HEIC 변환 등)가 끝나기 전에 미리보기 placeholder를 먼저 그리드에 띄움.
+        // file.lastModified 기준으로 날짜 그룹에 배치. HEIC는 일부 브라우저에서 미리보기 못 띄울 수 있지만
+        // 로딩 스피너 + dim 처리로 시각적으로 OK. 업로드 완료 시 실제 사진으로 자연 교체.
+        const initialPending: Record<string, PendingPhoto[]> = {};
+        const stampBatch = Date.now();
+        Array.from(files).forEach((file, idx) => {
+            const stamp = Number.isFinite(file.lastModified) ? file.lastModified : Date.now();
+            const d = new Date(stamp);
+            const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            let previewUrl: string;
+            try {
+                previewUrl = URL.createObjectURL(file);
                 createdUrls.push(previewUrl);
-                const list = nextPending[dateKey] ?? [];
-                list.push({ id: `pending-${Date.now()}-${idx}`, previewUrl });
-                nextPending[dateKey] = list;
-            });
-            setPendingByDate(nextPending);
+            } catch {
+                previewUrl = '';
+            }
+            const list = initialPending[dateKey] ?? [];
+            list.push({ id: `pending-${stampBatch}-${idx}`, previewUrl });
+            initialPending[dateKey] = list;
+        });
+        setPendingByDate(initialPending);
+        setUploadPhase('extracting');
 
+        try {
+            const uniqueFiles = await extractMetaData(files);
             setUploadPhase('uploading');
             await uploadImagesToS3(uniqueFiles);
             await queryClient.invalidateQueries({ queryKey: ['trip-images', tripKey] });

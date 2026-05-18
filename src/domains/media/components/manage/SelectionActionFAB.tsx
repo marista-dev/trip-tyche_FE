@@ -51,11 +51,11 @@ const SelectionActionFAB = ({ selectedCount, onEditLocation, onEditDate, onDelet
                 aria-label='선택 작업'
                 aria-expanded={open}
             >
-                <MoreHorizontal size={22} strokeWidth={2.4} />
+                <MoreHorizontal size={28} strokeWidth={2.4} />
             </button>
 
             <div css={countChipStyle} aria-live='polite'>
-                <Check size={11} strokeWidth={2.4} color='#fff' />
+                <Check size={14} strokeWidth={2.4} color='#fff' />
                 {selectedCount}장 선택
             </div>
         </>
@@ -76,10 +76,10 @@ const backdropStyle = css`
 const menuStyle = css`
     position: fixed;
     left: 20px;
-    bottom: 84px;
+    bottom: 100px;
     z-index: 80;
-    min-width: 180px;
-    padding: 6px;
+    min-width: 200px;
+    padding: 8px;
     background: rgba(255, 255, 255, 0.98);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -133,18 +133,18 @@ const fabStyle = (open: boolean) => css`
     left: 20px;
     bottom: 24px;
     z-index: 75;
-    width: 52px;
-    height: 52px;
+    width: 64px;
+    height: 64px;
     display: grid;
     place-items: center;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.78);
+    background: rgba(255, 255, 255, 0.82);
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.55);
     box-shadow:
-        0 8px 24px rgba(0, 0, 0, 0.15),
-        0 0 0 1px rgba(0, 0, 0, 0.04);
+        0 10px 28px rgba(0, 0, 0, 0.18),
+        0 0 0 1px rgba(0, 0, 0, 0.05);
     color: ${MANAGE_TOKENS.text.primary};
     cursor: pointer;
     transform: ${open ? 'rotate(90deg)' : 'rotate(0)'};
@@ -155,23 +155,23 @@ const fabStyle = (open: boolean) => css`
 const countChipStyle = css`
     position: fixed;
     left: 50%;
-    bottom: 32px;
+    bottom: 36px;
     transform: translateX(-50%);
     z-index: 75;
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
+    gap: 8px;
+    padding: 12px 22px;
     border-radius: 999px;
     background: rgba(17, 17, 17, 0.92);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     color: #fff;
     font-family: ${MANAGE_TOKENS.font};
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 700;
     letter-spacing: 0.3px;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.26);
     pointer-events: none;
     white-space: nowrap;
 `;
