@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useParams } from 'react-router-dom';
 
@@ -41,14 +41,17 @@ async function runWithPool<T, R>(
     return results;
 }
 
-async function uploadWithRetry(presignedPutUrl: string, file: File): Promise<void> {
+async function uploadWithRetry(presignedPutUrl: string, file: File, signal: AbortSignal): Promise<void> {
     let lastErr: unknown;
     for (let attempt = 0; attempt <= UPLOAD_RETRY_ATTEMPTS; attempt++) {
+        if (signal.aborted) throw new Error('aborted');
         try {
-            await mediaAPI.uploadToS3(presignedPutUrl, file);
+            await mediaAPI.uploadToS3(presignedPutUrl, file, signal);
             return;
         } catch (e) {
             lastErr = e;
+            // offline 상태에서 backoff 낭비 + 좀비 socket 추가 생성 방지 — abort 즉시 종료
+            if (signal.aborted) throw e;
             if (attempt < UPLOAD_RETRY_ATTEMPTS) {
                 // 1s, 2s 지수 backoff. 일시적 단절은 보통 수 초 내 회복.
                 await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
@@ -74,6 +77,9 @@ interface UploadContext {
     failedIndices: Set<number>;
     metadataSubmitted: boolean;
     postUploadTaskCompleted: boolean;
+    // offline 이벤트로 일괄 abort, 또는 retry 시 새 controller로 교체.
+    // 좀비 socket이 device pool을 점유하기 전에 명시적으로 끊는 것이 핵심.
+    abortController: AbortController;
 }
 
 export const useImageUpload = () => {
@@ -98,7 +104,7 @@ export const useImageUpload = () => {
     }, []);
 
     const submitMetadata = useCallback(
-        async (images: ClientImageFile[], presignedUrls: PresignedUrlResponse[]) => {
+        async (images: ClientImageFile[], presignedUrls: PresignedUrlResponse[], externalSignal?: AbortSignal) => {
             const metaDatas = presignedUrls.map((url: PresignedUrlResponse, index: number) => {
                 const { recordDate, latitude, longitude } = images[index];
                 return {
@@ -108,20 +114,40 @@ export const useImageUpload = () => {
                     recordDate: recordDate || DEFAULT_METADATA.DATE,
                 };
             });
-            await mediaAPI.createMediaFileMetadata(tripKey!, metaDatas);
+            // apiClient.timeout(10s)은 main response에만 적용 — CORS preflight가 좀비 socket으로
+            // hang하면 사용자에게 surface 안 됨. AbortController로 wall-clock 30s 강제 timeout.
+            const localController = new AbortController();
+            const timer = setTimeout(() => localController.abort(), 30_000);
+            const onExternalAbort = () => localController.abort();
+            if (externalSignal) {
+                if (externalSignal.aborted) localController.abort();
+                else externalSignal.addEventListener('abort', onExternalAbort);
+            }
+            try {
+                await mediaAPI.createMediaFileMetadata(tripKey!, metaDatas, localController.signal);
+            } finally {
+                clearTimeout(timer);
+                externalSignal?.removeEventListener('abort', onExternalAbort);
+            }
         },
         [tripKey],
     );
 
     // 지정한 인덱스만 업로드 → (이미 끝난 단계가 아닐 경우) 메타등록 → postUploadTask 순차 실행.
     // 초기 업로드와 retry 양쪽에서 재사용. ctx의 플래그로 idempotency를 보장한다.
+    // ctx.abortController는 offline 이벤트로 일괄 abort 되며, 모든 단계가 같은 signal을 공유한다.
     const buildUploadChain = useCallback(
         (ctx: UploadContext, indicesToUpload: number[]): Promise<void> =>
             (async () => {
+                const { signal } = ctx.abortController;
                 if (indicesToUpload.length > 0) {
                     await runWithPool(indicesToUpload, MAX_CONCURRENT_S3_UPLOADS, async (index: number) => {
                         try {
-                            await uploadWithRetry(ctx.presignedUrls[index].presignedPutUrl, ctx.fileArray[index]);
+                            await uploadWithRetry(
+                                ctx.presignedUrls[index].presignedPutUrl,
+                                ctx.fileArray[index],
+                                signal,
+                            );
                             ctx.failedIndices.delete(index);
                             setUploadStats((s) => ({ ...s, succeeded: s.succeeded + 1 }));
                         } catch {
@@ -135,7 +161,7 @@ export const useImageUpload = () => {
                     throw new Error(`${ctx.failedIndices.size}장 업로드 실패`);
                 }
                 if (!ctx.metadataSubmitted) {
-                    await submitMetadata(ctx.imagesWithMetadata, ctx.presignedUrls);
+                    await submitMetadata(ctx.imagesWithMetadata, ctx.presignedUrls, signal);
                     ctx.metadataSubmitted = true;
                 }
                 if (ctx.postUploadTask && !ctx.postUploadTaskCompleted) {
@@ -190,6 +216,7 @@ export const useImageUpload = () => {
                     failedIndices: new Set(),
                     metadataSubmitted: false,
                     postUploadTaskCompleted: false,
+                    abortController: new AbortController(),
                 };
                 uploadContextRef.current = ctx;
 
@@ -206,6 +233,7 @@ export const useImageUpload = () => {
 
     // step3 retry 버튼이 호출. 실패한 인덱스만 다시 업로드 → 남은 chain(메타등록/status 전환)을 이어서 실행.
     // bgUploadPromiseRef를 새 promise로 교체하므로, 호출 직후 waitForBackgroundUpload는 새 진행 상태를 await한다.
+    // 이전 controller가 aborted 상태일 수 있으므로(offline → online 시) 새 controller로 교체.
     const retryFailedUploads = useCallback((): void => {
         const ctx = uploadContextRef.current;
         if (!ctx) return;
@@ -214,6 +242,7 @@ export const useImageUpload = () => {
         // 실패 카운터만 초기화 → 진행률이 신선하게 보임. succeeded는 누적 유지.
         setUploadStats((s) => ({ ...s, failed: 0 }));
 
+        ctx.abortController = new AbortController();
         const newUpload = buildUploadChain(ctx, toRetry);
         bgUploadPromiseRef.current = newUpload;
         newUpload.catch(() => {});
@@ -224,6 +253,37 @@ export const useImageUpload = () => {
     const waitForBackgroundUpload = useCallback(async () => {
         if (bgUploadPromiseRef.current) await bgUploadPromiseRef.current;
     }, []);
+
+    // Wi-Fi 끊김 즉시 in-flight 요청을 일괄 abort → 좀비 socket 차단.
+    // 회복(online) 시 실패 인덱스가 있으면 자동 재시도 → 사용자 클릭 없이도 이어서 업로드.
+    useEffect(() => {
+        const onOffline = () => {
+            uploadContextRef.current?.abortController.abort();
+        };
+        const onOnline = () => {
+            const ctx = uploadContextRef.current;
+            if (!ctx) return;
+            // 진행 중인 chain이 실패 인덱스를 다 모으기 전에 다음 단계로 넘어가지 않도록,
+            // bgUploadPromise가 reject된 뒤에만 재시도. 그렇지 않으면 두 chain이 동시 실행될 수 있음.
+            const bg = bgUploadPromiseRef.current;
+            const attemptRetry = () => {
+                if (ctx.failedIndices.size > 0 || !ctx.metadataSubmitted || !ctx.postUploadTaskCompleted) {
+                    retryFailedUploads();
+                }
+            };
+            if (bg) {
+                bg.then(attemptRetry, attemptRetry);
+            } else {
+                attemptRetry();
+            }
+        };
+        window.addEventListener('offline', onOffline);
+        window.addEventListener('online', onOnline);
+        return () => {
+            window.removeEventListener('offline', onOffline);
+            window.removeEventListener('online', onOnline);
+        };
+    }, [retryFailedUploads]);
 
     return {
         images,

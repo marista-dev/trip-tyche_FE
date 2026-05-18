@@ -39,14 +39,25 @@ export const mediaAPI = {
     // 첫 onUploadProgress(=실제 전송 시작) 이후, 30초간 progress가 없으면 stall로 간주하고 abort.
     // 브라우저 queue 대기 중인 요청은 progress 이벤트가 없으므로 타이머를 사전 시작하지 않는다
     // (Safari 2-connection 제한 + 다수 파일 환경에서 queue request를 false-positive abort하던 버그 회피).
-    uploadToS3: async (presignedUrl: string, file: File) => {
+    // wall-clock timeout(120s)도 둠 — Wi-Fi 끊김으로 좀비 socket 상태가 됐을 때 무한 hang 방지.
+    // externalSignal은 hook이 일괄 abort(예: offline 이벤트)할 때 사용.
+    uploadToS3: async (presignedUrl: string, file: File, externalSignal?: AbortSignal) => {
         const STALL_TIMEOUT_MS = 30_000;
+        const WALL_CLOCK_TIMEOUT_MS = 120_000;
         const controller = new AbortController();
         let stallTimer: ReturnType<typeof setTimeout> | null = null;
+
+        const onExternalAbort = () => controller.abort();
+        if (externalSignal) {
+            if (externalSignal.aborted) controller.abort();
+            else externalSignal.addEventListener('abort', onExternalAbort);
+        }
+
         const resetStallTimer = () => {
             if (stallTimer) clearTimeout(stallTimer);
             stallTimer = setTimeout(() => controller.abort(), STALL_TIMEOUT_MS);
         };
+        const wallClockTimer = setTimeout(() => controller.abort(), WALL_CLOCK_TIMEOUT_MS);
         try {
             await axios.put(presignedUrl, file, {
                 headers: {
@@ -57,14 +68,19 @@ export const mediaAPI = {
             });
         } finally {
             if (stallTimer) clearTimeout(stallTimer);
+            clearTimeout(wallClockTimer);
+            externalSignal?.removeEventListener('abort', onExternalAbort);
         }
     },
     // 미디어 파일 메타데이터 등록 (fileKey, latitude, longitude, recordDate)
+    // signal: hook 측에서 명시적 timeout을 걸기 위함. apiClient 기본 timeout은 main response에만 적용되어
+    // CORS preflight가 좀비 socket 때문에 hang하는 경우 fail-fast 안 됨 → AbortSignal로 강제 종료.
     createMediaFileMetadata: async (
         tripKey: string,
         metaDatas: { fileKey: string; latitude: number; longitude: number; recordDate: string }[],
+        signal?: AbortSignal,
     ) => {
-        await apiClient.post(`/v1/trips/${tripKey}/media-files`, metaDatas);
+        await apiClient.post(`/v1/trips/${tripKey}/media-files`, metaDatas, { signal });
     },
     // 여행에 등록된 모든 이미지 조회
     getTripImages: async (
