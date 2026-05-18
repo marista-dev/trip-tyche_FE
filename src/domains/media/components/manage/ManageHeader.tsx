@@ -7,12 +7,21 @@ interface ManageHeaderProps {
     title: string;
     subtitle?: string;
     selectedCount?: number;
+    cancelLabel?: string;
     onBack: () => void;
     onCancel?: () => void;
     onDelete?: () => void;
 }
 
-const ManageHeader = ({ title, subtitle, selectedCount = 0, onBack, onCancel, onDelete }: ManageHeaderProps) => {
+const ManageHeader = ({
+    title,
+    subtitle,
+    selectedCount = 0,
+    cancelLabel = '취소',
+    onBack,
+    onCancel,
+    onDelete,
+}: ManageHeaderProps) => {
     const isSelecting = selectedCount > 0;
 
     return (
@@ -36,7 +45,7 @@ const ManageHeader = ({ title, subtitle, selectedCount = 0, onBack, onCancel, on
                     )}
                     {onCancel && (
                         <button css={cancelButtonStyle} onClick={onCancel} type='button'>
-                            취소
+                            {cancelLabel}
                         </button>
                     )}
                 </div>

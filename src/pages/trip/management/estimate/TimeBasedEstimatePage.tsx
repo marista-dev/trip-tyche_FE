@@ -221,7 +221,9 @@ const TimeBasedEstimatePage = () => {
 };
 
 const containerStyle = css`
-    min-height: 100dvh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
     background: ${MANAGE_TOKENS.bg};
     color: ${MANAGE_TOKENS.text.primary};
     font-family: ${MANAGE_TOKENS.font};
@@ -297,6 +299,11 @@ const activeSubStyle = css`
 `;
 
 const listStyle = css`
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
     padding: 12px 16px 140px;
 `;
 

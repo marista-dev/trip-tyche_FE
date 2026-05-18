@@ -5,13 +5,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ImageOff } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import DateGroupSection from '@/domains/media/components/manage/DateGroupSection';
+import DateGroupSection, { PendingPhoto } from '@/domains/media/components/manage/DateGroupSection';
 import IssueCard from '@/domains/media/components/manage/IssueCard';
 import ManageHeader from '@/domains/media/components/manage/ManageHeader';
+import SelectionActionFAB from '@/domains/media/components/manage/SelectionActionFAB';
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
 import { useMediaDelete } from '@/domains/media/hooks/mutations';
 import { useTripImages } from '@/domains/media/hooks/queries';
 import { useImageUpload } from '@/domains/media/hooks/useImageUpload';
+import { useEstimateStore } from '@/domains/media/stores/useEstimateStore';
 import { MediaFile } from '@/domains/media/types';
 import {
     filterValidMediaFile,
@@ -20,6 +22,7 @@ import {
     getImageGroupByDate,
 } from '@/domains/media/utils';
 import { useTripInfo } from '@/domains/trip/hooks/queries';
+import InlineDatePickSheet from '@/pages/trip/management/InlineDatePickSheet';
 import EmptyItem from '@/shared/components/common/EmptyItem';
 import ConfirmModal from '@/shared/components/common/Modal/ConfirmModal';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
@@ -46,7 +49,11 @@ const TripImageManagePage = () => {
 
     const [selected, setSelected] = useState<Set<number>>(new Set());
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showDateSheet, setShowDateSheet] = useState(false);
     const [uploadPhase, setUploadPhase] = useState<'idle' | 'extracting' | 'uploading'>('idle');
+    // 날짜키('YYYY-MM-DD') → 업로드 중인 사진 미리보기 목록
+    const [pendingByDate, setPendingByDate] = useState<Record<string, PendingPhoto[]>>({});
+    const setEstimateTargets = useEstimateStore((s) => s.setTargets);
 
     const { data: imagesResult, isLoading: isImagesLoading } = useTripImages(tripKey);
     const { data: tripInfoResult } = useTripInfo(tripKey);
@@ -62,7 +69,21 @@ const TripImageManagePage = () => {
     const noLocImages = useMemo(() => filterWithoutLocationMediaFile(allImages) as MediaFile[], [allImages]);
     const noDateImages = useMemo(() => filterWithoutDateMediaFile(allImages) as MediaFile[], [allImages]);
     const validImages = useMemo(() => filterValidMediaFile(allImages) as MediaFile[], [allImages]);
-    const groups = useMemo(() => getImageGroupByDate(validImages), [validImages]);
+    const baseGroups = useMemo(() => getImageGroupByDate(validImages), [validImages]);
+
+    // pending 미리보기를 날짜별로 baseGroups에 머지. 기존 그룹이 없으면 새 그룹 생성.
+    const renderGroups = useMemo(() => {
+        const merged = baseGroups.map((g) => ({ ...g, pending: pendingByDate[g.recordDate] ?? [] }));
+        const existingDates = new Set(baseGroups.map((g) => g.recordDate));
+        Object.entries(pendingByDate).forEach(([date, pending]) => {
+            if (date === 'unknown') return;
+            if (!existingDates.has(date)) {
+                merged.push({ recordDate: date, images: [], pending });
+            }
+        });
+        // 날짜 오름차순 정렬 유지
+        return merged.sort((a, b) => new Date(a.recordDate).getTime() - new Date(b.recordDate).getTime());
+    }, [baseGroups, pendingByDate]);
 
     const selectMode = selected.size > 0;
     const selectedList = useMemo(() => allImages.filter((img) => selected.has(img.mediaFileId)), [allImages, selected]);
@@ -103,9 +124,27 @@ const TripImageManagePage = () => {
         event.target.value = '';
         if (!files || files.length === 0) return;
 
+        const createdUrls: string[] = [];
+
         try {
             setUploadPhase('extracting');
             const uniqueFiles = await extractMetaData(files);
+
+            // file.lastModified 기준으로 placeholder를 올바른 날짜 그룹에 즉시 배치.
+            // EXIF 정확도보다 빠른 sync 처리 우선 — 업로드 완료 후 invalidate되며 실제 데이터로 자연 교체.
+            const nextPending: Record<string, PendingPhoto[]> = {};
+            Array.from(uniqueFiles).forEach((file, idx) => {
+                const stamp = Number.isFinite(file.lastModified) ? file.lastModified : Date.now();
+                const d = new Date(stamp);
+                const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                const previewUrl = URL.createObjectURL(file);
+                createdUrls.push(previewUrl);
+                const list = nextPending[dateKey] ?? [];
+                list.push({ id: `pending-${Date.now()}-${idx}`, previewUrl });
+                nextPending[dateKey] = list;
+            });
+            setPendingByDate(nextPending);
+
             setUploadPhase('uploading');
             await uploadImagesToS3(uniqueFiles);
             await queryClient.invalidateQueries({ queryKey: ['trip-images', tripKey] });
@@ -114,11 +153,26 @@ const TripImageManagePage = () => {
             showToast('사진 추가 중 문제가 발생했어요. 다시 시도해주세요.');
         } finally {
             setUploadPhase('idle');
+            setPendingByDate({});
+            createdUrls.forEach((url) => URL.revokeObjectURL(url));
         }
     };
 
     const goNoLocation = () => navigate(ROUTES.PATH.TRIP.EDIT.NO_LOCATION(tripKey));
     const goNoDate = () => navigate(ROUTES.PATH.TRIP.EDIT.NO_DATE(tripKey));
+
+    // 선택된 사진에 위치 수정 → MapPickPage 라우트로 이동 (store에 targets 채워둠)
+    const handleEditLocation = () => {
+        if (selectedList.length === 0) return;
+        setEstimateTargets({ mode: 'map-pick', tripKey, targets: selectedList });
+        navigate(ROUTES.PATH.TRIP.EDIT.MAP_PICK(tripKey));
+    };
+
+    // 선택된 사진에 날짜 수정 → 인라인 시트
+    const handleEditDate = () => {
+        if (selectedList.length === 0) return;
+        setShowDateSheet(true);
+    };
 
     const totalCount = allImages.length;
     const hasIssues = noLocImages.length > 0 || noDateImages.length > 0;
@@ -134,7 +188,11 @@ const TripImageManagePage = () => {
     return (
         <div css={containerStyle}>
             {(isImagesLoading || isDeleting) && <Indicator text={isDeleting ? '사진 삭제 중...' : undefined} />}
-            {uploadPhase !== 'idle' && <Indicator text={uploadingText} />}
+            {uploadPhase !== 'idle' && (
+                <div css={uploadChipStyle} role='status' aria-live='polite'>
+                    {uploadingText}
+                </div>
+            )}
 
             <input
                 ref={fileInputRef}
@@ -150,7 +208,7 @@ const TripImageManagePage = () => {
                 selectedCount={selected.size}
                 onBack={() => navigate(ROUTES.PATH.TICKETS)}
                 onCancel={clearSelection}
-                onDelete={() => setShowDeleteConfirm(true)}
+                cancelLabel='완료'
             />
 
             <main css={bodyStyle}>
@@ -190,7 +248,7 @@ const TripImageManagePage = () => {
 
                 <h3 css={sectionLabelStyle}>{selectMode ? '탭으로 추가 선택 / 해제' : '모든 사진'}</h3>
 
-                {groups.length === 0 && !selectMode ? (
+                {renderGroups.length === 0 && !selectMode ? (
                     <button type='button' css={emptyAddStyle} onClick={openFilePicker}>
                         <EmptyItem
                             title='등록된 사진이 없어요'
@@ -199,11 +257,12 @@ const TripImageManagePage = () => {
                         />
                     </button>
                 ) : (
-                    groups.map((g) => (
+                    renderGroups.map((g) => (
                         <DateGroupSection
                             key={g.recordDate}
                             label={g.recordDate}
                             photos={g.images}
+                            pending={g.pending}
                             selected={selected}
                             selectMode={selectMode}
                             onToggle={togglePhoto}
@@ -212,6 +271,15 @@ const TripImageManagePage = () => {
                     ))
                 )}
             </main>
+
+            {selectMode && (
+                <SelectionActionFAB
+                    selectedCount={selected.size}
+                    onEditLocation={handleEditLocation}
+                    onEditDate={handleEditDate}
+                    onDelete={() => setShowDeleteConfirm(true)}
+                />
+            )}
 
             {showDeleteConfirm && (
                 <ConfirmModal
@@ -223,18 +291,37 @@ const TripImageManagePage = () => {
                     closeModal={() => setShowDeleteConfirm(false)}
                 />
             )}
+
+            {showDateSheet && (
+                <InlineDatePickSheet
+                    tripKey={tripKey}
+                    targets={selectedList}
+                    onClose={() => setShowDateSheet(false)}
+                    onApplied={() => {
+                        setShowDateSheet(false);
+                        clearSelection();
+                    }}
+                />
+            )}
         </div>
     );
 };
 
 const containerStyle = css`
-    min-height: 100dvh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
     background: ${MANAGE_TOKENS.bg};
     color: ${MANAGE_TOKENS.text.primary};
     font-family: ${MANAGE_TOKENS.font};
 `;
 
 const bodyStyle = css`
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
     padding: 12px 16px 32px;
 `;
 
@@ -293,6 +380,25 @@ const emptyAddStyle = css`
     padding: 0;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+`;
+
+const uploadChipStyle = css`
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    z-index: 60;
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: rgba(17, 17, 17, 0.92);
+    color: #fff;
+    font-family: ${MANAGE_TOKENS.font};
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+    backdrop-filter: blur(10px);
+    pointer-events: none;
 `;
 
 export default TripImageManagePage;

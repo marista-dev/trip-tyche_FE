@@ -1,13 +1,20 @@
 import { css } from '@emotion/react';
 
 import AddPhotoCell from '@/domains/media/components/manage/AddPhotoCell';
+import PendingPhotoCell from '@/domains/media/components/manage/PendingPhotoCell';
 import PhotoGridCell from '@/domains/media/components/manage/PhotoGridCell';
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
 import { MediaFile } from '@/domains/media/types';
 
+export interface PendingPhoto {
+    id: string;
+    previewUrl: string;
+}
+
 interface DateGroupSectionProps {
     label: string;
     photos: MediaFile[];
+    pending?: PendingPhoto[];
     selected: Set<number>;
     selectMode: boolean;
     onToggle: (photo: MediaFile) => void;
@@ -26,26 +33,40 @@ const formatLabel = (recordDate: string) => {
     return `${month}월 ${day}일 (${weekday})`;
 };
 
-const DateGroupSection = ({ label, photos, selected, selectMode, onToggle, onAdd }: DateGroupSectionProps) => (
-    <section css={sectionStyle}>
-        <div css={headRowStyle}>
-            <h4 css={dateLabelStyle}>{formatLabel(label)}</h4>
-            <span css={countStyle}>{photos.length}장</span>
-        </div>
-        <div css={gridStyle}>
-            {photos.map((p) => (
-                <PhotoGridCell
-                    key={p.mediaFileId}
-                    photo={p}
-                    selected={selected.has(p.mediaFileId)}
-                    selectMode={selectMode}
-                    onToggle={onToggle}
-                />
-            ))}
-            {!selectMode && <AddPhotoCell onClick={onAdd} />}
-        </div>
-    </section>
-);
+const DateGroupSection = ({
+    label,
+    photos,
+    pending = [],
+    selected,
+    selectMode,
+    onToggle,
+    onAdd,
+}: DateGroupSectionProps) => {
+    const total = photos.length + pending.length;
+    return (
+        <section css={sectionStyle}>
+            <div css={headRowStyle}>
+                <h4 css={dateLabelStyle}>{formatLabel(label)}</h4>
+                <span css={countStyle}>{total}장</span>
+            </div>
+            <div css={gridStyle}>
+                {photos.map((p) => (
+                    <PhotoGridCell
+                        key={p.mediaFileId}
+                        photo={p}
+                        selected={selected.has(p.mediaFileId)}
+                        selectMode={selectMode}
+                        onToggle={onToggle}
+                    />
+                ))}
+                {pending.map((p) => (
+                    <PendingPhotoCell key={p.id} previewUrl={p.previewUrl} />
+                ))}
+                {!selectMode && <AddPhotoCell onClick={onAdd} />}
+            </div>
+        </section>
+    );
+};
 
 const sectionStyle = css`
     margin-bottom: 14px;
