@@ -14,7 +14,6 @@ import { useTripImages } from '@/domains/media/hooks/queries';
 import { useEstimateStore } from '@/domains/media/stores/useEstimateStore';
 import { MediaFile } from '@/domains/media/types';
 import { filterWithoutLocationMediaFile } from '@/domains/media/utils';
-import InlineMapPickPage from '@/pages/trip/management/InlineMapPickPage';
 import ConfirmModal from '@/shared/components/common/Modal/ConfirmModal';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import { ROUTES } from '@/shared/constants/route';
@@ -28,7 +27,6 @@ const NoLocationResolvePage = () => {
 
     const [selected, setSelected] = useState<Set<number>>(new Set());
     const [showDelete, setShowDelete] = useState(false);
-    const [showMapPick, setShowMapPick] = useState(false);
 
     const { data: imagesResult, isLoading } = useTripImages(tripKey);
     const { mutate: deleteMutate, isPending: isDeleting } = useMediaDelete();
@@ -70,7 +68,8 @@ const NoLocationResolvePage = () => {
             showToast('처리할 사진이 없습니다.');
             return;
         }
-        setShowMapPick(true);
+        setEstimateTargets({ mode: 'map-pick', tripKey, targets: scope });
+        navigate(ROUTES.PATH.TRIP.EDIT.MAP_PICK(tripKey));
     };
 
     const handleDelete = () => {
@@ -155,18 +154,6 @@ const NoLocationResolvePage = () => {
                     closeModal={() => setShowDelete(false)}
                 />
             )}
-
-            {showMapPick && (
-                <InlineMapPickPage
-                    tripKey={tripKey}
-                    targets={scope}
-                    onClose={() => setShowMapPick(false)}
-                    onApplied={() => {
-                        setShowMapPick(false);
-                        clearSelection();
-                    }}
-                />
-            )}
         </div>
     );
 };
@@ -176,8 +163,6 @@ const containerStyle = css`
     background: ${MANAGE_TOKENS.bg};
     color: ${MANAGE_TOKENS.text.primary};
     font-family: ${MANAGE_TOKENS.font};
-    display: flex;
-    flex-direction: column;
 `;
 
 const quickActionsStyle = css`
@@ -189,7 +174,6 @@ const quickActionsStyle = css`
 `;
 
 const bodyStyle = css`
-    flex: 1;
     padding: 12px 16px 32px;
 `;
 

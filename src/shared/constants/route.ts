@@ -21,6 +21,7 @@ export const ROUTES = {
                 NO_DATE: (tripKey: TripKey) => `/trip/${tripKey}/edit/image/no-date`,
                 ESTIMATE_TIME: (tripKey: TripKey) => `/trip/${tripKey}/edit/image/estimate-by-time`,
                 ESTIMATE_LOCATION: (tripKey: TripKey) => `/trip/${tripKey}/edit/image/estimate-by-location`,
+                MAP_PICK: (tripKey: TripKey) => `/trip/${tripKey}/edit/image/map-pick`,
             },
             IMAGE: {
                 BY_PINPOINT: (tripKey: TripKey, pinPointId: PinPointId) =>

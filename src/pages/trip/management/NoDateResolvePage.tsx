@@ -177,8 +177,6 @@ const containerStyle = css`
     background: ${MANAGE_TOKENS.bg};
     color: ${MANAGE_TOKENS.text.primary};
     font-family: ${MANAGE_TOKENS.font};
-    display: flex;
-    flex-direction: column;
 `;
 
 const quickActionsStyle = css`
@@ -190,7 +188,6 @@ const quickActionsStyle = css`
 `;
 
 const bodyStyle = css`
-    flex: 1;
     padding: 12px 16px 32px;
 `;
 

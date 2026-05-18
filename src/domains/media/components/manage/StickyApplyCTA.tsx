@@ -23,13 +23,17 @@ const StickyApplyCTA = ({ label, disabled, isLoading, onClick }: StickyApplyCTAP
 );
 
 const wrapStyle = css`
-    position: sticky;
+    position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    z-index: 10;
+    z-index: 50;
     padding: 12px 16px 24px;
     background: linear-gradient(180deg, rgba(250, 250, 250, 0) 0%, rgba(250, 250, 250, 1) 30%);
+    pointer-events: none;
+    & > button {
+        pointer-events: auto;
+    }
 `;
 
 const buttonStyle = (active: boolean) => css`

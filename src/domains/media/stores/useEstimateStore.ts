@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 import { MediaFile } from '@/domains/media/types';
 
-export type EstimateMode = 'time' | 'location';
+export type EstimateMode = 'time' | 'location' | 'map-pick';
 
 interface EstimateState {
     mode: EstimateMode | null;

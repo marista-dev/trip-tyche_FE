@@ -2,13 +2,17 @@ import { css } from '@emotion/react';
 import { Check, Clock, MapPin } from 'lucide-react';
 
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
+import { useReverseGeocode } from '@/shared/hooks/useReverseGeocode';
 
 interface ReferencePhotoCardProps {
     mediaLink: string;
     primaryLabel: string;
     secondaryLabel: string;
-    metaLabel: string;
     metaIcon: 'time' | 'location';
+    metaLabel?: string;
+    // metaIcon === 'location' 일 때 lat/lng 주면 역지오코딩으로 주소 표시
+    latitude?: number;
+    longitude?: number;
     selected: boolean;
     onClick: () => void;
 }
@@ -17,32 +21,44 @@ const ReferencePhotoCard = ({
     mediaLink,
     primaryLabel,
     secondaryLabel,
-    metaLabel,
     metaIcon,
+    metaLabel,
+    latitude,
+    longitude,
     selected,
     onClick,
-}: ReferencePhotoCardProps) => (
-    <div css={cardStyle(selected)} onClick={onClick}>
-        <div css={thumbStyle}>
-            <img src={mediaLink} alt='' css={thumbImgStyle} loading='lazy' />
-        </div>
-        <div css={infoStyle}>
-            <div css={primaryRowStyle}>
-                <span css={primaryStyle}>{primaryLabel}</span>
-                <span css={secondaryStyle}>{secondaryLabel}</span>
+}: ReferencePhotoCardProps) => {
+    const shouldGeocode = metaIcon === 'location' && latitude !== undefined && longitude !== undefined;
+    const { address, isLoading: isGeocoding } = useReverseGeocode(
+        shouldGeocode ? latitude! : 0,
+        shouldGeocode ? longitude! : 0,
+    );
+
+    const displayMeta = shouldGeocode ? (isGeocoding && !address ? '위치 확인 중...' : address) : (metaLabel ?? '');
+
+    return (
+        <div css={cardStyle(selected)} onClick={onClick}>
+            <div css={thumbStyle(selected)}>
+                <img src={mediaLink} alt='' css={thumbImgStyle} loading='lazy' />
             </div>
-            <div css={metaRowStyle}>
-                {metaIcon === 'time' ? (
-                    <Clock size={11} strokeWidth={2.2} color={MANAGE_TOKENS.accent} />
-                ) : (
-                    <MapPin size={11} strokeWidth={2.2} color={MANAGE_TOKENS.accent} />
-                )}
-                <span css={metaLabelStyle}>{metaLabel}</span>
+            <div css={infoStyle}>
+                <div css={primaryRowStyle}>
+                    <span css={primaryStyle}>{primaryLabel}</span>
+                    <span css={secondaryStyle}>{secondaryLabel}</span>
+                </div>
+                <div css={metaRowStyle}>
+                    {metaIcon === 'time' ? (
+                        <Clock size={11} strokeWidth={2.2} color={MANAGE_TOKENS.accent} />
+                    ) : (
+                        <MapPin size={11} strokeWidth={2.2} color={MANAGE_TOKENS.accent} />
+                    )}
+                    <span css={metaLabelStyle}>{displayMeta}</span>
+                </div>
             </div>
+            <span css={radioStyle(selected)}>{selected && <Check size={11} strokeWidth={3.4} color='#fff' />}</span>
         </div>
-        <span css={radioStyle(selected)}>{selected && <Check size={11} strokeWidth={3.4} color='#fff' />}</span>
-    </div>
-);
+    );
+};
 
 const cardStyle = (selected: boolean) => css`
     display: flex;
@@ -52,23 +68,29 @@ const cardStyle = (selected: boolean) => css`
     background: ${MANAGE_TOKENS.card};
     border-radius: 12px;
     border: ${selected ? `2px solid ${MANAGE_TOKENS.accent}` : `1px solid ${MANAGE_TOKENS.border}`};
-    box-shadow: ${selected ? '0 4px 14px rgba(0,113,227,0.12)' : 'none'};
+    box-shadow: ${selected ? '0 10px 24px rgba(0,113,227,0.18)' : '0 1px 0 rgba(0,0,0,0.02)'};
     cursor: pointer;
-    transition: all 180ms ease;
+    transform: ${selected ? 'scale(1.02)' : 'scale(1)'};
+    transition:
+        transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1),
+        box-shadow 220ms ease,
+        border-color 180ms ease;
     font-family: ${MANAGE_TOKENS.font};
     -webkit-tap-highlight-color: transparent;
     &:active {
-        opacity: 0.9;
+        transform: ${selected ? 'scale(1.02)' : 'scale(0.98)'};
     }
 `;
 
-const thumbStyle = css`
+const thumbStyle = (selected: boolean) => css`
     width: 64px;
     height: 64px;
     flex-shrink: 0;
     border-radius: 8px;
     overflow: hidden;
     background: ${MANAGE_TOKENS.bg};
+    transform: ${selected ? 'scale(1.06)' : 'scale(1)'};
+    transition: transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
 `;
 
 const thumbImgStyle = css`

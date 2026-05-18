@@ -1,31 +1,40 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { css } from '@emotion/react';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
 import { useMetadataUpdate } from '@/domains/media/hooks/mutations';
-import { MediaFile } from '@/domains/media/types';
+import { useEstimateStore } from '@/domains/media/stores/useEstimateStore';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import SearchPlaceInput from '@/shared/components/map/SearchPlaceInput';
 import SingleMarkerMap from '@/shared/components/map/SingleMarkerMap';
 import { DEFAULT_CENTER, ZOOM_SCALE } from '@/shared/constants/map';
+import { ROUTES } from '@/shared/constants/route';
 import { useMapControl } from '@/shared/hooks/useMapControl';
 import { useToastStore } from '@/shared/stores/useToastStore';
 import { Location, MapMouseEvent } from '@/shared/types/map';
 
-interface InlineMapPickPageProps {
-    tripKey: string;
-    targets: MediaFile[];
-    onClose: () => void;
-    onApplied: () => void;
-}
-
-const InlineMapPickPage = ({ tripKey, targets, onClose, onApplied }: InlineMapPickPageProps) => {
+// 위치 없는 사진들에 한 번에 위치를 지정하는 풀스크린 지도 페이지.
+// NoLocationResolvePage에서 store에 targets 채운 뒤 이 route로 이동.
+const MapPickPage = () => {
+    const { tripKey = '' } = useParams<{ tripKey: string }>();
+    const navigate = useNavigate();
     const { showToast } = useToastStore();
+    const { mode, tripKey: storeTripKey, targets, clear } = useEstimateStore();
+
     const { mapRef, isMapScriptLoaded, updateMapCenter } = useMapControl(ZOOM_SCALE.DEFAULT, DEFAULT_CENTER);
     const { mutate: updateMutate, isPending: isApplying } = useMetadataUpdate();
 
     const [picked, setPicked] = useState<Location | null>(null);
+
+    // store 비어 있거나 모드 안 맞으면 폴백
+    useEffect(() => {
+        if (targets.length === 0 || mode !== 'map-pick' || storeTripKey !== tripKey) {
+            showToast('처리할 사진을 다시 선택해주세요');
+            navigate(ROUTES.PATH.TRIP.EDIT.NO_LOCATION(tripKey), { replace: true });
+        }
+    }, [mode, storeTripKey, tripKey, targets.length, navigate, showToast]);
 
     const handlePlaceSelect = (latitude: number, longitude: number) => {
         const loc = { latitude, longitude };
@@ -48,7 +57,8 @@ const InlineMapPickPage = ({ tripKey, targets, onClose, onApplied }: InlineMapPi
                 onSuccess: (result) => {
                     if (result.success) {
                         showToast(`${updated.length}장에 위치가 적용되었어요`);
-                        onApplied();
+                        clear();
+                        navigate(-1);
                     } else {
                         showToast(result.error);
                     }
@@ -58,7 +68,7 @@ const InlineMapPickPage = ({ tripKey, targets, onClose, onApplied }: InlineMapPi
     };
 
     return (
-        <div css={overlayStyle}>
+        <div css={pageStyle}>
             {!isMapScriptLoaded && <Indicator />}
             {isApplying && <Indicator text='적용 중...' />}
 
@@ -66,7 +76,7 @@ const InlineMapPickPage = ({ tripKey, targets, onClose, onApplied }: InlineMapPi
                 isMapScriptLoaded={isMapScriptLoaded}
                 isBackButtonDisable={isApplying}
                 onLocationChange={handlePlaceSelect}
-                onBack={onClose}
+                onBack={() => navigate(-1)}
             />
 
             <SingleMarkerMap mapRef={mapRef} position={picked} onMapClick={handleMapClick} mapHeight='100dvh' />
@@ -85,10 +95,9 @@ const InlineMapPickPage = ({ tripKey, targets, onClose, onApplied }: InlineMapPi
     );
 };
 
-const overlayStyle = css`
+const pageStyle = css`
     position: fixed;
     inset: 0;
-    z-index: 995;
     background: ${MANAGE_TOKENS.bg};
     font-family: ${MANAGE_TOKENS.font};
 `;
@@ -101,6 +110,10 @@ const ctaBarStyle = css`
     padding: 12px 16px 24px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.98) 30%);
     z-index: 999;
+    pointer-events: none;
+    & > button {
+        pointer-events: auto;
+    }
 `;
 
 const ctaButtonStyle = (active: boolean) => css`
@@ -121,4 +134,4 @@ const ctaButtonStyle = (active: boolean) => css`
     }
 `;
 
-export default InlineMapPickPage;
+export default MapPickPage;

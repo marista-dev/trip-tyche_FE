@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { css } from '@emotion/react';
 import { MapPin } from 'lucide-react';
@@ -16,6 +16,7 @@ import { MediaFile } from '@/domains/media/types';
 import { extractTimeOfDay, findNearbyPhotosByLocation, formatDistance } from '@/domains/media/utils';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import { ROUTES } from '@/shared/constants/route';
+import { useReverseGeocode } from '@/shared/hooks/useReverseGeocode';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
 const formatDateLabel = (iso: string): string => {
@@ -54,12 +55,27 @@ const LocationBasedEstimatePage = () => {
 
     const activeTarget = targets.find((t) => t.mediaFileId === activeId) || null;
 
+    // 활성 target의 좌표 → 주소
+    const { address: activeAddress } = useReverseGeocode(activeTarget?.latitude ?? 0, activeTarget?.longitude ?? 0);
+
     const nearby = useMemo(() => {
         if (!activeTarget) return [];
         return findNearbyPhotosByLocation(activeTarget, pool);
     }, [activeTarget, pool]);
 
     const totalApplied = Object.keys(picks).length;
+
+    const skipActive = useCallback(() => {
+        if (targets.length <= 1) {
+            navigate(-1);
+            return;
+        }
+        const currentIdx = targets.findIndex((t) => t.mediaFileId === activeId);
+        const rotated = [...targets.slice(currentIdx + 1), ...targets.slice(0, currentIdx)];
+        const next = rotated.find((t) => picks[t.mediaFileId] === undefined);
+        if (next) setActiveId(next.mediaFileId);
+        else navigate(-1);
+    }, [targets, activeId, picks, navigate]);
 
     const handleApply = () => {
         const updated: MediaFile[] = targets
@@ -124,13 +140,13 @@ const LocationBasedEstimatePage = () => {
                 <div css={activeInfoStyle}>
                     <p css={activePrimaryStyle}>
                         <MapPin size={12} strokeWidth={2.4} color={MANAGE_TOKENS.accent} />
-                        {activeTarget.latitude.toFixed(4)}, {activeTarget.longitude.toFixed(4)}
+                        {activeAddress || '위치 확인 중...'}
                     </p>
                     <p css={activeSubStyle}>주변 500m 범위 내 날짜 있는 사진을 찾았어요</p>
                 </div>
             </div>
 
-            <div css={listStyle}>
+            <main css={listStyle}>
                 {nearby.length === 0 ? (
                     <div css={emptyCardStyle}>
                         <div css={emptyIconStyle}>
@@ -138,16 +154,21 @@ const LocationBasedEstimatePage = () => {
                         </div>
                         <h4 css={emptyTitleStyle}>가까운 위치의 사진이 없어요</h4>
                         <p css={emptyDescStyle}>직접 날짜를 입력해주세요</p>
-                        <button
-                            type='button'
-                            css={emptyPrimaryStyle}
-                            onClick={() => {
-                                clear();
-                                navigate(ROUTES.PATH.TRIP.EDIT.NO_DATE(tripKey));
-                            }}
-                        >
-                            날짜 직접 입력
-                        </button>
+                        <div css={emptyActionsStyle}>
+                            <button
+                                type='button'
+                                css={emptyPrimaryStyle}
+                                onClick={() => {
+                                    clear();
+                                    navigate(ROUTES.PATH.TRIP.EDIT.NO_DATE(tripKey));
+                                }}
+                            >
+                                날짜 직접 입력
+                            </button>
+                            <button type='button' css={emptySecondaryStyle} onClick={skipActive}>
+                                건너뛰기
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <>
@@ -176,10 +197,15 @@ const LocationBasedEstimatePage = () => {
                                 );
                             })}
                         </div>
+                        <div css={skipRowStyle}>
+                            <button type='button' css={skipButtonStyle} onClick={skipActive}>
+                                이 사진 건너뛰기
+                            </button>
+                        </div>
                         <p css={hintStyle}>가까운 거리의 사진을 골라 같은 날짜로 표시할 수 있어요.</p>
                     </>
                 )}
-            </div>
+            </main>
 
             <StickyApplyCTA
                 label={totalApplied === 0 ? '사진을 선택해주세요' : `${totalApplied}장 적용하기`}
@@ -193,8 +219,6 @@ const LocationBasedEstimatePage = () => {
 
 const containerStyle = css`
     min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
     background: ${MANAGE_TOKENS.bg};
     color: ${MANAGE_TOKENS.text.primary};
     font-family: ${MANAGE_TOKENS.font};
@@ -264,6 +288,9 @@ const activePrimaryStyle = css`
     font-weight: 700;
     letter-spacing: -0.2px;
     color: ${MANAGE_TOKENS.text.primary};
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 `;
 
 const activeSubStyle = css`
@@ -273,9 +300,7 @@ const activeSubStyle = css`
 `;
 
 const listStyle = css`
-    flex: 1;
-    padding: 12px 16px 120px;
-    overflow-y: auto;
+    padding: 12px 16px 140px;
 `;
 
 const listLabelStyle = css`
@@ -291,6 +316,28 @@ const cardsStyle = css`
     display: flex;
     flex-direction: column;
     gap: 8px;
+`;
+
+const skipRowStyle = css`
+    display: flex;
+    justify-content: center;
+    margin-top: 14px;
+`;
+
+const skipButtonStyle = css`
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: transparent;
+    color: ${MANAGE_TOKENS.text.label};
+    font-family: ${MANAGE_TOKENS.font};
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    &:active {
+        background: rgba(0, 0, 0, 0.04);
+    }
 `;
 
 const hintStyle = css`
@@ -329,12 +376,31 @@ const emptyDescStyle = css`
     color: ${MANAGE_TOKENS.text.label};
 `;
 
+const emptyActionsStyle = css`
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+`;
+
 const emptyPrimaryStyle = css`
     padding: 9px 14px;
     border-radius: 8px;
     border: none;
     background: ${MANAGE_TOKENS.accent};
     color: #fff;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+`;
+
+const emptySecondaryStyle = css`
+    padding: 9px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: ${MANAGE_TOKENS.card};
+    color: ${MANAGE_TOKENS.text.primary};
     font-family: inherit;
     font-size: 12px;
     font-weight: 700;

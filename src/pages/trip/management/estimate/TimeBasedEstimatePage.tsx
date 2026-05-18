@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { css } from '@emotion/react';
 import { Clock } from 'lucide-react';
@@ -32,7 +32,6 @@ const TimeBasedEstimatePage = () => {
         [imagesResult],
     );
 
-    // store가 비어 있거나 모드가 안 맞으면 즉시 폴백
     useEffect(() => {
         if (!isLoading && (targets.length === 0 || mode !== 'time' || storeTripKey !== tripKey)) {
             showToast('처리할 사진을 다시 선택해주세요');
@@ -55,6 +54,24 @@ const TimeBasedEstimatePage = () => {
     }, [activeTarget, pool]);
 
     const totalApplied = Object.keys(picks).length;
+
+    // 건너뛰기: 1장이면 뒤로, 여러 장이면 다음 미해결 사진으로 이동, 없으면 뒤로
+    const skipActive = useCallback(() => {
+        if (targets.length <= 1) {
+            navigate(-1);
+            return;
+        }
+        const currentIdx = targets.findIndex((t) => t.mediaFileId === activeId);
+        // 현재 이후부터 다음 미선택 사진을 찾고, 없으면 처음부터 다시
+        const rotated = [...targets.slice(currentIdx + 1), ...targets.slice(0, currentIdx)];
+        const next = rotated.find((t) => picks[t.mediaFileId] === undefined);
+        if (next) {
+            setActiveId(next.mediaFileId);
+        } else {
+            // 다른 미선택 대상이 없음 → 뒤로
+            navigate(-1);
+        }
+    }, [targets, activeId, picks, navigate]);
 
     const handleApply = () => {
         const updated: MediaFile[] = targets
@@ -123,7 +140,7 @@ const TimeBasedEstimatePage = () => {
                 </div>
             </div>
 
-            <div css={listStyle}>
+            <main css={listStyle}>
                 {nearby.length === 0 ? (
                     <div css={emptyCardStyle}>
                         <div css={emptyIconStyle}>
@@ -146,17 +163,7 @@ const TimeBasedEstimatePage = () => {
                             >
                                 지도에서 선택
                             </button>
-                            <button
-                                type='button'
-                                css={emptySecondaryStyle}
-                                onClick={() => {
-                                    const remaining = targets.find(
-                                        (t) => t.mediaFileId !== activeId && !picks[t.mediaFileId],
-                                    );
-                                    if (remaining) setActiveId(remaining.mediaFileId);
-                                    else showToast('처리할 다음 사진이 없어요');
-                                }}
-                            >
+                            <button type='button' css={emptySecondaryStyle} onClick={skipActive}>
                                 건너뛰기
                             </button>
                         </div>
@@ -173,8 +180,9 @@ const TimeBasedEstimatePage = () => {
                                         mediaLink={ref.mediaLink}
                                         primaryLabel={extractTimeOfDay(ref.recordDate)}
                                         secondaryLabel={formatTimeDiff(ref.diffMs)}
-                                        metaLabel={`${ref.latitude.toFixed(4)}, ${ref.longitude.toFixed(4)}`}
                                         metaIcon='location'
+                                        latitude={ref.latitude}
+                                        longitude={ref.longitude}
                                         selected={isPicked}
                                         onClick={() =>
                                             setPicks((p) => {
@@ -188,6 +196,11 @@ const TimeBasedEstimatePage = () => {
                                 );
                             })}
                         </div>
+                        <div css={skipRowStyle}>
+                            <button type='button' css={skipButtonStyle} onClick={skipActive}>
+                                이 사진 건너뛰기
+                            </button>
+                        </div>
                         <p css={hintStyle}>
                             사진을 골라 같은 위치로 표시할 수 있어요.
                             <br />
@@ -195,7 +208,7 @@ const TimeBasedEstimatePage = () => {
                         </p>
                     </>
                 )}
-            </div>
+            </main>
 
             <StickyApplyCTA
                 label={totalApplied === 0 ? '사진을 선택해주세요' : `${totalApplied}장 적용하기`}
@@ -209,8 +222,6 @@ const TimeBasedEstimatePage = () => {
 
 const containerStyle = css`
     min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
     background: ${MANAGE_TOKENS.bg};
     color: ${MANAGE_TOKENS.text.primary};
     font-family: ${MANAGE_TOKENS.font};
@@ -286,9 +297,7 @@ const activeSubStyle = css`
 `;
 
 const listStyle = css`
-    flex: 1;
-    padding: 12px 16px 120px;
-    overflow-y: auto;
+    padding: 12px 16px 140px;
 `;
 
 const listLabelStyle = css`
@@ -304,6 +313,28 @@ const cardsStyle = css`
     display: flex;
     flex-direction: column;
     gap: 8px;
+`;
+
+const skipRowStyle = css`
+    display: flex;
+    justify-content: center;
+    margin-top: 14px;
+`;
+
+const skipButtonStyle = css`
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: transparent;
+    color: ${MANAGE_TOKENS.text.label};
+    font-family: ${MANAGE_TOKENS.font};
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    &:active {
+        background: rgba(0, 0, 0, 0.04);
+    }
 `;
 
 const hintStyle = css`
