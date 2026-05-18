@@ -64,42 +64,47 @@ const cardStyle = (selected: boolean) => css`
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: ${selected ? '14px 14px' : '10px'};
-    margin: ${selected ? '6px 0' : '0'};
+    padding: ${selected ? '18px 18px' : '10px'};
+    margin: ${selected ? '10px 0' : '0'};
     background: ${MANAGE_TOKENS.card};
-    border-radius: 14px;
-    border: ${selected ? `2.5px solid ${MANAGE_TOKENS.accent}` : `1px solid ${MANAGE_TOKENS.border}`};
+    border-radius: 16px;
+    border: ${selected ? `3px solid ${MANAGE_TOKENS.accent}` : `1px solid ${MANAGE_TOKENS.border}`};
     box-shadow: ${selected
-        ? '0 18px 38px rgba(0,113,227,0.28), 0 0 0 4px rgba(0,113,227,0.10)'
+        ? '0 22px 44px rgba(0,113,227,0.32), 0 0 0 6px rgba(0,113,227,0.12)'
         : '0 1px 0 rgba(0,0,0,0.02)'};
     cursor: pointer;
-    transform: ${selected ? 'scale(1.06)' : 'scale(1)'};
+    transform: ${selected ? 'scale(1.08) translateY(-2px)' : 'scale(1)'};
     transform-origin: center;
     transition:
-        transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1),
-        padding 240ms ease,
-        margin 240ms ease,
-        box-shadow 220ms ease,
-        border-color 180ms ease;
+        transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
+        padding 260ms cubic-bezier(0.34, 1.56, 0.64, 1),
+        margin 260ms cubic-bezier(0.34, 1.56, 0.64, 1),
+        box-shadow 240ms ease,
+        border-color 200ms ease,
+        border-width 200ms ease;
     font-family: ${MANAGE_TOKENS.font};
     -webkit-tap-highlight-color: transparent;
     will-change: transform;
+    z-index: ${selected ? 2 : 1};
+    position: relative;
     &:active {
-        transform: ${selected ? 'scale(1.06)' : 'scale(0.97)'};
+        transform: ${selected ? 'scale(1.08) translateY(-2px)' : 'scale(0.97)'};
     }
 `;
 
 const thumbStyle = (selected: boolean) => css`
-    width: ${selected ? '84px' : '64px'};
-    height: ${selected ? '84px' : '64px'};
+    width: ${selected ? '96px' : '64px'};
+    height: ${selected ? '96px' : '64px'};
     flex-shrink: 0;
-    border-radius: ${selected ? '12px' : '8px'};
+    border-radius: ${selected ? '14px' : '8px'};
     overflow: hidden;
     background: ${MANAGE_TOKENS.bg};
+    box-shadow: ${selected ? '0 6px 16px rgba(0,0,0,0.18)' : 'none'};
     transition:
-        width 260ms cubic-bezier(0.34, 1.56, 0.64, 1),
-        height 260ms cubic-bezier(0.34, 1.56, 0.64, 1),
-        border-radius 220ms ease;
+        width 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
+        height 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
+        border-radius 240ms ease,
+        box-shadow 220ms ease;
 `;
 
 const thumbImgStyle = css`
