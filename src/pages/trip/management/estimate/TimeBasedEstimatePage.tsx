@@ -1,0 +1,378 @@
+import { useEffect, useMemo, useState } from 'react';
+
+import { css } from '@emotion/react';
+import { Clock } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+
+import EstimateTargetTab from '@/domains/media/components/manage/EstimateTargetTab';
+import ManageHeader from '@/domains/media/components/manage/ManageHeader';
+import ReferencePhotoCard from '@/domains/media/components/manage/ReferencePhotoCard';
+import StickyApplyCTA from '@/domains/media/components/manage/StickyApplyCTA';
+import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
+import { useMetadataUpdate } from '@/domains/media/hooks/mutations';
+import { useTripImages } from '@/domains/media/hooks/queries';
+import { useEstimateStore } from '@/domains/media/stores/useEstimateStore';
+import { MediaFile } from '@/domains/media/types';
+import { extractTimeOfDay, findNearbyPhotosByTime, formatTimeDiff } from '@/domains/media/utils';
+import Indicator from '@/shared/components/common/Spinner/Indicator';
+import { ROUTES } from '@/shared/constants/route';
+import { useToastStore } from '@/shared/stores/useToastStore';
+
+const TimeBasedEstimatePage = () => {
+    const { tripKey = '' } = useParams<{ tripKey: string }>();
+    const navigate = useNavigate();
+    const { showToast } = useToastStore();
+    const { mode, tripKey: storeTripKey, targets, clear } = useEstimateStore();
+
+    const { data: imagesResult, isLoading } = useTripImages(tripKey);
+    const { mutate: updateMutate, isPending: isApplying } = useMetadataUpdate();
+
+    const pool: MediaFile[] = useMemo(
+        () => (imagesResult?.success ? (imagesResult.data as MediaFile[]) : []),
+        [imagesResult],
+    );
+
+    // store가 비어 있거나 모드가 안 맞으면 즉시 폴백
+    useEffect(() => {
+        if (!isLoading && (targets.length === 0 || mode !== 'time' || storeTripKey !== tripKey)) {
+            showToast('처리할 사진을 다시 선택해주세요');
+            navigate(ROUTES.PATH.TRIP.EDIT.NO_LOCATION(tripKey), { replace: true });
+        }
+    }, [isLoading, mode, storeTripKey, tripKey, targets.length, navigate, showToast]);
+
+    const [activeId, setActiveId] = useState<number | null>(null);
+    const [picks, setPicks] = useState<Record<number, number>>({});
+
+    useEffect(() => {
+        if (activeId === null && targets.length > 0) setActiveId(targets[0].mediaFileId);
+    }, [targets, activeId]);
+
+    const activeTarget = targets.find((t) => t.mediaFileId === activeId) || null;
+
+    const nearby = useMemo(() => {
+        if (!activeTarget) return [];
+        return findNearbyPhotosByTime(activeTarget, pool);
+    }, [activeTarget, pool]);
+
+    const totalApplied = Object.keys(picks).length;
+
+    const handleApply = () => {
+        const updated: MediaFile[] = targets
+            .filter((t) => picks[t.mediaFileId] !== undefined)
+            .map((t) => {
+                const ref = pool.find((p) => p.mediaFileId === picks[t.mediaFileId]);
+                if (!ref) return t;
+                return { ...t, latitude: ref.latitude, longitude: ref.longitude };
+            });
+
+        if (updated.length === 0) return;
+
+        updateMutate(
+            { tripKey, images: updated },
+            {
+                onSuccess: (result) => {
+                    if (result.success) {
+                        showToast(`${updated.length}장의 위치가 업데이트되었어요`);
+                        clear();
+                        navigate(-1);
+                    } else {
+                        showToast(result.error);
+                    }
+                },
+            },
+        );
+    };
+
+    if (isLoading) return <Indicator />;
+    if (!activeTarget) return <Indicator />;
+
+    return (
+        <div css={containerStyle}>
+            {isApplying && <Indicator text='적용 중...' />}
+
+            <ManageHeader
+                title='비슷한 시간 사진 찾기'
+                subtitle='같은 위치일 가능성이 있는 사진을 골라주세요'
+                onBack={() => navigate(-1)}
+            />
+
+            <div css={targetsSectionStyle}>
+                <div css={targetsLabelStyle}>처리할 사진 · {targets.length}장</div>
+                <div css={targetsRowStyle}>
+                    {targets.map((t) => (
+                        <EstimateTargetTab
+                            key={t.mediaFileId}
+                            photo={t}
+                            active={t.mediaFileId === activeId}
+                            done={!!picks[t.mediaFileId]}
+                            onClick={() => setActiveId(t.mediaFileId)}
+                        />
+                    ))}
+                </div>
+            </div>
+
+            <div css={activeContextStyle}>
+                <div css={activeThumbStyle}>
+                    <img src={activeTarget.mediaLink} alt='' css={activeImgStyle} loading='lazy' />
+                </div>
+                <div css={activeInfoStyle}>
+                    <p css={activePrimaryStyle}>
+                        {extractTimeOfDay(activeTarget.recordDate) || '시간 미상'}에 찍힌 사진
+                    </p>
+                    <p css={activeSubStyle}>±30분 범위 내 위치 있는 사진을 찾았어요</p>
+                </div>
+            </div>
+
+            <div css={listStyle}>
+                {nearby.length === 0 ? (
+                    <div css={emptyCardStyle}>
+                        <div css={emptyIconStyle}>
+                            <Clock size={28} strokeWidth={2.2} color={MANAGE_TOKENS.text.muted} />
+                        </div>
+                        <h4 css={emptyTitleStyle}>비슷한 시간의 사진이 없어요</h4>
+                        <p css={emptyDescStyle}>
+                            지도에서 직접 위치를 선택하거나
+                            <br />
+                            다른 사진을 처리해주세요
+                        </p>
+                        <div css={emptyActionsStyle}>
+                            <button
+                                type='button'
+                                css={emptyPrimaryStyle}
+                                onClick={() => {
+                                    clear();
+                                    navigate(ROUTES.PATH.TRIP.EDIT.NO_LOCATION(tripKey));
+                                }}
+                            >
+                                지도에서 선택
+                            </button>
+                            <button
+                                type='button'
+                                css={emptySecondaryStyle}
+                                onClick={() => {
+                                    const remaining = targets.find(
+                                        (t) => t.mediaFileId !== activeId && !picks[t.mediaFileId],
+                                    );
+                                    if (remaining) setActiveId(remaining.mediaFileId);
+                                    else showToast('처리할 다음 사진이 없어요');
+                                }}
+                            >
+                                건너뛰기
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <h3 css={listLabelStyle}>같은 위치일 가능성이 있는 사진</h3>
+                        <div css={cardsStyle}>
+                            {nearby.map((ref) => {
+                                const isPicked = picks[activeTarget.mediaFileId] === ref.mediaFileId;
+                                return (
+                                    <ReferencePhotoCard
+                                        key={ref.mediaFileId}
+                                        mediaLink={ref.mediaLink}
+                                        primaryLabel={extractTimeOfDay(ref.recordDate)}
+                                        secondaryLabel={formatTimeDiff(ref.diffMs)}
+                                        metaLabel={`${ref.latitude.toFixed(4)}, ${ref.longitude.toFixed(4)}`}
+                                        metaIcon='location'
+                                        selected={isPicked}
+                                        onClick={() =>
+                                            setPicks((p) => {
+                                                const next = { ...p };
+                                                if (isPicked) delete next[activeTarget.mediaFileId];
+                                                else next[activeTarget.mediaFileId] = ref.mediaFileId;
+                                                return next;
+                                            })
+                                        }
+                                    />
+                                );
+                            })}
+                        </div>
+                        <p css={hintStyle}>
+                            사진을 골라 같은 위치로 표시할 수 있어요.
+                            <br />
+                            적용 후에도 개별 사진에서 위치를 수정할 수 있어요.
+                        </p>
+                    </>
+                )}
+            </div>
+
+            <StickyApplyCTA
+                label={totalApplied === 0 ? '사진을 선택해주세요' : `${totalApplied}장 적용하기`}
+                disabled={totalApplied === 0}
+                isLoading={isApplying}
+                onClick={handleApply}
+            />
+        </div>
+    );
+};
+
+const containerStyle = css`
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: ${MANAGE_TOKENS.bg};
+    color: ${MANAGE_TOKENS.text.primary};
+    font-family: ${MANAGE_TOKENS.font};
+`;
+
+const targetsSectionStyle = css`
+    padding: 12px 16px;
+    background: ${MANAGE_TOKENS.card};
+    border-bottom: 1px solid ${MANAGE_TOKENS.border};
+`;
+
+const targetsLabelStyle = css`
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: ${MANAGE_TOKENS.text.muted};
+    text-transform: uppercase;
+    margin-bottom: 8px;
+`;
+
+const targetsRowStyle = css`
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+        display: none;
+    }
+`;
+
+const activeContextStyle = css`
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px 12px;
+    background: ${MANAGE_TOKENS.card};
+    border-bottom: 1px solid ${MANAGE_TOKENS.border};
+`;
+
+const activeThumbStyle = css`
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: ${MANAGE_TOKENS.bg};
+`;
+
+const activeImgStyle = css`
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+`;
+
+const activeInfoStyle = css`
+    flex: 1;
+    min-width: 0;
+`;
+
+const activePrimaryStyle = css`
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    color: ${MANAGE_TOKENS.text.primary};
+`;
+
+const activeSubStyle = css`
+    margin: 2px 0 0;
+    font-size: 11px;
+    color: ${MANAGE_TOKENS.text.muted};
+`;
+
+const listStyle = css`
+    flex: 1;
+    padding: 12px 16px 120px;
+    overflow-y: auto;
+`;
+
+const listLabelStyle = css`
+    margin: 0 4px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: ${MANAGE_TOKENS.text.label};
+    text-transform: uppercase;
+`;
+
+const cardsStyle = css`
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+`;
+
+const hintStyle = css`
+    margin: 14px 8px 0;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #999;
+    text-align: center;
+`;
+
+const emptyCardStyle = css`
+    background: ${MANAGE_TOKENS.card};
+    border-radius: 14px;
+    padding: 40px 20px;
+    text-align: center;
+    border: 1px dashed rgba(0, 0, 0, 0.12);
+`;
+
+const emptyIconStyle = css`
+    margin-bottom: 10px;
+    display: grid;
+    place-items: center;
+`;
+
+const emptyTitleStyle = css`
+    margin: 0 0 4px;
+    font-size: 14px;
+    font-weight: 700;
+    color: ${MANAGE_TOKENS.text.primary};
+`;
+
+const emptyDescStyle = css`
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: ${MANAGE_TOKENS.text.label};
+`;
+
+const emptyActionsStyle = css`
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    justify-content: center;
+`;
+
+const emptyPrimaryStyle = css`
+    padding: 9px 14px;
+    border-radius: 8px;
+    border: none;
+    background: ${MANAGE_TOKENS.accent};
+    color: #fff;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+`;
+
+const emptySecondaryStyle = css`
+    padding: 9px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: ${MANAGE_TOKENS.card};
+    color: ${MANAGE_TOKENS.text.primary};
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+`;
+
+export default TimeBasedEstimatePage;

@@ -17,6 +17,10 @@ export const ROUTES = {
             EDIT: {
                 IMAGE: (tripKey: TripKey) => `/trip/${tripKey}/edit/image`,
                 INFO: (tripKey: TripKey) => `/trip/${tripKey}/edit/info`,
+                NO_LOCATION: (tripKey: TripKey) => `/trip/${tripKey}/edit/image/no-location`,
+                NO_DATE: (tripKey: TripKey) => `/trip/${tripKey}/edit/image/no-date`,
+                ESTIMATE_TIME: (tripKey: TripKey) => `/trip/${tripKey}/edit/image/estimate-by-time`,
+                ESTIMATE_LOCATION: (tripKey: TripKey) => `/trip/${tripKey}/edit/image/estimate-by-location`,
             },
             IMAGE: {
                 BY_PINPOINT: (tripKey: TripKey, pinPointId: PinPointId) =>

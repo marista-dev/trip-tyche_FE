@@ -23,6 +23,10 @@ const TripPages = {
     TripRoutePage: lazy(() => import('@/pages/trip/route/TripRoutePage')),
     ImageByDatePage: lazy(() => import('@/pages/trip/route/ImageByDatePage')),
     TripImageManagePage: lazy(() => import('@/pages/trip/management/TripImageManagePage')),
+    NoLocationResolvePage: lazy(() => import('@/pages/trip/management/NoLocationResolvePage')),
+    NoDateResolvePage: lazy(() => import('@/pages/trip/management/NoDateResolvePage')),
+    TimeBasedEstimatePage: lazy(() => import('@/pages/trip/management/estimate/TimeBasedEstimatePage')),
+    LocationBasedEstimatePage: lazy(() => import('@/pages/trip/management/estimate/LocationBasedEstimatePage')),
 };
 
 /** 인증 가드 + Suspense를 한 번에 적용하는 헬퍼. */
@@ -83,6 +87,22 @@ const router = createBrowserRouter([
                     {
                         path: 'edit/image',
                         element: protect(<TripPages.TripImageManagePage />),
+                    },
+                    {
+                        path: 'edit/image/no-location',
+                        element: protect(<TripPages.NoLocationResolvePage />),
+                    },
+                    {
+                        path: 'edit/image/no-date',
+                        element: protect(<TripPages.NoDateResolvePage />),
+                    },
+                    {
+                        path: 'edit/image/estimate-by-time',
+                        element: protect(<TripPages.TimeBasedEstimatePage />),
+                    },
+                    {
+                        path: 'edit/image/estimate-by-location',
+                        element: protect(<TripPages.LocationBasedEstimatePage />),
                     },
                     {
                         path: 'edit/info',
