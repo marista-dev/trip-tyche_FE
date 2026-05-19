@@ -244,7 +244,10 @@ const targetsLabelStyle = css`
 
 const targetsRowStyle = css`
     display: flex;
+    align-items: center;
     gap: 8px;
+    /* active tab(108px height + shadow)을 위한 vertical breathing room. */
+    padding: 8px 4px;
     overflow-x: auto;
     scrollbar-width: none;
     &::-webkit-scrollbar {

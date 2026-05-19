@@ -33,26 +33,29 @@ const EstimateTargetTab = ({ photo, active, done, showTime = true, onClick }: Es
 const tabStyle = (active: boolean) => css`
     position: relative;
     flex-shrink: 0;
-    width: 64px;
-    height: 80px;
+    /* 실제 width/height 차이로 시각 hierarchy. transform: scale은 인접 tab과 겹치거나
+       overflow-x: auto에 클리핑되는 문제가 있어 사용하지 않음. */
+    width: ${active ? '88px' : '52px'};
+    height: ${active ? '108px' : '64px'};
+    align-self: center;
     padding: 0;
     background: transparent;
     border: ${active ? `3px solid ${MANAGE_TOKENS.accent}` : '2px solid transparent'};
-    border-radius: 10px;
+    border-radius: ${active ? '12px' : '8px'};
     overflow: hidden;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    opacity: ${active ? 1 : 0.7};
-    transform: ${active ? 'scale(1.12)' : 'scale(1)'};
-    transform-origin: center;
-    box-shadow: ${active ? '0 8px 20px rgba(0, 113, 227, 0.32)' : 'none'};
+    opacity: ${active ? 1 : 0.55};
+    box-shadow: ${active ? '0 10px 26px rgba(0, 113, 227, 0.35)' : 'none'};
     z-index: ${active ? 1 : 0};
     transition:
-        transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1),
-        opacity 200ms ease,
-        box-shadow 220ms ease,
-        border-color 180ms ease;
-    will-change: transform;
+        width 260ms cubic-bezier(0.34, 1.56, 0.64, 1),
+        height 260ms cubic-bezier(0.34, 1.56, 0.64, 1),
+        border-radius 220ms ease,
+        opacity 220ms ease,
+        box-shadow 240ms ease,
+        border-color 200ms ease;
+    will-change: width, height;
 `;
 
 const imgStyle = css`
