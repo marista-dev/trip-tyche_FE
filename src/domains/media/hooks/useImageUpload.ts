@@ -96,7 +96,7 @@ export const useImageUpload = () => {
 
     const { tripKey } = useParams();
 
-    const extractMetaData = useCallback(async (images: FileList): Promise<FileList> => {
+    const extractMetaData = useCallback(async (images: FileList): Promise<File[]> => {
         setCurrentProcess('metadata');
         const imagesWithoutHeic = await convertHeicToJpg(images);
         const uniqueImages = removeDuplicateImages(imagesWithoutHeic);
@@ -175,7 +175,7 @@ export const useImageUpload = () => {
     // postUploadTask는 S3 업로드 + 메타등록 이후에 같은 체인으로 묶어 실행할 작업(예: status 전환).
     // 실패 시 step3의 waitForBackgroundUpload에서 함께 surface되어 retry UI로 노출된다.
     const uploadImagesToS3 = useCallback(
-        async (uniqueFiles: FileList, postUploadTask?: () => Promise<unknown>) => {
+        async (uniqueFiles: readonly File[], postUploadTask?: () => Promise<unknown>) => {
             const setRejected = (err: unknown) => {
                 const failed = Promise.reject(err instanceof Error ? err : new Error(String(err)));
                 failed.catch(() => {});
@@ -188,7 +188,7 @@ export const useImageUpload = () => {
                 const imageNames = fileArray.map((file) => ({ fileName: file.name }));
 
                 const [imagesWithMetadata, presignedResult] = await Promise.all([
-                    extractMetadataFromImage(uniqueFiles, setProgress),
+                    extractMetadataFromImage(fileArray, setProgress),
                     mediaAPI.requestPresignedUrls(tripKey!, imageNames),
                 ]);
 

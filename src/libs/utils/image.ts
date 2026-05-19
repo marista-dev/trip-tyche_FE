@@ -5,24 +5,19 @@ import { ClientImageFile } from '@/domains/media/types';
 import { formatToISOLocal } from '@/libs/utils/date';
 import { extractDateFromImage, extractLocationFromImage } from '@/libs/utils/exif';
 
-// 중복 이미지 제거
-export const removeDuplicateImages = (images: File[]): FileList => {
-    const imageMap = new Map();
-    Array.from(images).forEach((image) => {
+// 중복 이미지 제거 (이름 기준). DataTransfer는 iOS Safari/일부 Android Chromium에서
+// items.add()가 빈 FileList를 만들어버리는 버그가 있어 사용하지 않음. 단순 File[] 반환.
+export const removeDuplicateImages = (images: File[]): File[] => {
+    const imageMap = new Map<string, File>();
+    images.forEach((image) => {
         imageMap.set(image.name, image);
     });
-
-    const dataTransfer = new DataTransfer();
-    Array.from(imageMap.values()).forEach((image: File) => {
-        dataTransfer.items.add(image);
-    });
-
-    return dataTransfer.files;
+    return Array.from(imageMap.values());
 };
 
 // 이미지 메타데이터 추출
 export const extractMetadataFromImage = async (
-    images: FileList,
+    images: readonly File[],
     onProgress?: Dispatch<SetStateAction<{ metadata: number; upload: number }>>,
 ): Promise<ClientImageFile[]> => {
     if (images.length === 0) return [];
