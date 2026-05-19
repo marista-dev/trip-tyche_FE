@@ -29,7 +29,7 @@ const TripImageAddPage = ({ onClose }: { onClose: () => void }) => {
     const [tripForm, setTripForm] = useState<TripInfo>(FORM.INITIAL);
 
     const { isModalOpen, closeModal } = useBrowserCheck();
-    const { images, imageCategories, progress, extractMetaData, uploadImagesToS3, waitForBackgroundUpload } =
+    const { images, imageCategories, progress, prepareUploadFiles, uploadImagesToS3, waitForBackgroundUpload } =
         useImageUpload();
     const showToast = useToastStore((state) => state.showToast);
 
@@ -93,7 +93,7 @@ const TripImageAddPage = ({ onClose }: { onClose: () => void }) => {
         const selectedImages = event.target.files;
         if (selectedImages) {
             setStep('processing');
-            const uniqueFiles = await extractMetaData(selectedImages);
+            const uniqueFiles = await prepareUploadFiles(selectedImages);
             // uploadImagesToS3는 fire-and-forget이라 즉시 return → 실제 S3 PUT + metadata POST 완료까지
             // waitForBackgroundUpload로 await해야 review step이 정확한 데이터 기반으로 표시됨.
             await uploadImagesToS3(uniqueFiles);

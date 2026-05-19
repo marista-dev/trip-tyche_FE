@@ -5,12 +5,16 @@ import { ClientImageFile } from '@/domains/media/types';
 import { formatToISOLocal } from '@/libs/utils/date';
 import { extractDateFromImage, extractLocationFromImage } from '@/libs/utils/exif';
 
-// 중복 이미지 제거 (이름 기준). DataTransfer는 iOS Safari/일부 Android Chromium에서
-// items.add()가 빈 FileList를 만들어버리는 버그가 있어 사용하지 않음. 단순 File[] 반환.
+// 중복 이미지 제거.
+// 정확도: 파일명 단독 비교는 같은 이름의 다른 사진을 silent하게 잃을 수 있음 → name+size+lastModified
+// 복합 키로 식별. 해시까지 필요할 정도로 정확하진 않아도 일반적인 갤러리 중복 선택 시나리오는 충분.
+// DataTransfer는 iOS Safari/일부 Android Chromium에서 items.add()가 빈 FileList를 만들어버리는
+// 버그가 있어 사용하지 않음. 단순 File[] 반환.
 export const removeDuplicateImages = (images: File[]): File[] => {
     const imageMap = new Map<string, File>();
     images.forEach((image) => {
-        imageMap.set(image.name, image);
+        const key = `${image.name}::${image.size}::${image.lastModified}`;
+        if (!imageMap.has(key)) imageMap.set(key, image);
     });
     return Array.from(imageMap.values());
 };

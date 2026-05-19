@@ -9,6 +9,7 @@ import DateGroupSection, { PendingPhoto } from '@/domains/media/components/manag
 import IssueCard from '@/domains/media/components/manage/IssueCard';
 import ManageHeader from '@/domains/media/components/manage/ManageHeader';
 import SelectionActionFAB from '@/domains/media/components/manage/SelectionActionFAB';
+import { managePageContainerStyle } from '@/domains/media/components/manage/styles';
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
 import { useMediaDelete } from '@/domains/media/hooks/mutations';
 import { useTripImages } from '@/domains/media/hooks/queries';
@@ -58,7 +59,7 @@ const TripImageManagePage = () => {
     const { data: imagesResult, isLoading: isImagesLoading } = useTripImages(tripKey);
     const { data: tripInfoResult } = useTripInfo(tripKey);
     const { mutate: deleteMutate, isPending: isDeleting } = useMediaDelete();
-    const { extractMetaData, uploadImagesToS3, waitForBackgroundUpload, progress } = useImageUpload();
+    const { prepareUploadFiles, uploadImagesToS3, waitForBackgroundUpload, progress } = useImageUpload();
 
     const allImages: MediaFile[] = useMemo(
         () => (imagesResult?.success ? (imagesResult.data as MediaFile[]) : []),
@@ -134,7 +135,7 @@ const TripImageManagePage = () => {
 
         const createdUrls: string[] = [];
 
-        // INSTANT: extractMetaData가 끝나기 전에 미리보기 placeholder를 그리드에 즉시 띄움.
+        // INSTANT: prepareUploadFiles가 끝나기 전에 미리보기 placeholder를 그리드에 즉시 띄움.
         // file.lastModified 기준으로 날짜 그룹에 배치. 업로드 완료 시 실제 사진으로 자연 교체.
         const initialPending: Record<string, PendingPhoto[]> = {};
         const stampBatch = Date.now();
@@ -157,7 +158,7 @@ const TripImageManagePage = () => {
         setUploadPhase('extracting');
 
         try {
-            const uniqueFiles = await extractMetaData(files);
+            const uniqueFiles = await prepareUploadFiles(files);
             setUploadPhase('uploading');
 
             // uploadImagesToS3는 백그라운드 chain을 띄우고 즉시 return → waitForBackgroundUpload()로
@@ -215,7 +216,7 @@ const TripImageManagePage = () => {
               : undefined;
 
     return (
-        <div css={containerStyle}>
+        <div css={managePageContainerStyle}>
             {(isImagesLoading || isDeleting) && <Indicator text={isDeleting ? '사진 삭제 중...' : undefined} />}
             {uploadPhase !== 'idle' && (
                 <div css={uploadChipStyle} role='status' aria-live='polite'>
@@ -335,15 +336,6 @@ const TripImageManagePage = () => {
         </div>
     );
 };
-
-const containerStyle = css`
-    height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    background: ${MANAGE_TOKENS.bg};
-    color: ${MANAGE_TOKENS.text.primary};
-    font-family: ${MANAGE_TOKENS.font};
-`;
 
 const bodyStyle = css`
     flex: 1;

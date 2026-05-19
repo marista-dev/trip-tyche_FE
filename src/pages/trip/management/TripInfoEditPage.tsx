@@ -90,7 +90,11 @@ const TripInfoEditPage = () => {
         <div css={pageContainer}>
             {(isLoading || isSubmitting || isTripFinalizing) && <Indicator text='여행 정보 불러오는 중...' />}
 
-            <Header title={ROUTES.PATH_TITLE.TRIPS.NEW.INFO} isBackButton onBack={() => navigate(ROUTES.PATH.TICKETS)} />
+            <Header
+                title={ROUTES.PATH_TITLE.TRIPS.NEW.INFO}
+                isBackButton
+                onBack={() => navigate(ROUTES.PATH.TICKETS)}
+            />
             <main css={mainStyle}>
                 <div css={previewWrapper}>
                     <MiniTicketPreview trip={tripForm} ownerNickname={userInfo?.nickname} />

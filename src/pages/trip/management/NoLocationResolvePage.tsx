@@ -7,6 +7,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import ManageHeader from '@/domains/media/components/manage/ManageHeader';
 import PhotoListItem from '@/domains/media/components/manage/PhotoListItem';
 import QuickActionChip from '@/domains/media/components/manage/QuickActionChip';
+import { managePageContainerStyle } from '@/domains/media/components/manage/styles';
 import TaskContextCard from '@/domains/media/components/manage/TaskContextCard';
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
 import { useMediaDelete } from '@/domains/media/hooks/mutations';
@@ -86,7 +87,7 @@ const NoLocationResolvePage = () => {
     };
 
     return (
-        <div css={containerStyle}>
+        <div css={managePageContainerStyle}>
             {(isLoading || isDeleting) && <Indicator text={isDeleting ? '사진 삭제 중...' : undefined} />}
 
             <ManageHeader
@@ -157,15 +158,6 @@ const NoLocationResolvePage = () => {
         </div>
     );
 };
-
-const containerStyle = css`
-    height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    background: ${MANAGE_TOKENS.bg};
-    color: ${MANAGE_TOKENS.text.primary};
-    font-family: ${MANAGE_TOKENS.font};
-`;
 
 const quickActionsStyle = css`
     display: flex;

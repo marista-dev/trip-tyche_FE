@@ -99,7 +99,7 @@ export const useImageUpload = () => {
 
     const { tripKey } = useParams();
 
-    const extractMetaData = useCallback(async (images: FileList): Promise<File[]> => {
+    const prepareUploadFiles = useCallback(async (images: FileList): Promise<File[]> => {
         setCurrentProcess('metadata');
         const imagesWithoutHeic = await convertHeicToJpg(images);
         const uniqueImages = removeDuplicateImages(imagesWithoutHeic);
@@ -313,7 +313,7 @@ export const useImageUpload = () => {
         currentProcess,
         progress,
         uploadStats,
-        extractMetaData,
+        prepareUploadFiles,
         uploadImagesToS3,
         retryFailedUploads,
         waitForBackgroundUpload,

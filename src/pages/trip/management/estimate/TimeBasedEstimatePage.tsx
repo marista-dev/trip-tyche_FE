@@ -8,6 +8,7 @@ import EstimateTargetTab from '@/domains/media/components/manage/EstimateTargetT
 import ManageHeader from '@/domains/media/components/manage/ManageHeader';
 import ReferencePhotoCard from '@/domains/media/components/manage/ReferencePhotoCard';
 import StickyApplyCTA from '@/domains/media/components/manage/StickyApplyCTA';
+import { managePageContainerStyle } from '@/domains/media/components/manage/styles';
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
 import { useMetadataUpdate } from '@/domains/media/hooks/mutations';
 import { useTripImages } from '@/domains/media/hooks/queries';
@@ -104,7 +105,7 @@ const TimeBasedEstimatePage = () => {
     if (!activeTarget) return <Indicator />;
 
     return (
-        <div css={containerStyle}>
+        <div css={managePageContainerStyle}>
             {isApplying && <Indicator text='적용 중...' />}
 
             <ManageHeader
@@ -219,15 +220,6 @@ const TimeBasedEstimatePage = () => {
         </div>
     );
 };
-
-const containerStyle = css`
-    height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    background: ${MANAGE_TOKENS.bg};
-    color: ${MANAGE_TOKENS.text.primary};
-    font-family: ${MANAGE_TOKENS.font};
-`;
 
 const targetsSectionStyle = css`
     padding: 12px 16px;

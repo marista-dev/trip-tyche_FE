@@ -45,7 +45,7 @@ const TripImageUploadPage = () => {
         images,
         progress,
         uploadStats,
-        extractMetaData,
+        prepareUploadFiles,
         uploadImagesToS3,
         retryFailedUploads,
         waitForBackgroundUpload,
@@ -112,7 +112,7 @@ const TripImageUploadPage = () => {
         if (!selectedImages || selectedImages.length === 0) return;
 
         setStep('processing');
-        const uniqueFiles = await extractMetaData(selectedImages);
+        const uniqueFiles = await prepareUploadFiles(selectedImages);
         // S3 업로드는 백그라운드로 진행되며, 정보 입력 화면 진입을 막지 않는다.
         // 실제 업로드 완료는 Step3에서 waitForBackgroundUpload로 추적된다.
         // 신규 등록일 때는 status 전환도 같은 체인에 묶어 실패 시 step3 retry 화면에 surface되도록 한다.
