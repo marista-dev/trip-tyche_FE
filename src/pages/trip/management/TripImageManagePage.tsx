@@ -58,7 +58,7 @@ const TripImageManagePage = () => {
     const { data: imagesResult, isLoading: isImagesLoading } = useTripImages(tripKey);
     const { data: tripInfoResult } = useTripInfo(tripKey);
     const { mutate: deleteMutate, isPending: isDeleting } = useMediaDelete();
-    const { extractMetaData, uploadImagesToS3, progress } = useImageUpload();
+    const { extractMetaData, uploadImagesToS3, waitForBackgroundUpload, progress } = useImageUpload();
 
     const allImages: MediaFile[] = useMemo(
         () => (imagesResult?.success ? (imagesResult.data as MediaFile[]) : []),
@@ -152,7 +152,13 @@ const TripImageManagePage = () => {
         try {
             const uniqueFiles = await extractMetaData(files);
             setUploadPhase('uploading');
+
+            // uploadImagesToS3는 백그라운드 chain을 띄우고 즉시 return → waitForBackgroundUpload()로
+            // 실제 S3 PUT + metadata POST 완료까지 await. 이걸 안 걸면 placeholder가 곧바로 지워져
+            // 사용자에게 미리보기가 안 보임.
             await uploadImagesToS3(uniqueFiles);
+            await waitForBackgroundUpload();
+
             await queryClient.invalidateQueries({ queryKey: ['trip-images', tripKey] });
             showToast(`${uniqueFiles.length}장의 사진이 추가되었어요`);
         } catch {
@@ -160,7 +166,14 @@ const TripImageManagePage = () => {
         } finally {
             setUploadPhase('idle');
             setPendingByDate({});
-            createdUrls.forEach((url) => URL.revokeObjectURL(url));
+            // setPendingByDate({})는 비동기 렌더 → DOM 제거가 끝난 뒤 blob을 회수해야 broken image 깜빡임이 없음.
+            // 더블 rAF로 다음 paint 두 번 이후에 revoke (안전 마진).
+            const urlsToRevoke = createdUrls.slice();
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    urlsToRevoke.forEach((url) => URL.revokeObjectURL(url));
+                });
+            });
         }
     };
 
