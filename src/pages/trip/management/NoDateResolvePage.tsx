@@ -11,7 +11,7 @@ import { managePageContainerStyle } from '@/domains/media/components/manage/styl
 import TaskContextCard from '@/domains/media/components/manage/TaskContextCard';
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
 import { useMediaDelete } from '@/domains/media/hooks/mutations';
-import { useTripImages } from '@/domains/media/hooks/queries';
+import { useTripPhotos } from '@/domains/media/hooks/queries';
 import { useEstimateStore } from '@/domains/media/stores/useEstimateStore';
 import { MediaFile } from '@/domains/media/types';
 import { filterWithoutDateMediaFile } from '@/domains/media/utils';
@@ -31,13 +31,9 @@ const NoDateResolvePage = () => {
     const [showDelete, setShowDelete] = useState(false);
     const [showDateSheet, setShowDateSheet] = useState(false);
 
-    const { data: imagesResult, isLoading } = useTripImages(tripKey);
+    const { photos: allImages, isLoading } = useTripPhotos(tripKey);
     const { mutate: deleteMutate, isPending: isDeleting } = useMediaDelete();
 
-    const allImages: MediaFile[] = useMemo(
-        () => (imagesResult?.success ? (imagesResult.data as MediaFile[]) : []),
-        [imagesResult],
-    );
     const targets = useMemo(() => filterWithoutDateMediaFile(allImages) as MediaFile[], [allImages]);
 
     const allSelected = targets.length > 0 && selected.size === targets.length;

@@ -12,7 +12,7 @@ import SelectionActionFAB from '@/domains/media/components/manage/SelectionActio
 import { managePageContainerStyle } from '@/domains/media/components/manage/styles';
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
 import { useMediaDelete } from '@/domains/media/hooks/mutations';
-import { useTripImages } from '@/domains/media/hooks/queries';
+import { useTripPhotos } from '@/domains/media/hooks/queries';
 import { useImageUpload } from '@/domains/media/hooks/useImageUpload';
 import { useEstimateStore } from '@/domains/media/stores/useEstimateStore';
 import { MediaFile } from '@/domains/media/types';
@@ -56,15 +56,11 @@ const TripImageManagePage = () => {
     const [pendingByDate, setPendingByDate] = useState<Record<string, PendingPhoto[]>>({});
     const setEstimateTargets = useEstimateStore((s) => s.setTargets);
 
-    const { data: imagesResult, isLoading: isImagesLoading } = useTripImages(tripKey);
+    const { photos: allImages, isLoading: isImagesLoading } = useTripPhotos(tripKey);
     const { data: tripInfoResult } = useTripInfo(tripKey);
     const { mutate: deleteMutate, isPending: isDeleting } = useMediaDelete();
     const { prepareUploadFiles, uploadImagesToS3, waitForBackgroundUpload, progress } = useImageUpload();
 
-    const allImages: MediaFile[] = useMemo(
-        () => (imagesResult?.success ? (imagesResult.data as MediaFile[]) : []),
-        [imagesResult],
-    );
     const tripInfo = tripInfoResult?.success ? tripInfoResult.data : undefined;
 
     const noLocImages = useMemo(() => filterWithoutLocationMediaFile(allImages) as MediaFile[], [allImages]);

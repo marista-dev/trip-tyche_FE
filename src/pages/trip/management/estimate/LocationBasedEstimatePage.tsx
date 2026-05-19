@@ -11,7 +11,7 @@ import StickyApplyCTA from '@/domains/media/components/manage/StickyApplyCTA';
 import { managePageContainerStyle } from '@/domains/media/components/manage/styles';
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
 import { useMetadataUpdate } from '@/domains/media/hooks/mutations';
-import { useTripImages } from '@/domains/media/hooks/queries';
+import { useTripPhotos } from '@/domains/media/hooks/queries';
 import { useEstimateStore } from '@/domains/media/stores/useEstimateStore';
 import { MediaFile } from '@/domains/media/types';
 import { extractTimeOfDay, findNearbyPhotosByLocation, formatDistance } from '@/domains/media/utils';
@@ -32,13 +32,8 @@ const LocationBasedEstimatePage = () => {
     const { showToast } = useToastStore();
     const { mode, tripKey: storeTripKey, targets, clear } = useEstimateStore();
 
-    const { data: imagesResult, isLoading } = useTripImages(tripKey);
+    const { photos: pool, isLoading } = useTripPhotos(tripKey);
     const { mutate: updateMutate, isPending: isApplying } = useMetadataUpdate();
-
-    const pool: MediaFile[] = useMemo(
-        () => (imagesResult?.success ? (imagesResult.data as MediaFile[]) : []),
-        [imagesResult],
-    );
 
     useEffect(() => {
         if (!isLoading && (targets.length === 0 || mode !== 'location' || storeTripKey !== tripKey)) {
