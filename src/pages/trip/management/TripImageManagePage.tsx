@@ -120,24 +120,17 @@ const TripImageManagePage = () => {
 
     const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const inputEl = event.target;
-        const originalFiles = inputEl.files;
+        const { files } = inputEl;
 
-        // 일부 브라우저(Safari, 구버전 Chromium)는 input.value = ''로 reset하면 캡처한 FileList도
-        // 함께 비워버린다. 따라서 reset 전에 File[]로 즉시 스냅샷한 뒤, DataTransfer로 안정적인
-        // 새 FileList를 만들어 hook들에 전달한다.
-        if (!originalFiles || originalFiles.length === 0) {
+        if (!files || files.length === 0) {
             inputEl.value = '';
             return;
         }
-        const fileArray: File[] = Array.from(originalFiles);
 
-        // 같은 파일을 연달아 선택해도 onChange가 fire되도록 입력 초기화 (스냅샷 이후라 안전)
-        inputEl.value = '';
-
-        // DataTransfer로 File[] → FileList 재구성 (extractMetaData/uploadImagesToS3가 FileList 시그니처)
-        const dt = new DataTransfer();
-        fileArray.forEach((f) => dt.items.add(f));
-        const { files } = dt;
+        // File 객체는 개별 참조라 input.value reset에 영향 없음 (placeholder 생성용 스냅샷).
+        // DataTransfer는 모바일 호환성 이슈가 있어 사용하지 않음 — 원본 FileList를 그대로 hook에 전달.
+        // 대신 input.value reset은 모든 await가 끝난 뒤 finally에서 호출해 FileList 무효화 회피.
+        const fileArray: File[] = Array.from(files);
 
         const createdUrls: string[] = [];
 
@@ -180,6 +173,9 @@ const TripImageManagePage = () => {
         } finally {
             setUploadPhase('idle');
             setPendingByDate({});
+            // 같은 파일을 연달아 선택해도 onChange가 fire되도록 input 초기화. 업로드 chain이
+            // 다 끝난 뒤라 FileList 무효화로 인한 영향 없음.
+            inputEl.value = '';
             // setPendingByDate({})는 비동기 렌더 → DOM 제거가 끝난 뒤 blob을 회수해야 broken image 깜빡임이 없음.
             // 더블 rAF로 다음 paint 두 번 이후에 revoke (안전 마진).
             const urlsToRevoke = createdUrls.slice();
