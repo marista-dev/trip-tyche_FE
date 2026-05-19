@@ -14,7 +14,12 @@ interface EstimateTargetTabProps {
 }
 
 const EstimateTargetTab = ({ photo, active, done, showTime = true, onClick }: EstimateTargetTabProps) => (
-    <button type='button' css={tabStyle(active)} onClick={onClick}>
+    <button
+        type='button'
+        data-target-id={photo.mediaFileId}
+        css={tabStyle(active)}
+        onClick={onClick}
+    >
         <img src={photo.mediaLink} alt='' css={imgStyle} loading='lazy' />
         {showTime && <span css={timeStyle}>{extractTimeOfDay(photo.recordDate) || '—'}</span>}
         {done && (
@@ -32,11 +37,22 @@ const tabStyle = (active: boolean) => css`
     height: 80px;
     padding: 0;
     background: transparent;
-    border: ${active ? `2.5px solid ${MANAGE_TOKENS.accent}` : '2px solid transparent'};
+    border: ${active ? `3px solid ${MANAGE_TOKENS.accent}` : '2px solid transparent'};
     border-radius: 10px;
     overflow: hidden;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+    opacity: ${active ? 1 : 0.7};
+    transform: ${active ? 'scale(1.12)' : 'scale(1)'};
+    transform-origin: center;
+    box-shadow: ${active ? '0 8px 20px rgba(0, 113, 227, 0.32)' : 'none'};
+    z-index: ${active ? 1 : 0};
+    transition:
+        transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1),
+        opacity 200ms ease,
+        box-shadow 220ms ease,
+        border-color 180ms ease;
+    will-change: transform;
 `;
 
 const imgStyle = css`

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { css } from '@emotion/react';
 import { MapPin } from 'lucide-react';
@@ -32,6 +32,9 @@ const LocationBasedEstimatePage = () => {
     const { showToast } = useToastStore();
     const { mode, tripKey: storeTripKey, targets, clear } = useEstimateStore();
 
+    const mainScrollRef = useRef<HTMLElement>(null);
+    const targetsRowRef = useRef<HTMLDivElement>(null);
+
     const { photos: pool, isLoading } = useTripPhotos(tripKey);
     const { mutate: updateMutate, isPending: isApplying } = useMetadataUpdate();
 
@@ -48,6 +51,17 @@ const LocationBasedEstimatePage = () => {
     useEffect(() => {
         if (activeId === null && targets.length > 0) setActiveId(targets[0].mediaFileId);
     }, [targets, activeId]);
+
+    // activeId 변경 시 main scroll을 top으로, 가로 target row를 active tab으로 자동 스크롤.
+    useEffect(() => {
+        if (activeId === null) return;
+        mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+        const row = targetsRowRef.current;
+        if (row) {
+            const activeBtn = row.querySelector<HTMLButtonElement>(`[data-target-id="${activeId}"]`);
+            activeBtn?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+    }, [activeId]);
 
     const activeTarget = targets.find((t) => t.mediaFileId === activeId) || null;
 
@@ -115,7 +129,7 @@ const LocationBasedEstimatePage = () => {
 
             <div css={targetsSectionStyle}>
                 <div css={targetsLabelStyle}>처리할 사진 · {targets.length}장</div>
-                <div css={targetsRowStyle}>
+                <div ref={targetsRowRef} css={targetsRowStyle}>
                     {targets.map((t) => (
                         <EstimateTargetTab
                             key={t.mediaFileId}
@@ -142,7 +156,7 @@ const LocationBasedEstimatePage = () => {
                 </div>
             </div>
 
-            <main css={listStyle}>
+            <main ref={mainScrollRef} css={listStyle}>
                 {nearby.length === 0 ? (
                     <div css={emptyCardStyle}>
                         <div css={emptyIconStyle}>

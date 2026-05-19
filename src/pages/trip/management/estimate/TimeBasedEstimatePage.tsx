@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { css } from '@emotion/react';
 import { Clock } from 'lucide-react';
@@ -23,7 +23,10 @@ const TimeBasedEstimatePage = () => {
     const { tripKey = '' } = useParams<{ tripKey: string }>();
     const navigate = useNavigate();
     const { showToast } = useToastStore();
-    const { mode, tripKey: storeTripKey, targets, clear } = useEstimateStore();
+    const { mode, tripKey: storeTripKey, targets, setTargets, clear } = useEstimateStore();
+
+    const mainScrollRef = useRef<HTMLElement>(null);
+    const targetsRowRef = useRef<HTMLDivElement>(null);
 
     const { photos: pool, isLoading } = useTripPhotos(tripKey);
     const { mutate: updateMutate, isPending: isApplying } = useMetadataUpdate();
@@ -41,6 +44,18 @@ const TimeBasedEstimatePage = () => {
     useEffect(() => {
         if (activeId === null && targets.length > 0) setActiveId(targets[0].mediaFileId);
     }, [targets, activeId]);
+
+    // activeId 변경 시 main scroll을 top으로, 가로 target row를 active tab으로 자동 스크롤.
+    // 건너뛰기 후 새 nearby 리스트가 위부터 보이게 + 활성 tab을 시야 안으로 가져옴.
+    useEffect(() => {
+        if (activeId === null) return;
+        mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+        const row = targetsRowRef.current;
+        if (row) {
+            const activeBtn = row.querySelector<HTMLButtonElement>(`[data-target-id="${activeId}"]`);
+            activeBtn?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+    }, [activeId]);
 
     const activeTarget = targets.find((t) => t.mediaFileId === activeId) || null;
 
@@ -111,7 +126,7 @@ const TimeBasedEstimatePage = () => {
 
             <div css={targetsSectionStyle}>
                 <div css={targetsLabelStyle}>처리할 사진 · {targets.length}장</div>
-                <div css={targetsRowStyle}>
+                <div ref={targetsRowRef} css={targetsRowStyle}>
                     {targets.map((t) => (
                         <EstimateTargetTab
                             key={t.mediaFileId}
@@ -136,7 +151,7 @@ const TimeBasedEstimatePage = () => {
                 </div>
             </div>
 
-            <main css={listStyle}>
+            <main ref={mainScrollRef} css={listStyle}>
                 {nearby.length === 0 ? (
                     <div css={emptyCardStyle}>
                         <div css={emptyIconStyle}>
@@ -153,8 +168,11 @@ const TimeBasedEstimatePage = () => {
                                 type='button'
                                 css={emptyPrimaryStyle}
                                 onClick={() => {
-                                    clear();
-                                    navigate(ROUTES.PATH.TRIP.EDIT.NO_LOCATION(tripKey));
+                                    if (!activeTarget) return;
+                                    // 현재 활성 target 1장만 map-pick mode로 store에 채우고 Google Maps 페이지로 직행.
+                                    // (이전: clear() + NoLocation 페이지로 돌아가 2단계 우회 — 의도와 다름)
+                                    setTargets({ mode: 'map-pick', tripKey, targets: [activeTarget] });
+                                    navigate(ROUTES.PATH.TRIP.EDIT.MAP_PICK(tripKey));
                                 }}
                             >
                                 지도에서 선택
