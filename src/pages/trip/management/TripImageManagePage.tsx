@@ -1,11 +1,10 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { css } from '@emotion/react';
-import { useQueryClient } from '@tanstack/react-query';
 import { ImageOff } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import DateGroupSection, { PendingPhoto } from '@/domains/media/components/manage/DateGroupSection';
+import DateGroupSection from '@/domains/media/components/manage/DateGroupSection';
 import IssueCard from '@/domains/media/components/manage/IssueCard';
 import ManageHeader from '@/domains/media/components/manage/ManageHeader';
 import SelectionActionFAB from '@/domains/media/components/manage/SelectionActionFAB';
@@ -13,7 +12,8 @@ import { managePageContainerStyle } from '@/domains/media/components/manage/styl
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
 import { useMediaDelete } from '@/domains/media/hooks/mutations';
 import { useTripPhotos } from '@/domains/media/hooks/queries';
-import { useImageUpload } from '@/domains/media/hooks/useImageUpload';
+import { usePhotoSelection } from '@/domains/media/hooks/usePhotoSelection';
+import { usePhotoUpload } from '@/domains/media/hooks/usePhotoUpload';
 import { useEstimateStore } from '@/domains/media/stores/useEstimateStore';
 import { MediaFile } from '@/domains/media/types';
 import {
@@ -45,24 +45,24 @@ const TripImageManagePage = () => {
     const { tripKey = '' } = useParams<{ tripKey: string }>();
     const navigate = useNavigate();
     const { showToast } = useToastStore();
-    const queryClient = useQueryClient();
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    const [selected, setSelected] = useState<Set<number>>(new Set());
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [showDateSheet, setShowDateSheet] = useState(false);
-    const [uploadPhase, setUploadPhase] = useState<'idle' | 'extracting' | 'uploading'>('idle');
-    // 날짜키('YYYY-MM-DD') → 업로드 중인 사진 미리보기 목록
-    const [pendingByDate, setPendingByDate] = useState<Record<string, PendingPhoto[]>>({});
     const setEstimateTargets = useEstimateStore((s) => s.setTargets);
 
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showDateSheet, setShowDateSheet] = useState(false);
+
+    // 데이터 + 뮤테이션
     const { photos: allImages, isLoading: isImagesLoading } = useTripPhotos(tripKey);
     const { data: tripInfoResult } = useTripInfo(tripKey);
     const { mutate: deleteMutate, isPending: isDeleting } = useMediaDelete();
-    const { prepareUploadFiles, uploadImagesToS3, waitForBackgroundUpload, progress } = useImageUpload();
+
+    // 선택 상태 + 업로드 흐름 (각 책임을 hook으로 격리)
+    const { selected, selectMode, size: selectedCount, toggle: togglePhoto, clear: clearSelection } = usePhotoSelection();
+    const { fileInputRef, openFilePicker, handleFileSelected, isUploading, uploadingText, pendingByDate } =
+        usePhotoUpload(tripKey);
 
     const tripInfo = tripInfoResult?.success ? tripInfoResult.data : undefined;
 
+    // 파생 데이터 — 카테고리별 분류 + 날짜 그룹 + pending 머지
     const noLocImages = useMemo(() => filterWithoutLocationMediaFile(allImages) as MediaFile[], [allImages]);
     const noDateImages = useMemo(() => filterWithoutDateMediaFile(allImages) as MediaFile[], [allImages]);
     const validImages = useMemo(() => filterValidMediaFile(allImages) as MediaFile[], [allImages]);
@@ -78,23 +78,13 @@ const TripImageManagePage = () => {
                 merged.push({ recordDate: date, images: [], pending });
             }
         });
-        // 날짜 오름차순 정렬 유지
         return merged.sort((a, b) => new Date(a.recordDate).getTime() - new Date(b.recordDate).getTime());
     }, [baseGroups, pendingByDate]);
 
-    const selectMode = selected.size > 0;
-    const selectedList = useMemo(() => allImages.filter((img) => selected.has(img.mediaFileId)), [allImages, selected]);
-
-    const togglePhoto = (photo: MediaFile) => {
-        setSelected((prev) => {
-            const next = new Set(prev);
-            if (next.has(photo.mediaFileId)) next.delete(photo.mediaFileId);
-            else next.add(photo.mediaFileId);
-            return next;
-        });
-    };
-
-    const clearSelection = () => setSelected(new Set());
+    const selectedList = useMemo(
+        () => allImages.filter((img) => selected.has(img.mediaFileId)),
+        [allImages, selected],
+    );
 
     const handleDelete = () => {
         if (selectedList.length === 0) return;
@@ -110,91 +100,15 @@ const TripImageManagePage = () => {
         );
     };
 
-    const openFilePicker = () => {
-        if (uploadPhase !== 'idle') return;
-        fileInputRef.current?.click();
-    };
-
-    const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const inputEl = event.target;
-        const { files } = inputEl;
-
-        if (!files || files.length === 0) {
-            inputEl.value = '';
-            return;
-        }
-
-        // File 객체는 개별 참조라 input.value reset에 영향 없음 (placeholder 생성용 스냅샷).
-        // DataTransfer는 모바일 호환성 이슈가 있어 사용하지 않음 — 원본 FileList를 그대로 hook에 전달.
-        // 대신 input.value reset은 모든 await가 끝난 뒤 finally에서 호출해 FileList 무효화 회피.
-        const fileArray: File[] = Array.from(files);
-
-        const createdUrls: string[] = [];
-
-        // INSTANT: prepareUploadFiles가 끝나기 전에 미리보기 placeholder를 그리드에 즉시 띄움.
-        // file.lastModified 기준으로 날짜 그룹에 배치. 업로드 완료 시 실제 사진으로 자연 교체.
-        const initialPending: Record<string, PendingPhoto[]> = {};
-        const stampBatch = Date.now();
-        fileArray.forEach((file, idx) => {
-            const stamp = Number.isFinite(file.lastModified) ? file.lastModified : Date.now();
-            const d = new Date(stamp);
-            const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-            let previewUrl: string;
-            try {
-                previewUrl = URL.createObjectURL(file);
-                createdUrls.push(previewUrl);
-            } catch {
-                previewUrl = '';
-            }
-            const list = initialPending[dateKey] ?? [];
-            list.push({ id: `pending-${stampBatch}-${idx}`, previewUrl });
-            initialPending[dateKey] = list;
-        });
-        setPendingByDate(initialPending);
-        setUploadPhase('extracting');
-
-        try {
-            const uniqueFiles = await prepareUploadFiles(files);
-            setUploadPhase('uploading');
-
-            // uploadImagesToS3는 백그라운드 chain을 띄우고 즉시 return → waitForBackgroundUpload()로
-            // 실제 S3 PUT + metadata POST 완료까지 await. 이걸 안 걸면 placeholder가 곧바로 지워져
-            // 사용자에게 미리보기가 안 보임.
-            await uploadImagesToS3(uniqueFiles);
-            await waitForBackgroundUpload();
-
-            await queryClient.invalidateQueries({ queryKey: ['trip-images', tripKey] });
-            showToast(`${uniqueFiles.length}장의 사진이 추가되었어요`);
-        } catch {
-            showToast('사진 추가 중 문제가 발생했어요. 다시 시도해주세요.');
-        } finally {
-            setUploadPhase('idle');
-            setPendingByDate({});
-            // 같은 파일을 연달아 선택해도 onChange가 fire되도록 input 초기화. 업로드 chain이
-            // 다 끝난 뒤라 FileList 무효화로 인한 영향 없음.
-            inputEl.value = '';
-            // setPendingByDate({})는 비동기 렌더 → DOM 제거가 끝난 뒤 blob을 회수해야 broken image 깜빡임이 없음.
-            // 더블 rAF로 다음 paint 두 번 이후에 revoke (안전 마진).
-            const urlsToRevoke = createdUrls.slice();
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    urlsToRevoke.forEach((url) => URL.revokeObjectURL(url));
-                });
-            });
-        }
-    };
-
     const goNoLocation = () => navigate(ROUTES.PATH.TRIP.EDIT.NO_LOCATION(tripKey));
     const goNoDate = () => navigate(ROUTES.PATH.TRIP.EDIT.NO_DATE(tripKey));
 
-    // 선택된 사진에 위치 수정 → MapPickPage 라우트로 이동 (store에 targets 채워둠)
     const handleEditLocation = () => {
         if (selectedList.length === 0) return;
         setEstimateTargets({ mode: 'map-pick', tripKey, targets: selectedList });
         navigate(ROUTES.PATH.TRIP.EDIT.MAP_PICK(tripKey));
     };
 
-    // 선택된 사진에 날짜 수정 → 인라인 시트
     const handleEditDate = () => {
         if (selectedList.length === 0) return;
         setShowDateSheet(true);
@@ -204,17 +118,10 @@ const TripImageManagePage = () => {
     const hasIssues = noLocImages.length > 0 || noDateImages.length > 0;
     const dateRange = formatDateRange(tripInfo?.startDate, tripInfo?.endDate);
 
-    const uploadingText =
-        uploadPhase === 'extracting'
-            ? `사진 정보를 분석 중... ${Math.round(progress?.metadata ?? 0)}%`
-            : uploadPhase === 'uploading'
-              ? `사진 업로드 중... ${Math.round(progress?.upload ?? 0)}%`
-              : undefined;
-
     return (
         <div css={managePageContainerStyle}>
             {(isImagesLoading || isDeleting) && <Indicator text={isDeleting ? '사진 삭제 중...' : undefined} />}
-            {uploadPhase !== 'idle' && (
+            {isUploading && (
                 <div css={uploadChipStyle} role='status' aria-live='polite'>
                     {uploadingText}
                 </div>
@@ -231,7 +138,7 @@ const TripImageManagePage = () => {
 
             <ManageHeader
                 title='사진 관리'
-                selectedCount={selected.size}
+                selectedCount={selectedCount}
                 onBack={() => navigate(ROUTES.PATH.TICKETS)}
                 onCancel={clearSelection}
                 cancelLabel='완료'
@@ -300,7 +207,7 @@ const TripImageManagePage = () => {
 
             {selectMode && (
                 <SelectionActionFAB
-                    selectedCount={selected.size}
+                    selectedCount={selectedCount}
                     onEditLocation={handleEditLocation}
                     onEditDate={handleEditDate}
                     onDelete={() => setShowDeleteConfirm(true)}
