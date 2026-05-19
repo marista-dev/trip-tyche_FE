@@ -93,6 +93,9 @@ export const useImageUpload = () => {
     const [uploadStats, setUploadStats] = useState<UploadStats>({ total: 0, succeeded: 0, failed: 0 });
     const bgUploadPromiseRef = useRef<Promise<void> | null>(null);
     const uploadContextRef = useRef<UploadContext | null>(null);
+    // 동시 업로드 가드 — 두 번째 트리거가 첫 번째 promise를 ref에서 덮어써 orphan이 되는 것을 차단.
+    // 호출 측에서 uploadPhase 가드를 두지만, 훅 레벨에서도 방어.
+    const uploadInProgressRef = useRef(false);
 
     const { tripKey } = useParams();
 
@@ -176,11 +179,17 @@ export const useImageUpload = () => {
     // 실패 시 step3의 waitForBackgroundUpload에서 함께 surface되어 retry UI로 노출된다.
     const uploadImagesToS3 = useCallback(
         async (uniqueFiles: readonly File[], postUploadTask?: () => Promise<unknown>) => {
+            if (uploadInProgressRef.current) {
+                throw new Error('이미 진행 중인 업로드가 있습니다. 완료 후 다시 시도해주세요.');
+            }
+            uploadInProgressRef.current = true;
+
             const setRejected = (err: unknown) => {
                 const failed = Promise.reject(err instanceof Error ? err : new Error(String(err)));
                 failed.catch(() => {});
                 bgUploadPromiseRef.current = failed;
                 uploadContextRef.current = null;
+                uploadInProgressRef.current = false;
             };
 
             try {
@@ -224,6 +233,10 @@ export const useImageUpload = () => {
                 const rawUpload = buildUploadChain(ctx, allIndices);
                 bgUploadPromiseRef.current = rawUpload;
                 rawUpload.catch(() => {});
+                // chain 종료(성공/실패 무관) 시 in-progress 플래그 해제 — 다음 업로드 가능 상태로 복귀
+                rawUpload.finally(() => {
+                    uploadInProgressRef.current = false;
+                });
             } catch (err) {
                 setRejected(err);
             }
@@ -233,19 +246,28 @@ export const useImageUpload = () => {
 
     // step3 retry 버튼이 호출. 실패한 인덱스만 다시 업로드 → 남은 chain(메타등록/status 전환)을 이어서 실행.
     // bgUploadPromiseRef를 새 promise로 교체하므로, 호출 직후 waitForBackgroundUpload는 새 진행 상태를 await한다.
-    // 이전 controller가 aborted 상태일 수 있으므로(offline → online 시) 새 controller로 교체.
+    // race fix: 이전 controller가 살아있는 상태에서 새 controller로 단순 교체하면 좀비 chain이 백그라운드에서
+    // 계속 동작할 수 있음 → 새 controller 만들기 전에 명시적으로 abort. 또한 in-progress 플래그 다시 설정해
+    // 같은 ctx 위에서 retry되는 동안 다른 업로드가 끼어들지 않도록 한다.
     const retryFailedUploads = useCallback((): void => {
         const ctx = uploadContextRef.current;
         if (!ctx) return;
+
+        // 이전 chain의 잔여 요청을 명시적으로 abort
+        ctx.abortController.abort();
 
         const toRetry = Array.from(ctx.failedIndices);
         // 실패 카운터만 초기화 → 진행률이 신선하게 보임. succeeded는 누적 유지.
         setUploadStats((s) => ({ ...s, failed: 0 }));
 
         ctx.abortController = new AbortController();
+        uploadInProgressRef.current = true;
         const newUpload = buildUploadChain(ctx, toRetry);
         bgUploadPromiseRef.current = newUpload;
         newUpload.catch(() => {});
+        newUpload.finally(() => {
+            uploadInProgressRef.current = false;
+        });
     }, [buildUploadChain]);
 
     // 함수 identity가 매 render마다 바뀌면 step3의 runPhases deps가 흔들려 useEffect가 무한 fire됨.
