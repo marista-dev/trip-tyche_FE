@@ -119,19 +119,33 @@ const TripImageManagePage = () => {
     };
 
     const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const { files } = event.target;
-        // 같은 파일을 연달아 선택할 수 있도록 즉시 초기화
-        event.target.value = '';
-        if (!files || files.length === 0) return;
+        const inputEl = event.target;
+        const originalFiles = inputEl.files;
+
+        // 일부 브라우저(Safari, 구버전 Chromium)는 input.value = ''로 reset하면 캡처한 FileList도
+        // 함께 비워버린다. 따라서 reset 전에 File[]로 즉시 스냅샷한 뒤, DataTransfer로 안정적인
+        // 새 FileList를 만들어 hook들에 전달한다.
+        if (!originalFiles || originalFiles.length === 0) {
+            inputEl.value = '';
+            return;
+        }
+        const fileArray: File[] = Array.from(originalFiles);
+
+        // 같은 파일을 연달아 선택해도 onChange가 fire되도록 입력 초기화 (스냅샷 이후라 안전)
+        inputEl.value = '';
+
+        // DataTransfer로 File[] → FileList 재구성 (extractMetaData/uploadImagesToS3가 FileList 시그니처)
+        const dt = new DataTransfer();
+        fileArray.forEach((f) => dt.items.add(f));
+        const { files } = dt;
 
         const createdUrls: string[] = [];
 
-        // INSTANT: extractMetaData(HEIC 변환 등)가 끝나기 전에 미리보기 placeholder를 먼저 그리드에 띄움.
-        // file.lastModified 기준으로 날짜 그룹에 배치. HEIC는 일부 브라우저에서 미리보기 못 띄울 수 있지만
-        // 로딩 스피너 + dim 처리로 시각적으로 OK. 업로드 완료 시 실제 사진으로 자연 교체.
+        // INSTANT: extractMetaData가 끝나기 전에 미리보기 placeholder를 그리드에 즉시 띄움.
+        // file.lastModified 기준으로 날짜 그룹에 배치. 업로드 완료 시 실제 사진으로 자연 교체.
         const initialPending: Record<string, PendingPhoto[]> = {};
         const stampBatch = Date.now();
-        Array.from(files).forEach((file, idx) => {
+        fileArray.forEach((file, idx) => {
             const stamp = Number.isFinite(file.lastModified) ? file.lastModified : Date.now();
             const d = new Date(stamp);
             const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
