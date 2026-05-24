@@ -131,8 +131,10 @@ const TimeBasedEstimatePage = () => {
                 onSuccess: (result) => {
                     if (result.success) {
                         showToast(`${updated.length}장의 위치가 업데이트되었어요`);
-                        clear();
-                        navigate(-1);
+                        // 페이지 머무름: picks만 리셋 → useMetadataUpdate가 trip-images invalidate →
+                        // pool 갱신 → sortedTargets에서 처리된 사진 빠짐 → activeId 자동으로 다음 미해결로 이동.
+                        // 모든 사진 처리됐을 땐 sortedTargets.length === 0 useEffect가 자동 navigate(-1).
+                        setPicks({});
                     } else {
                         showToast(result.error);
                     }

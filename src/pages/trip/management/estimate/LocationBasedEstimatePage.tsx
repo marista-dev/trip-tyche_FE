@@ -15,6 +15,7 @@ import { useTripPhotos } from '@/domains/media/hooks/queries';
 import { useEstimateStore } from '@/domains/media/stores/useEstimateStore';
 import { MediaFile } from '@/domains/media/types';
 import { extractTimeOfDay, findNearbyPhotosByLocation, formatDistance } from '@/domains/media/utils';
+import { hasValidDate } from '@/libs/utils/validate';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import { ROUTES } from '@/shared/constants/route';
 import { useReverseGeocode } from '@/shared/hooks/useReverseGeocode';
@@ -45,12 +46,35 @@ const LocationBasedEstimatePage = () => {
         }
     }, [isLoading, mode, storeTripKey, tripKey, targets.length, navigate, showToast]);
 
+    // pool에서 이미 날짜가 채워진 사진은 처리 대상에서 제외 → MapPick 서브플로우/Apply 후 자동으로 빠짐
+    const sortedTargets = useMemo(() => {
+        return targets.filter((t) => {
+            const current = pool.find((p) => p.mediaFileId === t.mediaFileId);
+            if (!current) return true;
+            return !hasValidDate(current.recordDate);
+        });
+    }, [targets, pool]);
+
     const [activeId, setActiveId] = useState<number | null>(null);
     const [picks, setPicks] = useState<Record<number, number>>({});
 
+    // activeId가 (1) null이거나 (2) 처리되어 sortedTargets에서 빠졌으면 첫 항목으로 자동 이동
     useEffect(() => {
-        if (activeId === null && targets.length > 0) setActiveId(targets[0].mediaFileId);
-    }, [targets, activeId]);
+        if (sortedTargets.length === 0) return;
+        if (activeId === null || !sortedTargets.some((t) => t.mediaFileId === activeId)) {
+            setActiveId(sortedTargets[0].mediaFileId);
+        }
+    }, [sortedTargets, activeId]);
+
+    // 모든 target이 처리되면 자동으로 뒤로
+    useEffect(() => {
+        if (isLoading) return;
+        if (targets.length > 0 && sortedTargets.length === 0 && mode === 'location') {
+            showToast('모든 사진의 날짜가 업데이트되었어요');
+            clear();
+            navigate(-1);
+        }
+    }, [isLoading, targets.length, sortedTargets.length, mode, clear, navigate, showToast]);
 
     // activeId 변경 시 main scroll을 top으로, 가로 target row를 active tab으로 자동 스크롤.
     useEffect(() => {
@@ -63,7 +87,7 @@ const LocationBasedEstimatePage = () => {
         }
     }, [activeId]);
 
-    const activeTarget = targets.find((t) => t.mediaFileId === activeId) || null;
+    const activeTarget = sortedTargets.find((t) => t.mediaFileId === activeId) || null;
 
     // 활성 target의 좌표 → 주소
     const { address: activeAddress } = useReverseGeocode(activeTarget?.latitude ?? 0, activeTarget?.longitude ?? 0);
@@ -76,19 +100,19 @@ const LocationBasedEstimatePage = () => {
     const totalApplied = Object.keys(picks).length;
 
     const skipActive = useCallback(() => {
-        if (targets.length <= 1) {
+        if (sortedTargets.length <= 1) {
             navigate(-1);
             return;
         }
-        const currentIdx = targets.findIndex((t) => t.mediaFileId === activeId);
-        const rotated = [...targets.slice(currentIdx + 1), ...targets.slice(0, currentIdx)];
+        const currentIdx = sortedTargets.findIndex((t) => t.mediaFileId === activeId);
+        const rotated = [...sortedTargets.slice(currentIdx + 1), ...sortedTargets.slice(0, currentIdx)];
         const next = rotated.find((t) => picks[t.mediaFileId] === undefined);
         if (next) setActiveId(next.mediaFileId);
         else navigate(-1);
-    }, [targets, activeId, picks, navigate]);
+    }, [sortedTargets, activeId, picks, navigate]);
 
     const handleApply = () => {
-        const updated: MediaFile[] = targets
+        const updated: MediaFile[] = sortedTargets
             .filter((t) => picks[t.mediaFileId] !== undefined)
             .map((t) => {
                 const ref = pool.find((p) => p.mediaFileId === picks[t.mediaFileId]);
@@ -104,8 +128,8 @@ const LocationBasedEstimatePage = () => {
                 onSuccess: (result) => {
                     if (result.success) {
                         showToast(`${updated.length}장의 날짜가 업데이트되었어요`);
-                        clear();
-                        navigate(-1);
+                        // 페이지 머무름: picks만 리셋. pool 갱신으로 처리된 사진은 sortedTargets에서 자동 제거.
+                        setPicks({});
                     } else {
                         showToast(result.error);
                     }
@@ -128,9 +152,9 @@ const LocationBasedEstimatePage = () => {
             />
 
             <div css={targetsSectionStyle}>
-                <div css={targetsLabelStyle}>처리할 사진 · {targets.length}장</div>
+                <div css={targetsLabelStyle}>처리할 사진 · {sortedTargets.length}장</div>
                 <div ref={targetsRowRef} css={targetsRowStyle}>
-                    {targets.map((t) => (
+                    {sortedTargets.map((t) => (
                         <EstimateTargetTab
                             key={t.mediaFileId}
                             photo={t}
