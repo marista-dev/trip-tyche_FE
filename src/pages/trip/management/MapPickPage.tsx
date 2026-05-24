@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 
 import { css } from '@emotion/react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
 import { useMetadataUpdate } from '@/domains/media/hooks/mutations';
 import { useEstimateStore } from '@/domains/media/stores/useEstimateStore';
+import { MediaFile } from '@/domains/media/types';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import SearchPlaceInput from '@/shared/components/map/SearchPlaceInput';
 import SingleMarkerMap from '@/shared/components/map/SingleMarkerMap';
@@ -16,25 +17,36 @@ import { useToastStore } from '@/shared/stores/useToastStore';
 import { Location, MapMouseEvent } from '@/shared/types/map';
 
 // 위치 없는 사진들에 한 번에 위치를 지정하는 풀스크린 지도 페이지.
-// NoLocationResolvePage에서 store에 targets 채운 뒤 이 route로 이동.
+// 두 가지 진입 경로 지원:
+//  1) NoLocationResolvePage → store에 mode='map-pick'으로 targets 채운 뒤 이 route로 이동 (다수 사진)
+//  2) TimeBasedEstimatePage → navigate state로 단일 target 전달 (store 안 건드림 → 돌아갔을 때
+//     time estimate 컨텍스트 보존). useLocation().state.singleTarget으로 인식
 const MapPickPage = () => {
     const { tripKey = '' } = useParams<{ tripKey: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     const { showToast } = useToastStore();
-    const { mode, tripKey: storeTripKey, targets, clear } = useEstimateStore();
+    const { mode, tripKey: storeTripKey, targets: storeTargets, clear } = useEstimateStore();
+
+    // navigate state로 들어왔으면 그 사진 1장만 처리 (store 우회). store 진입이면 storeTargets 사용.
+    const navState = location.state as { singleTarget?: MediaFile } | null;
+    const singleTarget = navState?.singleTarget;
+    const usingNavState = !!singleTarget;
+    const targets: MediaFile[] = usingNavState ? [singleTarget] : storeTargets;
 
     const { mapRef, isMapScriptLoaded, updateMapCenter } = useMapControl(ZOOM_SCALE.DEFAULT, DEFAULT_CENTER);
     const { mutate: updateMutate, isPending: isApplying } = useMetadataUpdate();
 
     const [picked, setPicked] = useState<Location | null>(null);
 
-    // store 비어 있거나 모드 안 맞으면 폴백
+    // store 비어 있거나 모드 안 맞으면 폴백. navState로 들어온 경우는 가드 건너뜀.
     useEffect(() => {
-        if (targets.length === 0 || mode !== 'map-pick' || storeTripKey !== tripKey) {
+        if (usingNavState) return;
+        if (storeTargets.length === 0 || mode !== 'map-pick' || storeTripKey !== tripKey) {
             showToast('처리할 사진을 다시 선택해주세요');
             navigate(ROUTES.PATH.TRIP.EDIT.NO_LOCATION(tripKey), { replace: true });
         }
-    }, [mode, storeTripKey, tripKey, targets.length, navigate, showToast]);
+    }, [usingNavState, mode, storeTripKey, tripKey, storeTargets.length, navigate, showToast]);
 
     const handlePlaceSelect = (latitude: number, longitude: number) => {
         const loc = { latitude, longitude };
@@ -57,7 +69,9 @@ const MapPickPage = () => {
                 onSuccess: (result) => {
                     if (result.success) {
                         showToast(`${updated.length}장에 위치가 적용되었어요`);
-                        clear();
+                        // navState 진입(sub-flow)이면 store를 건드리지 않음 — 호출자(TimeBased 등)의
+                        // estimate 컨텍스트를 그대로 유지해야 돌아갔을 때 redirect 가드에 안 걸림.
+                        if (!usingNavState) clear();
                         navigate(-1);
                     } else {
                         showToast(result.error);

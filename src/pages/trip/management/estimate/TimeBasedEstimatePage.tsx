@@ -15,6 +15,7 @@ import { useTripPhotos } from '@/domains/media/hooks/queries';
 import { useEstimateStore } from '@/domains/media/stores/useEstimateStore';
 import { MediaFile } from '@/domains/media/types';
 import { extractTimeOfDay, findNearbyPhotosByTime, formatTimeDiff } from '@/domains/media/utils';
+import { hasValidLocation } from '@/libs/utils/validate';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import { ROUTES } from '@/shared/constants/route';
 import { useToastStore } from '@/shared/stores/useToastStore';
@@ -23,7 +24,7 @@ const TimeBasedEstimatePage = () => {
     const { tripKey = '' } = useParams<{ tripKey: string }>();
     const navigate = useNavigate();
     const { showToast } = useToastStore();
-    const { mode, tripKey: storeTripKey, targets, setTargets, clear } = useEstimateStore();
+    const { mode, tripKey: storeTripKey, targets, clear } = useEstimateStore();
 
     const mainScrollRef = useRef<HTMLElement>(null);
     const targetsRowRef = useRef<HTMLDivElement>(null);
@@ -38,20 +39,40 @@ const TimeBasedEstimatePage = () => {
         }
     }, [isLoading, mode, storeTripKey, tripKey, targets.length, navigate, showToast]);
 
-    // 처리할 사진을 과거 → 최신 순으로 정렬해서 표시 (사용자가 시간 흐름대로 작업 가능).
-    // 원본 targets는 store 가드(length 체크)에만 사용. 화면/내비게이션은 sortedTargets 기준.
-    const sortedTargets = useMemo(
-        () =>
-            [...targets].sort((a, b) => new Date(a.recordDate).getTime() - new Date(b.recordDate).getTime()),
-        [targets],
-    );
+    // 처리할 사진을 과거 → 최신 순으로 정렬 + pool에서 이미 위치가 채워진 사진(이전 처리 완료)을 제외.
+    // MapPick 서브플로우에서 한 장씩 위치 적용하고 돌아왔을 때 자동으로 리스트에서 빠짐.
+    const sortedTargets = useMemo(() => {
+        const stillUnresolved = targets.filter((t) => {
+            const current = pool.find((p) => p.mediaFileId === t.mediaFileId);
+            // pool에 없거나(이상 케이스) location 여전히 빈 경우만 처리 대상
+            if (!current) return true;
+            return !hasValidLocation({ latitude: current.latitude, longitude: current.longitude });
+        });
+        return [...stillUnresolved].sort(
+            (a, b) => new Date(a.recordDate).getTime() - new Date(b.recordDate).getTime(),
+        );
+    }, [targets, pool]);
 
     const [activeId, setActiveId] = useState<number | null>(null);
     const [picks, setPicks] = useState<Record<number, number>>({});
 
+    // activeId가 (1) null이거나 (2) 처리된 사진이라 sortedTargets에서 빠졌으면 첫 항목으로 자동 이동
     useEffect(() => {
-        if (activeId === null && sortedTargets.length > 0) setActiveId(sortedTargets[0].mediaFileId);
+        if (sortedTargets.length === 0) return;
+        if (activeId === null || !sortedTargets.some((t) => t.mediaFileId === activeId)) {
+            setActiveId(sortedTargets[0].mediaFileId);
+        }
     }, [sortedTargets, activeId]);
+
+    // 모든 target이 처리되면 자동으로 뒤로 (NoLocation 페이지로 자연 복귀)
+    useEffect(() => {
+        if (isLoading) return;
+        if (targets.length > 0 && sortedTargets.length === 0 && mode === 'time') {
+            showToast('모든 사진의 위치가 업데이트되었어요');
+            clear();
+            navigate(-1);
+        }
+    }, [isLoading, targets.length, sortedTargets.length, mode, clear, navigate, showToast]);
 
     // activeId 변경 시 main scroll을 top으로, 가로 target row를 active tab으로 자동 스크롤.
     // 건너뛰기 후 새 nearby 리스트가 위부터 보이게 + 활성 tab을 시야 안으로 가져옴.
@@ -177,10 +198,12 @@ const TimeBasedEstimatePage = () => {
                                 css={emptyPrimaryStyle}
                                 onClick={() => {
                                     if (!activeTarget) return;
-                                    // 현재 활성 target 1장만 map-pick mode로 store에 채우고 Google Maps 페이지로 직행.
-                                    // (이전: clear() + NoLocation 페이지로 돌아가 2단계 우회 — 의도와 다름)
-                                    setTargets({ mode: 'map-pick', tripKey, targets: [activeTarget] });
-                                    navigate(ROUTES.PATH.TRIP.EDIT.MAP_PICK(tripKey));
+                                    // store는 그대로 두고(time estimate 컨텍스트 보존), navigate state로
+                                    // 단일 target만 전달. MapPickPage에서 navState 분기 처리 → 적용 후
+                                    // navigate(-1)로 이 페이지에 돌아왔을 때 time 모드 가드 통과.
+                                    navigate(ROUTES.PATH.TRIP.EDIT.MAP_PICK(tripKey), {
+                                        state: { singleTarget: activeTarget },
+                                    });
                                 }}
                             >
                                 지도에서 선택
