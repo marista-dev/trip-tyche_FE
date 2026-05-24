@@ -15,6 +15,7 @@ import { useTripPhotos } from '@/domains/media/hooks/queries';
 import { useEstimateStore } from '@/domains/media/stores/useEstimateStore';
 import { MediaFile } from '@/domains/media/types';
 import { extractTimeOfDay, findNearbyPhotosByTime, formatTimeDiff } from '@/domains/media/utils';
+import { formatKoreanDate } from '@/libs/utils/date';
 import { hasValidLocation } from '@/libs/utils/validate';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import { ROUTES } from '@/shared/constants/route';
@@ -174,7 +175,12 @@ const TimeBasedEstimatePage = () => {
                 </div>
                 <div css={activeInfoStyle}>
                     <p css={activePrimaryStyle}>
-                        {extractTimeOfDay(activeTarget.recordDate) || '시간 미상'}에 찍힌 사진
+                        {(() => {
+                            const date = formatKoreanDate(activeTarget.recordDate);
+                            const time = extractTimeOfDay(activeTarget.recordDate);
+                            if (!date && !time) return '시간 미상의 사진';
+                            return `${date} ${time}에 찍힌 사진`.trim();
+                        })()}
                     </p>
                     <p css={activeSubStyle}>±30분 범위 내 위치 있는 사진을 찾았어요</p>
                 </div>
@@ -223,7 +229,7 @@ const TimeBasedEstimatePage = () => {
                                     <ReferencePhotoCard
                                         key={ref.mediaFileId}
                                         mediaLink={ref.mediaLink}
-                                        primaryLabel={extractTimeOfDay(ref.recordDate)}
+                                        primaryLabel={`${formatKoreanDate(ref.recordDate)} ${extractTimeOfDay(ref.recordDate)}`.trim()}
                                         secondaryLabel={formatTimeDiff(ref.diffMs)}
                                         metaIcon='location'
                                         latitude={ref.latitude}
