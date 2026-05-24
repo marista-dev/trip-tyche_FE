@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { css } from '@emotion/react';
 import { ChevronLeft, ImageOff } from 'lucide-react';
@@ -45,12 +45,21 @@ const ImageByDatePage = () => {
         setDates(ds);
     }, []);
 
+    // 날짜 전환 시 페인트 전에 캐러셀 스크롤·활성 인덱스를 동기 리셋
+    useLayoutEffect(() => {
+        setActiveIdx(0);
+        if (carouselRef.current) {
+            carouselRef.current.scrollLeft = 0;
+        }
+    }, [date]);
+
     useEffect(() => {
         if (imagesResult) {
             const imgs = imagesResult.success ? imagesResult.data : [];
             setImages(imgs);
             loadedImagesCount.current = 0;
             setActiveIdx(0);
+            if (carouselRef.current) carouselRef.current.scrollLeft = 0;
             if (imgs.length === 0) setIsAllImageLoad(true);
         }
     }, [imagesResult]);
