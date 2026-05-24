@@ -38,12 +38,20 @@ const TimeBasedEstimatePage = () => {
         }
     }, [isLoading, mode, storeTripKey, tripKey, targets.length, navigate, showToast]);
 
+    // 처리할 사진을 과거 → 최신 순으로 정렬해서 표시 (사용자가 시간 흐름대로 작업 가능).
+    // 원본 targets는 store 가드(length 체크)에만 사용. 화면/내비게이션은 sortedTargets 기준.
+    const sortedTargets = useMemo(
+        () =>
+            [...targets].sort((a, b) => new Date(a.recordDate).getTime() - new Date(b.recordDate).getTime()),
+        [targets],
+    );
+
     const [activeId, setActiveId] = useState<number | null>(null);
     const [picks, setPicks] = useState<Record<number, number>>({});
 
     useEffect(() => {
-        if (activeId === null && targets.length > 0) setActiveId(targets[0].mediaFileId);
-    }, [targets, activeId]);
+        if (activeId === null && sortedTargets.length > 0) setActiveId(sortedTargets[0].mediaFileId);
+    }, [sortedTargets, activeId]);
 
     // activeId 변경 시 main scroll을 top으로, 가로 target row를 active tab으로 자동 스크롤.
     // 건너뛰기 후 새 nearby 리스트가 위부터 보이게 + 활성 tab을 시야 안으로 가져옴.
@@ -57,7 +65,7 @@ const TimeBasedEstimatePage = () => {
         }
     }, [activeId]);
 
-    const activeTarget = targets.find((t) => t.mediaFileId === activeId) || null;
+    const activeTarget = sortedTargets.find((t) => t.mediaFileId === activeId) || null;
 
     const nearby = useMemo(() => {
         if (!activeTarget) return [];
@@ -66,15 +74,15 @@ const TimeBasedEstimatePage = () => {
 
     const totalApplied = Object.keys(picks).length;
 
-    // 건너뛰기: 1장이면 뒤로, 여러 장이면 다음 미해결 사진으로 이동, 없으면 뒤로
+    // 건너뛰기: 1장이면 뒤로, 여러 장이면 다음 미해결 사진으로 이동(시간 오름차순), 없으면 뒤로
     const skipActive = useCallback(() => {
-        if (targets.length <= 1) {
+        if (sortedTargets.length <= 1) {
             navigate(-1);
             return;
         }
-        const currentIdx = targets.findIndex((t) => t.mediaFileId === activeId);
+        const currentIdx = sortedTargets.findIndex((t) => t.mediaFileId === activeId);
         // 현재 이후부터 다음 미선택 사진을 찾고, 없으면 처음부터 다시
-        const rotated = [...targets.slice(currentIdx + 1), ...targets.slice(0, currentIdx)];
+        const rotated = [...sortedTargets.slice(currentIdx + 1), ...sortedTargets.slice(0, currentIdx)];
         const next = rotated.find((t) => picks[t.mediaFileId] === undefined);
         if (next) {
             setActiveId(next.mediaFileId);
@@ -82,10 +90,10 @@ const TimeBasedEstimatePage = () => {
             // 다른 미선택 대상이 없음 → 뒤로
             navigate(-1);
         }
-    }, [targets, activeId, picks, navigate]);
+    }, [sortedTargets, activeId, picks, navigate]);
 
     const handleApply = () => {
-        const updated: MediaFile[] = targets
+        const updated: MediaFile[] = sortedTargets
             .filter((t) => picks[t.mediaFileId] !== undefined)
             .map((t) => {
                 const ref = pool.find((p) => p.mediaFileId === picks[t.mediaFileId]);
@@ -125,9 +133,9 @@ const TimeBasedEstimatePage = () => {
             />
 
             <div css={targetsSectionStyle}>
-                <div css={targetsLabelStyle}>처리할 사진 · {targets.length}장</div>
+                <div css={targetsLabelStyle}>처리할 사진 · {sortedTargets.length}장</div>
                 <div ref={targetsRowRef} css={targetsRowStyle}>
-                    {targets.map((t) => (
+                    {sortedTargets.map((t) => (
                         <EstimateTargetTab
                             key={t.mediaFileId}
                             photo={t}
