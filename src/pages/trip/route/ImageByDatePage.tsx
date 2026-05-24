@@ -8,7 +8,7 @@ import { useMediaByDate } from '@/domains/media/hooks/queries';
 import { MediaFile } from '@/domains/media/types';
 import DateSelector from '@/domains/trip/components/DateSelector';
 import ImageItem from '@/domains/trip/components/ImageItem';
-import { getNeighborhoodFromLocation } from '@/libs/utils/map';
+import { getPreciseLocationFromCoordinate } from '@/libs/utils/map';
 import Spinner from '@/shared/components/common/Spinner';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import MultiMarkerMap from '@/shared/components/map/MultiMarkerMap';
@@ -99,7 +99,7 @@ const ImageByDatePage = () => {
         const img = images[activeIdx];
         if (!img || !isMapScriptLoaded) return;
 
-        getNeighborhoodFromLocation({ latitude: img.latitude, longitude: img.longitude }).then(setActivePlace);
+        getPreciseLocationFromCoordinate({ latitude: img.latitude, longitude: img.longitude }).then(setActivePlace);
 
         const map = mapRef.current;
         if (!map) return;
@@ -183,14 +183,6 @@ const ImageByDatePage = () => {
                 </div>
             ) : (
                 <>
-                    {images.length > 1 && (
-                        <div css={progressStrip} aria-hidden>
-                            {images.map((_, i) => (
-                                <span key={i} css={progressSegment(i, activeIdx)} />
-                            ))}
-                        </div>
-                    )}
-
                     <main css={photoCarousel} ref={carouselRef}>
                         {images.map((image, index) => (
                             <div
@@ -332,26 +324,6 @@ const infoCardPlace = css`
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 180px;
-`;
-
-const progressStrip = css`
-    display: flex;
-    gap: 4px;
-    padding: 10px 14px 8px;
-    background: #fff;
-    flex-shrink: 0;
-`;
-
-const progressSegment = (idx: number, active: number) => css`
-    flex: 1;
-    height: 3px;
-    border-radius: 2px;
-    background: ${idx === active
-        ? '#0ea5e9'
-        : idx < active
-        ? 'rgba(10, 10, 10, 0.42)'
-        : 'rgba(10, 10, 10, 0.1)'};
-    transition: background 240ms ease;
 `;
 
 const photoCarousel = css`
