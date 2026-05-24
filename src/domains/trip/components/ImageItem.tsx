@@ -17,10 +17,7 @@ const ImageItem = ({ image, onImageLoad }: ImageItemProps) => {
         onImageLoad?.();
     }, [onImageLoad]);
 
-    const timePart = image.recordDate.split('T')[1] ?? '';
-    const [hh = '', mm = '', rawSs = ''] = timePart.split(':');
-    const ss = rawSs.slice(0, 2);
-    const time = hh && mm ? (ss && ss !== '00' ? `${hh}:${mm}:${ss}` : `${hh}:${mm}`) : '';
+    const time = image.recordDate.split('T')[1]?.slice(0, 5) ?? '';
 
     return (
         <div css={imageItemStyle}>
