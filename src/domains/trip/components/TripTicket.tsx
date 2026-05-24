@@ -266,7 +266,7 @@ const cardClickableStyle = css`
 
 const photoHeroStyle = (fallbackBg: string) => css`
     position: relative;
-    aspect-ratio: 4 / 3;
+    height: 220px;
     background: ${fallbackBg};
     overflow: hidden;
 `;
