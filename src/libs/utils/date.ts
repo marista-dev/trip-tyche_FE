@@ -66,6 +66,14 @@ export const formatHyphenToDot = (dateString: string): string => {
     return `${year}.${month}.${date}`;
 };
 
+// YYYY-MM-DDTHH:mm:ss => MM월 DD일 (요일)
+export const formatKoreanShortDate = (dateString: string) => {
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    const d = new Date(dateString);
+    if (Number.isNaN(d.getTime())) return '';
+    return `${d.getMonth() + 1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
+};
+
 // YYYY-MM-DDTHH:mm:ss => MM월 DD일
 export const formatKoreanDate = (dateString: string, hasYear = false) => {
     const date = new Date(dateString);

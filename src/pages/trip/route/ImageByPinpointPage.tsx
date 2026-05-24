@@ -7,6 +7,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMediaByPinPoint } from '@/domains/media/hooks/queries';
 import { useAutoAdvance } from '@/domains/media/hooks/useAutoAdvance';
 import { useGestureRouter } from '@/domains/media/hooks/useGestureRouter';
+import { formatKoreanShortDate } from '@/libs/utils/date';
 import { getPreciseLocationFromCoordinate } from '@/libs/utils/map';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import { ROUTES } from '@/shared/constants/route';
@@ -302,7 +303,9 @@ const ImageByPinpointPage = () => {
         );
     }
 
-    const time = activeImage?.recordDate.split('T')[1]?.slice(0, 5) ?? '';
+    const recordDate = activeImage?.recordDate ?? '';
+    const time = recordDate.split('T')[1]?.slice(0, 5) ?? '';
+    const dateLabel = recordDate ? formatKoreanShortDate(recordDate) : '';
     const carouselLocked = zoom !== ZOOM_OUT || isPinching;
     const chromeVisible = zoom <= 1.05 && !isPinching;
 
@@ -357,8 +360,10 @@ const ImageByPinpointPage = () => {
             <div css={captionWrap(chromeVisible)}>
                 <MapPin size={11} color={ACCENT} fill={ACCENT} strokeWidth={0} />
                 {placeName && <span css={captionText}>{placeName.toUpperCase()}</span>}
-                {placeName && <span css={captionDot}>·</span>}
-                <span css={captionTime}>{time}</span>
+                {placeName && dateLabel && <span css={captionDot}>·</span>}
+                {dateLabel && <span css={captionDate}>{dateLabel}</span>}
+                {dateLabel && time && <span css={captionDot}>·</span>}
+                {time && <span css={captionTime}>{time}</span>}
             </div>
 
             {count > 1 && (
@@ -597,6 +602,11 @@ const captionText = css`
 
 const captionDot = css`
     opacity: 0.4;
+`;
+
+const captionDate = css`
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 `;
 
 const captionTime = css`
