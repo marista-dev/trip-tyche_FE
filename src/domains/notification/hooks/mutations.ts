@@ -8,9 +8,11 @@ export const useNotificationStatus = () => {
     return useMutation({
         mutationFn: (notificationId: number) =>
             toResult(() => notificationAPI.updateNotificationStatus(notificationId)),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['notification'] });
-            queryClient.invalidateQueries({ queryKey: ['summary'] });
+        onSuccess: async () => {
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['notification'] }),
+                queryClient.invalidateQueries({ queryKey: ['summary'] }),
+            ]);
         },
     });
 };
@@ -19,9 +21,11 @@ export const useNotificationDelete = () => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (notificationIds: number[]) => toResult(() => notificationAPI.deleteNotification(notificationIds)),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['notification'] });
-            queryClient.invalidateQueries({ queryKey: ['summary'] });
+        onSuccess: async () => {
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['notification'] }),
+                queryClient.invalidateQueries({ queryKey: ['summary'] }),
+            ]);
         },
     });
 };

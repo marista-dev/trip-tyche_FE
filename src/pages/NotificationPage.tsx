@@ -68,9 +68,10 @@ const NotificationPage = () => {
 
     const handleInlineAccept = async (n: Notification) => {
         await ensureRead(n);
-        const r = await updateShareStatusAsync({ shareId: n.referenceId, status: 'APPROVE' });
+        const r = await updateShareStatusAsync({ shareId: n.referenceId, status: 'APPROVED' });
         if (r.success) {
             showToast(`${n.senderNickname}님의 여행에 참여했어요`);
+            navigate(ROUTES.PATH.TICKETS);
         } else {
             showToast(r.error);
         }
@@ -108,6 +109,10 @@ const NotificationPage = () => {
 
     const handleCtaPrimary = (n: Notification) => {
         setActiveNotif(null);
+        if (n.message === 'SHARED_APPROVE') {
+            navigate(ROUTES.PATH.TICKETS);
+            return;
+        }
         // TODO: NOTICE_* payload 가 정의되면 타입별로 적절한 라우트 이동 처리
         if (n.message === 'NOTICE_INCOMPLETE') {
             showToast('사진 관리 진입점이 곧 제공돼요');

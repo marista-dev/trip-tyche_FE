@@ -38,6 +38,13 @@ const NotificationDetailSheet = ({
                     />
                 );
             case 'SHARED_APPROVE':
+                return (
+                    <ShareResultSheet
+                        notification={notification}
+                        onPrimary={() => onCtaPrimary(notification)}
+                        onRemove={() => onRemove(notification)}
+                    />
+                );
             case 'SHARED_REJECTED':
                 return (
                     <ShareResultSheet
