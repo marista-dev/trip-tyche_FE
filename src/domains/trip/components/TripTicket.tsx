@@ -266,7 +266,7 @@ const cardClickableStyle = css`
 
 const photoHeroStyle = (fallbackBg: string) => css`
     position: relative;
-    height: 220px;
+    height: 200px;
     background: ${fallbackBg};
     overflow: hidden;
 `;
@@ -277,6 +277,7 @@ const coverPhotoStyle = css`
     width: 100%;
     height: 100%;
     object-fit: cover;
+    object-position: center 35%;
 `;
 
 const gradientTopStyle = css`
@@ -289,7 +290,7 @@ const gradientTopStyle = css`
 const gradientBottomStyle = css`
     position: absolute;
     inset: 0;
-    background: linear-gradient(to bottom, transparent 35%, rgba(15, 23, 42, 0.75) 90%, rgba(15, 23, 42, 0.95) 100%);
+    background: linear-gradient(to bottom, transparent 55%, rgba(15, 23, 42, 0.7) 88%, rgba(15, 23, 42, 0.95) 100%);
     pointer-events: none;
 `;
 
