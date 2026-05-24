@@ -3,6 +3,7 @@ import NoticeFeatureSheet from '@/domains/notification/components/sheets/NoticeF
 import NoticeIncompleteSheet from '@/domains/notification/components/sheets/NoticeIncompleteSheet';
 import ShareRequestSheet from '@/domains/notification/components/sheets/ShareRequestSheet';
 import ShareResultSheet from '@/domains/notification/components/sheets/ShareResultSheet';
+import TripActivitySheet from '@/domains/notification/components/sheets/TripActivitySheet';
 import { Notification } from '@/domains/notification/types';
 import BottomSheet from '@/shared/components/common/BottomSheet';
 
@@ -65,8 +66,26 @@ const NotificationDetailSheet = ({
                 return <NoticeFeatureSheet notification={notification} onPrimary={() => onCtaPrimary(notification)} />;
             case 'NOTICE_BACKUP':
                 return <NoticeBackupSheet notification={notification} onPrimary={onClose} />;
+            case 'TRIP_UPDATED':
+            case 'TRIP_DELETED':
+            case 'MEDIA_FILE_ADDED':
+            case 'MEDIA_FILE_UPDATED':
+            case 'MEDIA_FILE_DELETED':
+                return (
+                    <TripActivitySheet
+                        notification={notification}
+                        onPrimary={onClose}
+                        onRemove={() => onRemove(notification)}
+                    />
+                );
             default:
-                return null;
+                return (
+                    <TripActivitySheet
+                        notification={notification}
+                        onPrimary={onClose}
+                        onRemove={() => onRemove(notification)}
+                    />
+                );
         }
     };
 

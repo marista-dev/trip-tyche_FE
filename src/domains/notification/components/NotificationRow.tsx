@@ -1,6 +1,11 @@
 import { css } from '@emotion/react';
 
-import { buildNotificationBody, NOTIFICATION_ICON, NOTIFICATION_TITLE } from '@/domains/notification/constants';
+import {
+    buildNotificationBody,
+    FALLBACK_NOTIFICATION_ICON,
+    NOTIFICATION_ICON,
+    NOTIFICATION_TITLE,
+} from '@/domains/notification/constants';
 import { Notification } from '@/domains/notification/types';
 import { formatKoreanTime } from '@/libs/utils/date';
 
@@ -21,7 +26,9 @@ const CTA_LABEL: Partial<Record<Notification['message'], string>> = {
 const NotificationRow = ({ notification, onClick, onAccept, onReject, onCtaClick }: NotificationRowProps) => {
     const { message, status, senderNickname, createdAt } = notification;
     const isUnread = status === 'UNREAD';
-    const Icon = NOTIFICATION_ICON[message];
+    const Icon = NOTIFICATION_ICON[message] ?? FALLBACK_NOTIFICATION_ICON;
+    const title = NOTIFICATION_TITLE[message] ?? '새로운 알림';
+    const body = buildNotificationBody(message, senderNickname) || `${senderNickname}님이 알림을 보냈어요`;
     const isShareRequest = message === 'SHARED_REQUEST';
     const isNotice = message === 'NOTICE_INCOMPLETE' || message === 'NOTICE_FEATURE' || message === 'NOTICE_BACKUP';
     const showActions = isShareRequest && isUnread && onAccept && onReject;
@@ -36,11 +43,11 @@ const NotificationRow = ({ notification, onClick, onAccept, onReject, onCtaClick
 
             <div css={contentCol}>
                 <div css={topRow}>
-                    <h3 css={titleStyle(isUnread)}>{NOTIFICATION_TITLE[message]}</h3>
+                    <h3 css={titleStyle(isUnread)}>{title}</h3>
                     <span css={timeStyle}>{formatKoreanTime(createdAt)}</span>
                 </div>
 
-                <p css={bodyStyle(isUnread)}>{buildNotificationBody(message, senderNickname)}</p>
+                <p css={bodyStyle(isUnread)}>{body}</p>
 
                 {showActions && (
                     <div css={actionsRow}>
