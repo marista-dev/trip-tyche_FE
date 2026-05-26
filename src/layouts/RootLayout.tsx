@@ -3,15 +3,13 @@ import { useEffect } from 'react';
 import { css } from '@emotion/react';
 import { Outlet } from 'react-router-dom';
 
-import GlobalShareModal from '@/domains/share/components/GlobalShareModal';
-import { useShareModalStore } from '@/domains/share/stores/useShareModalStore';
+import WebSocketBanner from '@/domains/notification/banner/WebSocketBanner';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import { socket } from '@/libs/socket';
 import Toast from '@/shared/components/common/Toast';
 import theme from '@/shared/styles/theme';
 
 const RootLayout = () => {
-    const { senderNickname, description } = useShareModalStore();
     const { connect, disconnect } = socket;
 
     const userId = useUserStore((s) => s.userInfo?.userId);
@@ -29,7 +27,7 @@ const RootLayout = () => {
         <div css={container}>
             <Outlet />
             <Toast />
-            <GlobalShareModal senderNickname={senderNickname} description={description} />
+            <WebSocketBanner />
         </div>
     );
 };

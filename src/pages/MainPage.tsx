@@ -4,7 +4,6 @@ import { css, keyframes } from '@emotion/react';
 import { Bell, Globe, Settings, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { useShareModalStore } from '@/domains/share/stores/useShareModalStore';
 import TripTicket from '@/domains/trip/components/TripTicket';
 import { useTripTicketList } from '@/domains/trip/hooks/queries';
 import { Trip } from '@/domains/trip/types';
@@ -41,8 +40,6 @@ const MainPage = () => {
     const shouldFetchTrips = mounted && !!userInfo;
     const { data: myTrips, isLoading: isTripsLoading } = useTripTicketList(shouldFetchTrips);
 
-    const setTicketPageReady = useShareModalStore((state) => state.setTicketPageReady);
-    const isModalOpen = useShareModalStore((state) => state.isModalOpen);
     const [pendingCheckDone, setPendingCheckDone] = useState(false);
     const navigate = useNavigate();
 
@@ -63,9 +60,8 @@ const MainPage = () => {
 
     useEffect(() => {
         if (!myTrips?.success) return;
-        setTicketPageReady();
         setPendingCheckDone(true);
-    }, [myTrips, setTicketPageReady]);
+    }, [myTrips]);
 
     const createNewTrip = async () => {
         const result = await toResult(() => tripAPI.createNewTrip());
@@ -104,7 +100,7 @@ const MainPage = () => {
                         aria-label='알림'
                     >
                         <Bell css={iconBtn} />
-                        {!!(pendingCheckDone && !isModalOpen && unreadNotificationsCount) && (
+                        {!!(pendingCheckDone && unreadNotificationsCount) && (
                             <span css={badge}>{unreadNotificationsCount}</span>
                         )}
                     </button>

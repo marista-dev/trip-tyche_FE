@@ -1,9 +1,9 @@
 import { Client } from '@stomp/stompjs';
 
-import { useShareModalStore } from '@/domains/share/stores/useShareModalStore';
+import { BannerType } from '@/domains/notification/banner/types';
+import { useBannerStore } from '@/domains/notification/banner/useBannerStore';
 import { SOCKET_URL } from '@/shared/constants/socket';
 import { queryClient } from '@/shared/providers/TanStackProvider';
-import { useToastStore } from '@/shared/stores/useToastStore';
 
 const state = {
     userId: null as string | null,
@@ -59,46 +59,36 @@ const subscribeToShareNotifications = (userId: string) => {
     if (!state.client) return;
 
     state.client.subscribe(SOCKET_URL.TOPIC.REQUEST(userId), async (message) => {
-        const { showToast } = useToastStore.getState();
-        const { queueOrOpen } = useShareModalStore.getState();
-
         try {
             const subscribedMessage = JSON.parse(message.body);
-            const messageType = subscribedMessage.type;
+            const messageType = subscribedMessage.type as BannerType;
+
+            useBannerStore.getState().show({
+                type: messageType,
+                senderNickname: subscribedMessage.senderNickname,
+                tripTitle: subscribedMessage.tripTitle,
+                tripKey: subscribedMessage.tripKey,
+            });
 
             if (messageType === 'SHARED_REQUEST') {
-                queueOrOpen(subscribedMessage.senderNickname, `${subscribedMessage.tripTitle} 여행에 초대합니다!`);
-                // summary/notification 즉시 무효화 생략 — 모달보다 벨이 먼저 켜지는 것 방지
-                // GlobalShareModal 닫힐 때 무효화됨
-            } else {
-                if (messageType === 'SHARED_APPROVE') {
-                    showToast('친구와 여행 메이트가 됐어요! 🎉');
-                    queryClient.invalidateQueries({ queryKey: ['ticket-list'] });
-                } else if (messageType === 'SHARED_REJECTED') {
-                    showToast('친구가 공유 요청을 거절했어요 ✈️');
-                } else if (messageType === 'TRIP_UPDATED') {
-                    showToast('친구가 여행 정보를 수정했어요 🧳');
-                } else if (messageType === 'TRIP_DELETED') {
-                    showToast('친구가 공유한 여행를 삭제했어요 🧳');
-                } else if (messageType === 'MEDIA_FILE_UPDATED') {
-                    showToast('친구가 여행의 사진을 수정했어요 📷');
-                } else if (messageType === 'MEDIA_FILE_ADDED') {
-                    showToast('친구가 여행의 사진을 추가했어요 📷');
-                } else if (messageType === 'MEDIA_FILE_DELETED') {
-                    showToast('친구가 여행의 사진을 삭제했어요 📷');
-                }
+                // summary/notification 즉시 무효화 생략 — 배너 응답 후 NotificationPage 진입 시 자연 갱신
+                return;
+            }
 
-                queryClient.invalidateQueries({ queryKey: ['summary'] });
-                queryClient.invalidateQueries({ queryKey: ['notification'] });
+            if (messageType === 'SHARED_APPROVE') {
+                queryClient.invalidateQueries({ queryKey: ['ticket-list'] });
+            }
 
-                if (messageType.startsWith('TRIP')) {
-                    await queryClient.invalidateQueries({ queryKey: ['ticket-list'] });
-                    await queryClient.invalidateQueries({ queryKey: ['ticket-info'] });
-                }
+            queryClient.invalidateQueries({ queryKey: ['summary'] });
+            queryClient.invalidateQueries({ queryKey: ['notification'] });
 
-                if (messageType.startsWith('MEDIA')) {
-                    queryClient.invalidateQueries({ queryKey: ['trip-images', subscribedMessage.tripKey] });
-                }
+            if (messageType.startsWith('TRIP')) {
+                await queryClient.invalidateQueries({ queryKey: ['ticket-list'] });
+                await queryClient.invalidateQueries({ queryKey: ['ticket-info'] });
+            }
+
+            if (messageType.startsWith('MEDIA')) {
+                queryClient.invalidateQueries({ queryKey: ['trip-images', subscribedMessage.tripKey] });
             }
         } catch (error) {
             console.error('메시지 처리 오류:', error);
