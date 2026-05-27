@@ -231,7 +231,7 @@ const badge = css`
     right: 2px;
     min-width: 16px;
     height: 16px;
-    background: #ff3b30;
+    background: #0071e3;
     color: #ffffff;
     font-size: 10px;
     font-weight: 700;
@@ -242,7 +242,7 @@ const badge = css`
     align-items: center;
     justify-content: center;
     padding: 0 4px;
-    box-shadow: 0 2px 6px rgba(255, 59, 48, 0.35);
+    box-shadow: 0 2px 6px rgba(0, 113, 227, 0.35);
     pointer-events: none;
 `;
 
