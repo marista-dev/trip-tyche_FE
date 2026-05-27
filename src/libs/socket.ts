@@ -12,6 +12,20 @@ const state = {
     unReadNotificationCount: null as number | null,
 };
 
+const connectListeners = new Set<() => void>();
+
+export const getStompClient = (): Client | null => state.client;
+
+export const isStompConnected = (): boolean => state.isConnected;
+
+export const addStompConnectListener = (listener: () => void): (() => void) => {
+    connectListeners.add(listener);
+    if (state.isConnected) {
+        listener();
+    }
+    return () => connectListeners.delete(listener);
+};
+
 const connect = (userId: string) => {
     if (state.client && state.isConnected && state.userId === userId) {
         return state.client;
@@ -30,6 +44,13 @@ const connect = (userId: string) => {
         console.log('[socket] CONNECTED', { path: location.pathname, t: Date.now() });
         state.isConnected = true;
         subscribeToShareNotifications(userId);
+        connectListeners.forEach((listener) => {
+            try {
+                listener();
+            } catch (err) {
+                console.error('[stomp] connect listener error', err);
+            }
+        });
     };
 
     client.onStompError = (frame) => {

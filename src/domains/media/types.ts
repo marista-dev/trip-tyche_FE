@@ -1,7 +1,6 @@
 import { Location } from '@/shared/types/map';
 
 export type ImageUploadStepType = 'upload' | 'processing' | 'review' | 'info' | 'done';
-export type ImageProcessStatusType = 'metadata' | 'upload';
 
 interface MetaData extends Location {
     recordDate: string;
@@ -31,11 +30,29 @@ export interface ClientImageFile extends MetaData {
     image: File;
 }
 
-export interface ImageFileWithAddress extends MediaFile {
-    address: string;
-}
 
 export interface PresignedUrlResponse {
-    fileKey: string;
+    mediaFileId: number;
+    tempKey: string;
+    finalKey: string;
     presignedPutUrl: string;
+}
+
+export type ProcessingStatus = 'UPLOADED' | 'PROCESSING' | 'PROCESSED' | 'FAILED' | 'LEGACY';
+
+export interface MediaFileItem {
+    mediaFileId: number;
+    currentUrl: string;
+    finalUrl: string;
+    status: ProcessingStatus;
+    processedAt?: string | null;
+    failureReason?: string | null;
+}
+
+export interface MediaProcessedPayload {
+    mediaFileId: number;
+    finalUrl?: string;
+    status: 'PROCESSED' | 'FAILED';
+    processedAt?: string;
+    reason?: string;
 }

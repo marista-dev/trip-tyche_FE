@@ -3,6 +3,7 @@ export const SOCKET_URL = {
     TOPIC: {
         REQUEST: (userId: string) => `/topic/share-notifications/${userId}`,
         UNREAD: '/app/notification-count',
+        MEDIA_PROCESSED: (userId: string) => `/topic/media-processed/${userId}`,
     },
 };
 
