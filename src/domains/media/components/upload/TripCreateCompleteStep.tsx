@@ -58,6 +58,8 @@ const TripCreateCompleteStep = ({
     const processedCount = useUploadSessionStore((s) => s.processedCount);
     const failedCount = useUploadSessionStore((s) => s.failedCount);
 
+    const displayTotal = totalCount > 0 ? totalCount : (photoCount ?? 0);
+
     const stampDate = toStampDate(tripInfo.startDate) || toStampDate();
 
     /** waitForBackgroundUpload → updateForm → finalize → phase2 시퀀스. cancellation token으로 unmount 안전성 확보. */
@@ -127,9 +129,9 @@ const TripCreateCompleteStep = ({
                         <div key={phase} css={phaseTextWrap}>
                             <div css={kicker}>{phase === 0 ? '티켓 확인 중' : '색상 적용 중'}</div>
                             <h2 css={waitingTitle}>{phase === 0 ? '잠시만 기다려 주세요' : '티켓을 완성하는 중...'}</h2>
-                            {phase === 0 && totalCount > 0 && (
+                            {phase === 0 && displayTotal > 0 && (
                                 <p css={progressLine}>
-                                    사진 처리 {processedCount} / {totalCount}
+                                    사진 처리 {processedCount} / {displayTotal}
                                     {failedCount > 0 && ` · 실패 ${failedCount}`}
                                 </p>
                             )}
