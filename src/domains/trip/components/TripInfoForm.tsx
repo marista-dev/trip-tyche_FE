@@ -325,13 +325,15 @@ const card = css`
     box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
 `;
 
-// 긴 날짜 범위 문자열이 입력란을 2줄로 만들지 않도록 강제 1줄 + 말줄임.
-// Mantine 7 input section 대상.
+// 가장 긴 케이스(예: "2024.12.31 (화) ~ 2025.01.05 (일)")도 모바일에서 무조건
+// 한 줄에 들어가도록 폰트 크기와 자간을 살짝 좁힘. nowrap + ellipsis는 최후 안전망.
 const datePickerInputNowrap = css`
     .trip-date-input {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        font-size: 13px;
+        letter-spacing: -0.25px;
     }
 `;
 
