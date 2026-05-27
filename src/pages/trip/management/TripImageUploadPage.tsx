@@ -9,6 +9,7 @@ import TripCreateCompleteStep from '@/domains/media/components/upload/TripCreate
 import TripUploadStepper from '@/domains/media/components/upload/TripUploadStepper';
 import UploadStep from '@/domains/media/components/upload/UploadStep';
 import { useImageUpload } from '@/domains/media/hooks/useImageUpload';
+import { useUploadSessionSync } from '@/domains/media/hooks/useUploadSessionSync';
 import { ImageUploadStepType } from '@/domains/media/types';
 import { getImageDateFromImage } from '@/domains/media/utils';
 import TripInfoForm from '@/domains/trip/components/TripInfoForm';
@@ -41,14 +42,8 @@ const TripImageUploadPage = () => {
     const { isModalOpen, closeModal } = useBrowserCheck();
 
     const { isFormComplete } = useTripFormValidation(tripForm);
-    const {
-        images,
-        progress,
-        prepareUploadFiles,
-        uploadImagesToS3,
-        retryFailedUploads,
-        waitForBackgroundUpload,
-    } = useImageUpload();
+    const { images, progress, prepareUploadFiles, uploadImagesToS3, retryFailedUploads, waitForBackgroundUpload } =
+        useImageUpload();
 
     const userInfo = useUserStore((state) => state.userInfo);
 
@@ -63,6 +58,8 @@ const TripImageUploadPage = () => {
     const navigate = useNavigate();
 
     const isEdit = pathname.includes('edit');
+
+    useUploadSessionSync(tripKey ?? null, userInfo?.userId ?? null);
 
     // 추출된 이미지 → tripForm의 mediaFilesDates 동기화 (날짜 픽커 인디케이터에 사용).
     useEffect(() => {

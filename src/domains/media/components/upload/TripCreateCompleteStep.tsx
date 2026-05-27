@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import MiniTicketPreview from '@/domains/media/components/upload/MiniTicketPreview';
 import PassportStamp from '@/domains/media/components/upload/PassportStamp';
 import { fadeUp, ink, slamEntry } from '@/domains/media/components/upload/tripUploadAnimations';
+import { useUploadSessionStore } from '@/domains/media/stores/useUploadSessionStore';
 import { TripInfo } from '@/domains/trip/types';
 import Button from '@/shared/components/common/Button';
 import { ROUTES } from '@/shared/constants/route';
@@ -52,6 +53,10 @@ const TripCreateCompleteStep = ({
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const showToast = useToastStore((state) => state.showToast);
     const navigate = useNavigate();
+
+    const totalCount = useUploadSessionStore((s) => s.totalCount);
+    const processedCount = useUploadSessionStore((s) => s.processedCount);
+    const failedCount = useUploadSessionStore((s) => s.failedCount);
 
     const stampDate = toStampDate(tripInfo.startDate) || toStampDate();
 
@@ -122,6 +127,12 @@ const TripCreateCompleteStep = ({
                         <div key={phase} css={phaseTextWrap}>
                             <div css={kicker}>{phase === 0 ? '티켓 확인 중' : '색상 적용 중'}</div>
                             <h2 css={waitingTitle}>{phase === 0 ? '잠시만 기다려 주세요' : '티켓을 완성하는 중...'}</h2>
+                            {phase === 0 && totalCount > 0 && (
+                                <p css={progressLine}>
+                                    사진 처리 {processedCount} / {totalCount}
+                                    {failedCount > 0 && ` · 실패 ${failedCount}`}
+                                </p>
+                            )}
                         </div>
                     ) : (
                         <div css={phaseTextWrap}>
@@ -221,6 +232,15 @@ const waitingTitle = css`
     color: #94a3b8;
     letter-spacing: -0.3px;
     line-height: 1.2;
+`;
+
+const progressLine = css`
+    margin-top: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #94a3b8;
+    letter-spacing: 0.2px;
+    font-variant-numeric: tabular-nums;
 `;
 
 const doneTitle = css`
