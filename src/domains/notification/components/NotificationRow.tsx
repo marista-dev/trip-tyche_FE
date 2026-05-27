@@ -61,7 +61,10 @@ const NotificationRow = ({
             <div css={contentCol}>
                 <div css={topRow}>
                     <h3 css={titleStyle(isUnread)}>{title}</h3>
-                    <span css={timeStyle}>{formatKoreanTime(createdAt)}</span>
+                    <div css={rightMeta}>
+                        {!selectMode && isUnread && <span css={unreadDot} aria-label='읽지 않음' />}
+                        <span css={timeStyle}>{formatKoreanTime(createdAt)}</span>
+                    </div>
                 </div>
 
                 <p css={bodyStyle(isUnread)}>{body}</p>
@@ -104,8 +107,6 @@ const NotificationRow = ({
                     </button>
                 )}
             </div>
-
-            {!selectMode && isUnread && <span css={unreadDot} />}
         </div>
     );
 };
@@ -166,9 +167,19 @@ const contentCol = css`
 
 const topRow = css`
     display: flex;
+    align-items: center;
     justify-content: space-between;
     gap: 8px;
     margin-bottom: 3px;
+`;
+
+// 시간 + unread dot 인라인 컨테이너 — row 우측 absolute 점이 시간과 겹치던
+// 문제를 해결하고 두 요소를 한 줄로 묶어 정렬.
+const rightMeta = css`
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
 `;
 
 const titleStyle = (isUnread: boolean) => css`
@@ -241,14 +252,15 @@ const ctaBtn = css`
     cursor: pointer;
 `;
 
+// 시간 텍스트 바로 왼쪽에 위치하는 인라인 dot — absolute가 아니라 flex 자식이라
+// 어떤 시간 길이에서도 겹치지 않고 일정한 간격으로 정렬됨.
 const unreadDot = css`
-    position: absolute;
-    top: 22px;
-    right: 12px;
     width: 7px;
     height: 7px;
     border-radius: 50%;
     background: #0071e3;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.12);
 `;
 
 export default NotificationRow;
