@@ -99,7 +99,7 @@ const MainPage = () => {
                         onClick={() => userId && navigate(ROUTES.PATH.NOTIFICATION(userId))}
                         aria-label='알림'
                     >
-                        <BellRing css={[iconBtn, bellIcon]} strokeWidth={2.2} fill='currentColor' fillOpacity={0.18} />
+                        <BellRing css={iconBtn} />
                         {!!(pendingCheckDone && unreadNotificationsCount) && (
                             <span css={badge}>{unreadNotificationsCount}</span>
                         )}
@@ -222,13 +222,6 @@ const iconBtn = css`
     width: 20px;
     height: 20px;
     color: #475569;
-`;
-
-// BellRing 아이콘만 살짝 통통하게 — 다른 유틸 아이콘 대비 액션 가독성을 높임
-const bellIcon = css`
-    width: 22px;
-    height: 22px;
-    color: #0071e3;
 `;
 
 const badge = css`
