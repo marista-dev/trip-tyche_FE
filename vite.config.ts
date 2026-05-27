@@ -1,15 +1,18 @@
+/// <reference types="vitest/config" />
 import fs from 'fs';
 import { resolve } from 'path';
 
 import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
-import { defineConfig, UserConfig } from 'vite';
+import { defineConfig, type UserConfig } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
 const KEY_PATH = 'certificates/local.triptychetest.shop-key.pem';
 const CERT_PATH = 'certificates/local.triptychetest.shop.pem';
 
-const baseConfig: UserConfig = {
+type ViteConfigWithTest = UserConfig & { test?: Record<string, unknown> };
+
+const baseConfig: ViteConfigWithTest = {
     plugins: [
         react({
             jsxImportSource: '@emotion/react',
@@ -40,10 +43,15 @@ const baseConfig: UserConfig = {
     define: {
         global: 'window',
     },
+    test: {
+        globals: true,
+        environment: 'jsdom',
+        setupFiles: ['./src/test/setup.ts'],
+        css: false,
+    },
 };
 
 export default defineConfig(({ command }) => {
-    // 개발 서버의 경우 HTTPS 설정 추가
     if (command === 'serve') {
         return {
             ...baseConfig,
@@ -75,5 +83,5 @@ function getHttpsConfig() {
     } catch (error) {
         console.log('HTTPS certificates not found, using HTTP');
     }
-    return false;
+    return undefined;
 }

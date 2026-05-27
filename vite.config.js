@@ -9,6 +9,7 @@ var __assign = (this && this.__assign) || function () {
     };
     return __assign.apply(this, arguments);
 };
+/// <reference types="vitest/config" />
 import fs from 'fs';
 import { resolve } from 'path';
 import react from '@vitejs/plugin-react';
@@ -48,10 +49,15 @@ var baseConfig = {
     define: {
         global: 'window',
     },
+    test: {
+        globals: true,
+        environment: 'jsdom',
+        setupFiles: ['./src/test/setup.ts'],
+        css: false,
+    },
 };
 export default defineConfig(function (_a) {
     var command = _a.command;
-    // 개발 서버의 경우 HTTPS 설정 추가
     if (command === 'serve') {
         return __assign(__assign({}, baseConfig), { server: {
                 port: 3000,
@@ -76,5 +82,5 @@ function getHttpsConfig() {
     catch (error) {
         console.log('HTTPS certificates not found, using HTTP');
     }
-    return false;
+    return undefined;
 }

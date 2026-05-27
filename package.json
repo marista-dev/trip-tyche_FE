@@ -11,7 +11,10 @@
         "preview": "vite preview",
         "clean": "rm -rf node_modules yarn.lock dist",
         "cy:dev": "cypress open",
-        "cy": "cypress run"
+        "cy": "cypress run",
+        "test": "vitest",
+        "test:run": "vitest run",
+        "test:ui": "vitest --ui"
     },
     "dependencies": {
         "@deck.gl/core": "^9.3.2",
@@ -44,6 +47,8 @@
     "devDependencies": {
         "@emotion/babel-plugin": "^11.12.0",
         "@tanstack/eslint-plugin-query": "^5.62.1",
+        "@testing-library/jest-dom": "^6.9.1",
+        "@testing-library/react": "^16.3.2",
         "@types/cypress": "^1.1.6",
         "@types/google.maps": "^3.64.1",
         "@types/node": "^20.0.0",
@@ -65,10 +70,12 @@
         "eslint-plugin-react-hooks": "^4.6.2",
         "eslint-plugin-react-refresh": "^0.4.9",
         "eslint-plugin-simple-import-sort": "^12.1.1",
+        "jsdom": "^29.1.1",
         "prettier": "^3.3.3",
         "rollup-plugin-visualizer": "^5.13.1",
         "typescript": "^5.6.3",
         "vite": "^5.4.8",
-        "vite-tsconfig-paths": "^5.0.1"
+        "vite-tsconfig-paths": "^5.0.1",
+        "vitest": "^4.1.7"
     }
 }

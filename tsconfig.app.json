@@ -29,7 +29,7 @@
         "skipLibCheck": true,
         "noEmit": true,
 
-        "types": ["node", "vite/client", "google.maps"]
+        "types": ["node", "vite/client", "google.maps", "vitest/globals"]
     },
     "include": ["src", "**/*.ts", "**/*.tsx", "**/*d.ts"],
     "references": [{ "path": "./tsconfig.node.json" }]
