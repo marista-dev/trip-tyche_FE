@@ -68,11 +68,13 @@ const DateGroupSection = ({
     );
 };
 
+// 사진은 다크 배경 위에서 가장 또렷하게 보임 — 그리드 카드를 다크로 전환
 const sectionStyle = css`
     margin-bottom: 14px;
     padding: 12px;
-    background: ${MANAGE_TOKENS.card};
+    background: #0f172a;
     border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.18);
     font-family: ${MANAGE_TOKENS.font};
 `;
 
@@ -87,12 +89,13 @@ const dateLabelStyle = css`
     margin: 0;
     font-size: 13px;
     font-weight: 700;
-    color: ${MANAGE_TOKENS.text.primary};
+    color: #ffffff;
+    letter-spacing: -0.1px;
 `;
 
 const countStyle = css`
     font-size: 11px;
-    color: ${MANAGE_TOKENS.text.muted};
+    color: rgba(255, 255, 255, 0.55);
 `;
 
 const gridStyle = css`
