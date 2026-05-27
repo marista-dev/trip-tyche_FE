@@ -68,6 +68,9 @@ const subscribeToShareNotifications = (userId: string) => {
                 senderNickname: subscribedMessage.senderNickname,
                 tripTitle: subscribedMessage.tripTitle,
                 tripKey: subscribedMessage.tripKey,
+                shareId: subscribedMessage.shareId,
+                notificationId: subscribedMessage.notificationId,
+                count: subscribedMessage.count,
             });
 
             if (messageType === 'SHARED_REQUEST') {
@@ -77,6 +80,7 @@ const subscribeToShareNotifications = (userId: string) => {
 
             if (messageType === 'SHARED_APPROVE') {
                 queryClient.invalidateQueries({ queryKey: ['ticket-list'] });
+                queryClient.invalidateQueries({ queryKey: ['share'] });
             }
 
             queryClient.invalidateQueries({ queryKey: ['summary'] });

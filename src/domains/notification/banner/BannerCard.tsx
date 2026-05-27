@@ -11,6 +11,7 @@ import { BannerMessage } from './types';
 interface BannerCardProps {
     message: BannerMessage;
     expanded: boolean;
+    pending?: boolean;
     onTap: () => void;
     onDismiss: () => void;
     onAccept: () => void;
@@ -20,7 +21,15 @@ interface BannerCardProps {
 const ENTER_TRANSITION = { type: 'spring' as const, stiffness: 380, damping: 32, mass: 0.9 };
 const LAYOUT_TRANSITION = { type: 'spring' as const, stiffness: 320, damping: 30 };
 
-const BannerCard: React.FC<BannerCardProps> = ({ message, expanded, onTap, onDismiss, onAccept, onReject }) => {
+const BannerCard: React.FC<BannerCardProps> = ({
+    message,
+    expanded,
+    pending = false,
+    onTap,
+    onDismiss,
+    onAccept,
+    onReject,
+}) => {
     const isPersistent = message.type === 'SHARED_REQUEST';
 
     useEffect(() => {
@@ -76,23 +85,25 @@ const BannerCard: React.FC<BannerCardProps> = ({ message, expanded, onTap, onDis
                     <div css={actionRow}>
                         <button
                             type='button'
-                            css={[actionBtn, rejectBtn]}
+                            disabled={pending}
+                            css={[actionBtn, rejectBtn, pending && disabledBtn]}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                onReject();
+                                if (!pending) onReject();
                             }}
                         >
                             거절
                         </button>
                         <button
                             type='button'
-                            css={[actionBtn, acceptBtn]}
+                            disabled={pending}
+                            css={[actionBtn, acceptBtn, pending && disabledBtn]}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                onAccept();
+                                if (!pending) onAccept();
                             }}
                         >
-                            여행에 참여하기
+                            {pending ? '처리 중…' : '여행에 참여하기'}
                         </button>
                     </div>
                 </motion.div>
@@ -224,6 +235,12 @@ const acceptBtn = css`
     background: ${BANNER_DESIGN.actions.accept.bg};
     color: ${BANNER_DESIGN.actions.accept.color};
     box-shadow: ${BANNER_DESIGN.actions.accept.shadow};
+`;
+
+const disabledBtn = css`
+    opacity: 0.6;
+    cursor: not-allowed;
+    box-shadow: none;
 `;
 
 export default BannerCard;

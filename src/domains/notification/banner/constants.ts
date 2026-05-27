@@ -25,25 +25,26 @@ export const BANNER_TITLE: Record<BannerType, string> = {
 };
 
 export const buildBannerBody = (msg: BannerMessage): string => {
-    const sender = msg.senderNickname;
+    const sender = msg.senderNickname || '친구';
     const trip = msg.tripTitle ? `"${msg.tripTitle}"` : '';
+    const n = msg.count && msg.count > 0 ? `${msg.count}장의 ` : '';
     switch (msg.type) {
         case 'SHARED_REQUEST':
             return trip ? `${sender}님이 ${trip}에 초대했어요` : `${sender}님이 여행에 초대했어요`;
         case 'SHARED_APPROVE':
-            return `${sender}님과 여행 메이트가 됐어요`;
+            return trip ? `${sender}님과 ${trip} 메이트가 됐어요` : `${sender}님과 여행 메이트가 됐어요`;
         case 'SHARED_REJECTED':
             return `${sender}님이 공유 요청을 거절했어요`;
         case 'TRIP_UPDATED':
             return trip ? `${sender}님이 ${trip}을 수정했어요` : `${sender}님이 여행을 수정했어요`;
         case 'TRIP_DELETED':
-            return `${sender}님이 공유한 여행을 삭제했어요`;
+            return trip ? `${sender}님이 ${trip}을 삭제했어요` : `${sender}님이 공유한 여행을 삭제했어요`;
         case 'MEDIA_FILE_ADDED':
-            return `${sender}님이 사진을 추가했어요`;
+            return `${sender}님이 ${n}사진을 추가했어요`;
         case 'MEDIA_FILE_UPDATED':
-            return `${sender}님이 사진 정보를 수정했어요`;
+            return `${sender}님이 ${n}사진 정보를 수정했어요`;
         case 'MEDIA_FILE_DELETED':
-            return `${sender}님이 사진을 삭제했어요`;
+            return `${sender}님이 ${n}사진을 삭제했어요`;
     }
 };
 

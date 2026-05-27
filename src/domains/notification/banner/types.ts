@@ -14,6 +14,9 @@ export interface BannerMessage {
     senderNickname: string;
     tripTitle?: string;
     tripKey?: string;
+    shareId?: number;
+    notificationId?: number;
+    count?: number;
 }
 
 export type BannerInput = Omit<BannerMessage, 'id'>;
