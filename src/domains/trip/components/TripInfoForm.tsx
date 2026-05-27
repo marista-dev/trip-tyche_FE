@@ -10,9 +10,22 @@ import { Plane, Calendar, Globe, X } from 'lucide-react';
 import { COUNTRIES, FORM } from '@/domains/trip/constants';
 import { useTripDateRange } from '@/domains/trip/hooks/useTripDateRange';
 import { Trip } from '@/domains/trip/types';
-import { formatToKorean } from '@/libs/utils/date';
 import Input from '@/shared/components/common/Input';
 import theme from '@/shared/styles/theme';
+
+// 입력란 너비를 한 줄로 유지하기 위한 컴팩트 포맷 (예: 2025.01.01 ~ 01.15)
+const formatCompactSingle = (d: Date | string) => dayjs(d).format('YYYY.MM.DD');
+
+const formatCompactRange = (start: Date | string | null, end: Date | string | null) => {
+    if (!start) return '';
+    if (!end) return formatCompactSingle(start);
+    const s = dayjs(start);
+    const e = dayjs(end);
+    if (s.isSame(e, 'day')) return formatCompactSingle(start);
+    if (s.year() !== e.year()) return `${s.format('YYYY.MM.DD')} ~ ${e.format('YYYY.MM.DD')}`;
+    if (s.month() !== e.month()) return `${s.format('YYYY.MM.DD')} ~ ${e.format('MM.DD')}`;
+    return `${s.format('YYYY.MM.DD')} ~ ${e.format('DD')}`;
+};
 
 type DateSelectType = 'range' | 'single';
 type DateChangeHandler = (value: DateValue | DatesRangeValue) => void;
@@ -138,8 +151,8 @@ const TripInfoForm = ({ isEditing = false, tripForm, onChangeTripInfo }: TripInf
                         !defaultStartDate || !defaultEndDate
                             ? '여행 기간을 선택해주세요'
                             : isSelectRange
-                              ? `${formatToKorean(defaultStartDate, true)} ${formatToKorean(defaultEndDate, true) ? `~ ${formatToKorean(defaultEndDate, true)}` : ''}`
-                              : `${formatToKorean(defaultStartDate, true)}`
+                              ? formatCompactRange(defaultStartDate, defaultEndDate)
+                              : formatCompactSingle(defaultStartDate)
                     }
                     value={
                         datePickerProps.isInitialized
@@ -156,11 +169,20 @@ const TripInfoForm = ({ isEditing = false, tripForm, onChangeTripInfo }: TripInf
                     locale='ko'
                     size='md'
                     radius='md'
-                    valueFormat='YYYY년 MM월 DD일'
+                    valueFormat='YYYY.MM.DD'
+                    valueFormatter={({ type, date }) => {
+                        if (type === 'range' && Array.isArray(date)) {
+                            return formatCompactRange(date[0] as Date | null, date[1] as Date | null);
+                        }
+                        if (date instanceof Date) return formatCompactSingle(date);
+                        return '';
+                    }}
                     defaultDate={imageDates[0] ? new Date(imageDates[0]) : undefined}
                     onChange={handleDateChange}
                     onMouseLeave={datePickerProps?.handleDateMouseLeave}
                     popoverProps={{ position: 'bottom' }}
+                    classNames={{ input: 'trip-date-input' }}
+                    css={datePickerInputNowrap}
                     getDayProps={(date: Date) => {
                         const defaultProps: Omit<Partial<DayProps>, 'classNames' | 'styles' | 'vars'> = {
                             disabled: false,
@@ -273,6 +295,16 @@ const card = css`
     gap: 24px;
     border: 1px solid #f1f5f9;
     box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+`;
+
+// 긴 날짜 범위 문자열이 입력란을 2줄로 만들지 않도록 강제 1줄 + 말줄임.
+// Mantine 7 input section 대상.
+const datePickerInputNowrap = css`
+    .trip-date-input {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 `;
 
 const titleRow = css`

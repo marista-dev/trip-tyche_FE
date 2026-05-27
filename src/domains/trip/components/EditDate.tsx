@@ -208,6 +208,9 @@ const datePickerStyle = css`
 
     input {
         cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 `;
 
