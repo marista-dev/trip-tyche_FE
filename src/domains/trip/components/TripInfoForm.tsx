@@ -13,8 +13,14 @@ import { Trip } from '@/domains/trip/types';
 import Input from '@/shared/components/common/Input';
 import theme from '@/shared/styles/theme';
 
-// 입력란 너비를 한 줄로 유지하기 위한 컴팩트 포맷 (예: 2025.01.01 ~ 01.15)
-const formatCompactSingle = (d: Date | string) => dayjs(d).format('YYYY.MM.DD');
+// 여행 컨텍스트에 맞는 날짜 포맷 — 양쪽 날짜를 풀어 쓰고 요일을 함께 표기.
+// 예: "2025.03.05 (수) ~ 03.09 (일)"  또는  "2024.12.31 (화) ~ 2025.01.05 (일)"
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+
+const withWeekday = (d: dayjs.Dayjs, includeYear: boolean) =>
+    `${d.format(includeYear ? 'YYYY.MM.DD' : 'MM.DD')} (${WEEKDAYS[d.day()]})`;
+
+const formatCompactSingle = (d: Date | string) => withWeekday(dayjs(d), true);
 
 const formatCompactRange = (start: Date | string | null, end: Date | string | null) => {
     if (!start) return '';
@@ -22,9 +28,17 @@ const formatCompactRange = (start: Date | string | null, end: Date | string | nu
     const s = dayjs(start);
     const e = dayjs(end);
     if (s.isSame(e, 'day')) return formatCompactSingle(start);
-    if (s.year() !== e.year()) return `${s.format('YYYY.MM.DD')} ~ ${e.format('YYYY.MM.DD')}`;
-    if (s.month() !== e.month()) return `${s.format('YYYY.MM.DD')} ~ ${e.format('MM.DD')}`;
-    return `${s.format('YYYY.MM.DD')} ~ ${e.format('DD')}`;
+    if (s.year() !== e.year()) return `${withWeekday(s, true)} ~ ${withWeekday(e, true)}`;
+    return `${withWeekday(s, true)} ~ ${withWeekday(e, false)}`;
+};
+
+// 기간 요약 — "당일" / "N박 N일"
+const formatDuration = (start: string | null | undefined, end: string | null | undefined) => {
+    if (!start || !end) return null;
+    const days = dayjs(end).diff(dayjs(start), 'day') + 1;
+    if (days <= 0) return null;
+    if (days === 1) return '당일';
+    return `${days - 1}박 ${days}일`;
 };
 
 type DateSelectType = 'range' | 'single';
@@ -200,13 +214,27 @@ const TripInfoForm = ({ isEditing = false, tripForm, onChangeTripInfo }: TripInf
                     }}
                     renderDay={(date) => renderCustomDay(date)}
                 />
-                {datePickerProps?.isError ? (
-                    <p css={errorStyle}>
-                        선택하신 날짜 외에도 사진이 있습니다. {isSelectRange && '기간을 다시 확인해 주세요.'}
-                    </p>
-                ) : (
-                    <p css={dateDescriptionStyle}>사진이 있는 날짜는 숫자 위에 파란점으로 표시됩니다</p>
-                )}
+                {(() => {
+                    const duration = formatDuration(startDate, endDate);
+                    return (
+                        <div css={dateMetaRow}>
+                            {duration && (
+                                <span css={durationBadge}>
+                                    <span css={durationDot} aria-hidden />
+                                    {duration}
+                                </span>
+                            )}
+                            {datePickerProps?.isError ? (
+                                <span css={errorStyle}>
+                                    선택하신 날짜 외에도 사진이 있어요.
+                                    {isSelectRange && ' 기간을 다시 확인해 주세요.'}
+                                </span>
+                            ) : (
+                                <span css={dateDescriptionStyle}>사진이 있는 날짜는 파란 점으로 표시됩니다</span>
+                            )}
+                        </div>
+                    );
+                })()}
             </section>
 
             <section>
@@ -483,15 +511,41 @@ const baseDescriptionStyle = css`
 
 const dateDescriptionStyle = css`
     ${baseDescriptionStyle}
-    margin-top: 6px;
-    margin-left: 4px;
 `;
 
 const errorStyle = css`
-    margin-top: 6px;
-    margin-left: 4px;
     font-size: ${theme.FONT_SIZES.SM};
     color: ${theme.COLORS.TEXT.ERROR};
+`;
+
+const dateMetaRow = css`
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    margin-left: 4px;
+`;
+
+// 여행 기간 강조 칩 — 무성의해 보이지 않도록 시각적 무게 부여
+const durationBadge = css`
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    background: rgba(0, 113, 227, 0.08);
+    color: ${ACCENT};
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: -0.1px;
+`;
+
+const durationDot = css`
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: ${ACCENT};
 `;
 
 const dayContainerStyle = css`
