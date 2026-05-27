@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { css, keyframes } from '@emotion/react';
-import { BellRing, Globe, Settings, Plus } from 'lucide-react';
+import { Globe, MessageCircleMore, Settings, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import TripTicket from '@/domains/trip/components/TripTicket';
@@ -99,7 +99,7 @@ const MainPage = () => {
                         onClick={() => userId && navigate(ROUTES.PATH.NOTIFICATION(userId))}
                         aria-label='알림'
                     >
-                        <BellRing css={iconBtn} />
+                        <MessageCircleMore css={iconBtn} />
                         {!!(pendingCheckDone && unreadNotificationsCount) && (
                             <span css={badge}>{unreadNotificationsCount}</span>
                         )}
@@ -224,21 +224,26 @@ const iconBtn = css`
     color: #475569;
 `;
 
+// 아이콘 우측 상단에 살짝 떠 있게 — 흰 테두리로 아이콘과 분리, 음수 오프셋으로 튀어나옴
 const badge = css`
     position: absolute;
-    top: 4px;
-    right: 4px;
-    min-width: 14px;
-    height: 14px;
-    background: #0071e3;
+    top: 2px;
+    right: 2px;
+    min-width: 16px;
+    height: 16px;
+    background: #ff3b30;
     color: #ffffff;
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 700;
+    line-height: 1;
     border-radius: 999px;
+    border: 2px solid #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0 3px;
+    padding: 0 4px;
+    box-shadow: 0 2px 6px rgba(255, 59, 48, 0.35);
+    pointer-events: none;
 `;
 
 const main = css`
