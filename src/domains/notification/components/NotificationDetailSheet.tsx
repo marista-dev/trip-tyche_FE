@@ -36,6 +36,7 @@ const NotificationDetailSheet = ({
                         notification={notification}
                         onAccept={() => onAccept(notification)}
                         onReject={() => onReject(notification)}
+                        onRemove={() => onRemove(notification)}
                     />
                 );
             case 'SHARED_APPROVE':

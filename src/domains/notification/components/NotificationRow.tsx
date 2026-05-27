@@ -1,4 +1,5 @@
 import { css } from '@emotion/react';
+import { Check } from 'lucide-react';
 
 import {
     buildNotificationBody,
@@ -15,6 +16,8 @@ interface NotificationRowProps {
     onAccept?: () => void;
     onReject?: () => void;
     onCtaClick?: () => void;
+    selectMode?: boolean;
+    selected?: boolean;
 }
 
 const CTA_LABEL: Partial<Record<Notification['message'], string>> = {
@@ -23,7 +26,15 @@ const CTA_LABEL: Partial<Record<Notification['message'], string>> = {
     NOTICE_BACKUP: '내역 보기 →',
 };
 
-const NotificationRow = ({ notification, onClick, onAccept, onReject, onCtaClick }: NotificationRowProps) => {
+const NotificationRow = ({
+    notification,
+    onClick,
+    onAccept,
+    onReject,
+    onCtaClick,
+    selectMode = false,
+    selected = false,
+}: NotificationRowProps) => {
     const { message, status, senderNickname, createdAt } = notification;
     const isUnread = status === 'UNREAD';
     const Icon = NOTIFICATION_ICON[message] ?? FALLBACK_NOTIFICATION_ICON;
@@ -31,12 +42,18 @@ const NotificationRow = ({ notification, onClick, onAccept, onReject, onCtaClick
     const body = buildNotificationBody(message, senderNickname) || `${senderNickname}님이 알림을 보냈어요`;
     const isShareRequest = message === 'SHARED_REQUEST';
     const isNotice = message === 'NOTICE_INCOMPLETE' || message === 'NOTICE_FEATURE' || message === 'NOTICE_BACKUP';
-    const showActions = isShareRequest && isUnread && onAccept && onReject;
-    const showCta = isNotice && !!onCtaClick;
+    const showActions = !selectMode && isShareRequest && isUnread && onAccept && onReject;
+    const showCta = !selectMode && isNotice && !!onCtaClick;
     const ctaLabel = CTA_LABEL[message];
 
     return (
-        <div css={rootStyle(isUnread)} onClick={onClick}>
+        <div css={rootStyle(isUnread, selectMode, selected)} onClick={onClick}>
+            {selectMode && (
+                <div css={checkbox(selected)} aria-label={selected ? '선택 해제' : '선택'}>
+                    {selected && <Check size={14} strokeWidth={3} />}
+                </div>
+            )}
+
             <div css={iconCircle(isUnread)}>
                 <Icon size={18} strokeWidth={2} />
             </div>
@@ -88,24 +105,46 @@ const NotificationRow = ({ notification, onClick, onAccept, onReject, onCtaClick
                 )}
             </div>
 
-            {isUnread && <span css={unreadDot} />}
+            {!selectMode && isUnread && <span css={unreadDot} />}
         </div>
     );
 };
 
-const rootStyle = (isUnread: boolean) => css`
+const rootStyle = (isUnread: boolean, selectMode: boolean, selected: boolean) => css`
     display: flex;
+    align-items: flex-start;
     gap: 12px;
     padding: 16px 20px;
     cursor: pointer;
     position: relative;
     border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-    background: ${isUnread ? 'rgba(0, 113, 227, 0.04)' : 'transparent'};
+    background: ${selectMode && selected
+        ? 'rgba(0, 113, 227, 0.08)'
+        : isUnread
+          ? 'rgba(0, 113, 227, 0.04)'
+          : 'transparent'};
     transition: background 200ms;
     -webkit-tap-highlight-color: transparent;
     &:active {
         background: rgba(0, 0, 0, 0.03);
     }
+`;
+
+const checkbox = (selected: boolean) => css`
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    margin-top: 9px;
+    border-radius: 50%;
+    border: 1.5px solid ${selected ? '#0071e3' : 'rgba(0, 0, 0, 0.2)'};
+    background: ${selected ? '#0071e3' : 'transparent'};
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+        background 150ms,
+        border-color 150ms;
 `;
 
 const iconCircle = (isUnread: boolean) => css`

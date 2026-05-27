@@ -8,9 +8,10 @@ interface ShareRequestSheetProps {
     notification: Notification;
     onAccept: () => void;
     onReject: () => void;
+    onRemove?: () => void;
 }
 
-const ShareRequestSheet: React.FC<ShareRequestSheetProps> = ({ notification, onAccept, onReject }) => {
+const ShareRequestSheet: React.FC<ShareRequestSheetProps> = ({ notification, onAccept, onReject, onRemove }) => {
     const { senderNickname } = notification;
 
     return (
@@ -40,6 +41,12 @@ const ShareRequestSheet: React.FC<ShareRequestSheetProps> = ({ notification, onA
                     여행에 참여하기
                 </button>
             </div>
+
+            {onRemove && (
+                <button type='button' css={removeButton} onClick={onRemove}>
+                    알림 삭제
+                </button>
+            )}
         </div>
     );
 };
@@ -103,6 +110,24 @@ const joinButton = css`
     cursor: pointer;
     font-family: inherit;
     box-shadow: 0 6px 16px rgba(0, 113, 227, 0.4);
+`;
+
+const removeButton = css`
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px 0;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    &:active {
+        opacity: 0.6;
+    }
 `;
 
 export default ShareRequestSheet;
