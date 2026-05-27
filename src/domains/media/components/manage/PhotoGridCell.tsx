@@ -4,6 +4,7 @@ import { Check } from 'lucide-react';
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
 import { MediaFile } from '@/domains/media/types';
 import { extractTimeOfDay } from '@/domains/media/utils';
+import { IMAGE_PLACEHOLDER } from '@/shared/constants/image';
 
 interface PhotoGridCellProps {
     photo: MediaFile;
@@ -15,7 +16,18 @@ interface PhotoGridCellProps {
 
 const PhotoGridCell = ({ photo, selected, selectMode, showTime = false, onToggle }: PhotoGridCellProps) => (
     <button type='button' css={cellStyle(selected)} onClick={() => onToggle(photo)}>
-        <img src={photo.mediaLink} alt='' css={imgStyle} loading='lazy' />
+        <img
+            src={photo.mediaLink}
+            alt=''
+            css={imgStyle}
+            loading='lazy'
+            onError={(e) => {
+                const img = e.currentTarget;
+                if (img.dataset.fallback === '1') return;
+                img.dataset.fallback = '1';
+                img.src = IMAGE_PLACEHOLDER;
+            }}
+        />
         {showTime && !selectMode && <span css={timeBadgeStyle}>{extractTimeOfDay(photo.recordDate)}</span>}
         {(selected || selectMode) && (
             <span css={radioStyle(selected)}>{selected && <Check size={10} strokeWidth={3.4} color='#fff' />}</span>

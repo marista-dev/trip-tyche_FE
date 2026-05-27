@@ -6,9 +6,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { css, keyframes } from '@emotion/react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -23,6 +23,7 @@ import useUserStore from '@/domains/user/stores/useUserStore';
 import { tripAPI } from '@/libs/apis';
 import { toResult } from '@/libs/apis/shared/utils';
 import { validateUserNickName } from '@/libs/utils/validate';
+import { IMAGE_PLACEHOLDER } from '@/shared/constants/image';
 import { ROUTES } from '@/shared/constants/route';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
@@ -168,7 +169,19 @@ const TicketCard = ({ trip, country, onPress }: { trip: TripSummary; country: Se
             {/* main area */}
             <div css={ticketMain}>
                 <div css={ticketPhotoArea}>
-                    {coverPhoto && <img src={coverPhoto} alt={trip.tripTitle} css={ticketCoverImg} />}
+                    {coverPhoto && (
+                        <img
+                            src={coverPhoto}
+                            alt={trip.tripTitle}
+                            css={ticketCoverImg}
+                            onError={(e) => {
+                                const img = e.currentTarget;
+                                if (img.dataset.fallback === '1') return;
+                                img.dataset.fallback = '1';
+                                img.src = IMAGE_PLACEHOLDER;
+                            }}
+                        />
+                    )}
                     <div css={ticketPhotoOverlay} />
                     <div css={ticketPhotoMeta}>
                         <div>

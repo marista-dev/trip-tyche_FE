@@ -44,7 +44,6 @@ const TripImageUploadPage = () => {
     const {
         images,
         progress,
-        uploadStats,
         prepareUploadFiles,
         uploadImagesToS3,
         retryFailedUploads,
@@ -168,7 +167,6 @@ const TripImageUploadPage = () => {
                         coverPhotoUrl={coverPhotoUrl}
                         ownerNickname={userInfo?.nickname}
                         photoCount={images?.length}
-                        uploadStats={uploadStats}
                         onRetryUpload={retryFailedUploads}
                     />
                 );

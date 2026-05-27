@@ -3,10 +3,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 import { DEFAULT_METADATA } from '@/domains/media/constants';
+import { useUploadSessionStore } from '@/domains/media/stores/useUploadSessionStore';
 import {
     PresignedUrlResponse,
     ClientImageFile,
-    ImageProcessStatusType,
     MediaFileCategories,
 } from '@/domains/media/types';
 import { filterWithoutDateMediaFile, filterWithoutLocationMediaFile } from '@/domains/media/utils';
@@ -85,7 +85,6 @@ interface UploadContext {
 export const useImageUpload = () => {
     const [images, setImages] = useState<ClientImageFile[]>();
     const [imageCategories, setImageCategories] = useState<MediaFileCategories>();
-    const [currentProcess, setCurrentProcess] = useState<ImageProcessStatusType>('metadata');
     const [progress, setProgress] = useState({
         metadata: 0,
         upload: 0,
@@ -100,38 +99,27 @@ export const useImageUpload = () => {
     const { tripKey } = useParams();
 
     const prepareUploadFiles = useCallback(async (images: FileList): Promise<File[]> => {
-        setCurrentProcess('metadata');
         const imagesWithoutHeic = await convertHeicToJpg(images);
         const uniqueImages = removeDuplicateImages(imagesWithoutHeic);
         return uniqueImages;
     }, []);
 
     const submitMetadata = useCallback(
-        async (images: ClientImageFile[], presignedUrls: PresignedUrlResponse[], externalSignal?: AbortSignal) => {
-            const metaDatas = presignedUrls.map((url: PresignedUrlResponse, index: number) => {
+        async (images: ClientImageFile[], presignedUrls: PresignedUrlResponse[]) => {
+            const items = presignedUrls.map((url: PresignedUrlResponse, index: number) => {
                 const { recordDate, latitude, longitude } = images[index];
                 return {
-                    fileKey: url.fileKey,
+                    mediaFileId: url.mediaFileId,
                     latitude: latitude || DEFAULT_METADATA.LOCATION,
                     longitude: longitude || DEFAULT_METADATA.LOCATION,
                     recordDate: recordDate || DEFAULT_METADATA.DATE,
                 };
             });
-            // apiClient.timeout(10s)은 main response에만 적용 — CORS preflight가 좀비 socket으로
-            // hang하면 사용자에게 surface 안 됨. AbortController로 wall-clock 30s 강제 timeout.
-            const localController = new AbortController();
-            const timer = setTimeout(() => localController.abort(), 30_000);
-            const onExternalAbort = () => localController.abort();
-            if (externalSignal) {
-                if (externalSignal.aborted) localController.abort();
-                else externalSignal.addEventListener('abort', onExternalAbort);
+            const result = await mediaAPI.triggerMediaProcessing(tripKey!, items);
+            if (!result.success) {
+                throw new Error(result.error);
             }
-            try {
-                await mediaAPI.createMediaFileMetadata(tripKey!, metaDatas, localController.signal);
-            } finally {
-                clearTimeout(timer);
-                externalSignal?.removeEventListener('abort', onExternalAbort);
-            }
+            useUploadSessionStore.getState().initialize(tripKey!, result.data);
         },
         [tripKey],
     );
@@ -164,7 +152,7 @@ export const useImageUpload = () => {
                     throw new Error(`${ctx.failedIndices.size}장 업로드 실패`);
                 }
                 if (!ctx.metadataSubmitted) {
-                    await submitMetadata(ctx.imagesWithMetadata, ctx.presignedUrls, signal);
+                    await submitMetadata(ctx.imagesWithMetadata, ctx.presignedUrls);
                     ctx.metadataSubmitted = true;
                 }
                 if (ctx.postUploadTask && !ctx.postUploadTaskCompleted) {
@@ -310,7 +298,6 @@ export const useImageUpload = () => {
     return {
         images,
         imageCategories,
-        currentProcess,
         progress,
         uploadStats,
         prepareUploadFiles,

@@ -4,17 +4,21 @@ import { css } from '@emotion/react';
 import { ImageOff } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 
+import { SwappableImage } from '@/domains/media/components/common/SwappableImage';
 import DateGroupSection from '@/domains/media/components/manage/DateGroupSection';
 import IssueCard from '@/domains/media/components/manage/IssueCard';
 import ManageHeader from '@/domains/media/components/manage/ManageHeader';
 import SelectionActionFAB from '@/domains/media/components/manage/SelectionActionFAB';
 import { managePageContainerStyle } from '@/domains/media/components/manage/styles';
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
+import { FailedImageCard } from '@/domains/media/components/upload/FailedImageCard';
 import { useMediaDelete } from '@/domains/media/hooks/mutations';
 import { useTripPhotos } from '@/domains/media/hooks/queries';
 import { usePhotoSelection } from '@/domains/media/hooks/usePhotoSelection';
 import { usePhotoUpload } from '@/domains/media/hooks/usePhotoUpload';
+import { useUploadSessionSync } from '@/domains/media/hooks/useUploadSessionSync';
 import { useEstimateStore } from '@/domains/media/stores/useEstimateStore';
+import { useUploadSessionStore } from '@/domains/media/stores/useUploadSessionStore';
 import { MediaFile } from '@/domains/media/types';
 import {
     filterValidMediaFile,
@@ -23,6 +27,7 @@ import {
     getImageGroupByDate,
 } from '@/domains/media/utils';
 import { useTripInfo } from '@/domains/trip/hooks/queries';
+import useUserStore from '@/domains/user/stores/useUserStore';
 import InlineDatePickSheet from '@/pages/trip/management/InlineDatePickSheet';
 import EmptyItem from '@/shared/components/common/EmptyItem';
 import ConfirmModal from '@/shared/components/common/Modal/ConfirmModal';
@@ -56,9 +61,27 @@ const TripImageManagePage = () => {
     const { mutate: deleteMutate, isPending: isDeleting } = useMediaDelete();
 
     // 선택 상태 + 업로드 흐름 (각 책임을 hook으로 격리)
-    const { selected, selectMode, size: selectedCount, toggle: togglePhoto, clear: clearSelection } = usePhotoSelection();
+    const {
+        selected,
+        selectMode,
+        size: selectedCount,
+        toggle: togglePhoto,
+        clear: clearSelection,
+    } = usePhotoSelection();
     const { fileInputRef, openFilePicker, handleFileSelected, isUploading, uploadingText, pendingByDate } =
         usePhotoUpload(tripKey);
+
+    const userId = useUserStore((s) => s.userInfo?.userId ?? null);
+    useUploadSessionSync(tripKey, userId);
+
+    const sessionImages = useUploadSessionStore((s) => s.images);
+    const sessionTripKey = useUploadSessionStore((s) => s.tripKey);
+    const inProgressItems = useMemo(() => {
+        if (sessionTripKey !== tripKey) return [];
+        return Object.values(sessionImages).filter(
+            (item) => item.status === 'UPLOADED' || item.status === 'PROCESSING' || item.status === 'FAILED',
+        );
+    }, [sessionTripKey, tripKey, sessionImages]);
 
     const tripInfo = tripInfoResult?.success ? tripInfoResult.data : undefined;
 
@@ -81,10 +104,7 @@ const TripImageManagePage = () => {
         return merged.sort((a, b) => new Date(a.recordDate).getTime() - new Date(b.recordDate).getTime());
     }, [baseGroups, pendingByDate]);
 
-    const selectedList = useMemo(
-        () => allImages.filter((img) => selected.has(img.mediaFileId)),
-        [allImages, selected],
-    );
+    const selectedList = useMemo(() => allImages.filter((img) => selected.has(img.mediaFileId)), [allImages, selected]);
 
     const handleDelete = () => {
         if (selectedList.length === 0) return;
@@ -176,6 +196,28 @@ const TripImageManagePage = () => {
                                 onResolve={goNoDate}
                             />
                         )}
+                    </section>
+                )}
+
+                {!selectMode && inProgressItems.length > 0 && (
+                    <section css={uploadingSectionStyle}>
+                        <h3 css={sectionLabelStyle}>업로드 중</h3>
+                        <div css={uploadingGridStyle}>
+                            {inProgressItems.map((item) =>
+                                item.status === 'FAILED' ? (
+                                    <FailedImageCard key={item.mediaFileId} item={item} />
+                                ) : (
+                                    <SwappableImage
+                                        key={item.mediaFileId}
+                                        currentUrl={item.currentUrl}
+                                        finalUrl={item.finalUrl}
+                                        status={item.status}
+                                        alt=''
+                                        css={uploadingCellStyle}
+                                    />
+                                ),
+                            )}
+                        </div>
                     </section>
                 )}
 
@@ -323,6 +365,24 @@ const uploadChipStyle = css`
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
     backdrop-filter: blur(10px);
     pointer-events: none;
+`;
+
+const uploadingSectionStyle = css`
+    margin-bottom: 16px;
+`;
+
+const uploadingGridStyle = css`
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3px;
+`;
+
+const uploadingCellStyle = css`
+    aspect-ratio: 1 / 1;
+    width: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: ${MANAGE_TOKENS.radius.pill}px;
 `;
 
 export default TripImageManagePage;

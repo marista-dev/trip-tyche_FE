@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-import { PresignedUrlResponse, MediaFile } from '@/domains/media/types';
+import { PresignedUrlResponse, MediaFile, MediaFileItem } from '@/domains/media/types';
 import { apiClient } from '@/libs/apis/shared/client';
 import { ApiResponse, MediaByDate, MediaByPinPoint, Result } from '@/libs/apis/shared/types';
 import { exceptTimeFromDateString } from '@/libs/utils/date';
@@ -72,16 +72,6 @@ export const mediaAPI = {
             externalSignal?.removeEventListener('abort', onExternalAbort);
         }
     },
-    // 미디어 파일 메타데이터 등록 (fileKey, latitude, longitude, recordDate)
-    // signal: hook 측에서 명시적 timeout을 걸기 위함. apiClient 기본 timeout은 main response에만 적용되어
-    // CORS preflight가 좀비 socket 때문에 hang하는 경우 fail-fast 안 됨 → AbortSignal로 강제 종료.
-    createMediaFileMetadata: async (
-        tripKey: string,
-        metaDatas: { fileKey: string; latitude: number; longitude: number; recordDate: string }[],
-        signal?: AbortSignal,
-    ) => {
-        await apiClient.post(`/v1/trips/${tripKey}/media-files`, metaDatas, { signal });
-    },
     // 여행에 등록된 모든 이미지 조회
     getTripImages: async (
         tripKey: string,
@@ -104,4 +94,23 @@ export const mediaAPI = {
         }),
     updateTripStatusToImagesUploaded: async (tripKey: string): Promise<ApiResponse<string>> =>
         await apiClient.patch(`/v1/trips/${tripKey}/images-uploaded`),
+    triggerMediaProcessing: async (
+        tripKey: string,
+        items: { mediaFileId: number; recordDate: string; latitude: number; longitude: number }[],
+    ): Promise<Result<MediaFileItem[]>> => {
+        try {
+            const response = await apiClient.post(`/v1/trips/${tripKey}/media-files/processing`, { items });
+            return { success: true, data: response.data.items };
+        } catch {
+            return { success: false, error: '미디어 처리 요청에 실패했습니다.' };
+        }
+    },
+    fetchUploadStatus: async (tripKey: string): Promise<Result<MediaFileItem[]>> => {
+        try {
+            const response = await apiClient.get(`/v1/trips/${tripKey}/media-files/upload-status`);
+            return { success: true, data: response.data.items };
+        } catch {
+            return { success: false, error: '업로드 상태를 불러오지 못했습니다.' };
+        }
+    },
 };

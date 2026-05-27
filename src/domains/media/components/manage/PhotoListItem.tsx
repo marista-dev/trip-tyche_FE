@@ -4,6 +4,7 @@ import { AlertCircle, Check, ChevronRight } from 'lucide-react';
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
 import { MediaFile } from '@/domains/media/types';
 import { extractTimeOfDay } from '@/domains/media/utils';
+import { IMAGE_PLACEHOLDER } from '@/shared/constants/image';
 
 type ListTone = 'red' | 'amber';
 
@@ -31,7 +32,18 @@ const PhotoListItem = ({ photo, tone, selected, isFirst, onToggle, primaryLabel,
             <span css={radioStyle(selected)}>{selected && <Check size={10} strokeWidth={3.4} color='#fff' />}</span>
 
             <div css={thumbStyle}>
-                <img src={photo.mediaLink} alt='' css={thumbImgStyle} loading='lazy' />
+                <img
+                    src={photo.mediaLink}
+                    alt=''
+                    css={thumbImgStyle}
+                    loading='lazy'
+                    onError={(e) => {
+                        const img = e.currentTarget;
+                        if (img.dataset.fallback === '1') return;
+                        img.dataset.fallback = '1';
+                        img.src = IMAGE_PLACEHOLDER;
+                    }}
+                />
             </div>
 
             <div css={infoStyle}>

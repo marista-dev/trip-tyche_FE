@@ -1,4 +1,4 @@
-import { ClientImageFile, ImageProcessStatusType, ImageUploadStepType, MediaFile } from '@/domains/media/types';
+import { ClientImageFile, ImageUploadStepType, MediaFile } from '@/domains/media/types';
 import { hasValidDate, hasValidLocation } from '@/libs/utils/validate';
 
 const EARTH_RADIUS_M = 6_371_000;
@@ -133,23 +133,6 @@ export const getTitleByStep = (step: ImageUploadStepType) => {
     }
 };
 
-export const getAlertBoxMessage = (currentProcess: ImageProcessStatusType) => {
-    if (currentProcess === 'metadata') {
-        return {
-            title: '사진 정보 수집 중...',
-            description: '소중한 추억의 장소와 날짜를 기억하고 있어요.',
-        };
-    } else if (currentProcess === 'upload') {
-        return {
-            title: '안전하게 저장 중...',
-            description: '소중한 사진을 안전하게 저장하고 있어요.',
-        };
-    }
-    return {
-        title: '문제가 발생했나요?',
-        description: '새로고침 및 서비스 종료 후 다시 이용해주세요.',
-    };
-};
 
 export const getImageDateFromImage = (images: ClientImageFile[] | null) => {
     if (!images || images?.length === 0) return null;

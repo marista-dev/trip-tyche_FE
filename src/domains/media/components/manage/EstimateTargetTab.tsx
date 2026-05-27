@@ -4,6 +4,7 @@ import { Check } from 'lucide-react';
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
 import { MediaFile } from '@/domains/media/types';
 import { extractTimeOfDay } from '@/domains/media/utils';
+import { IMAGE_PLACEHOLDER } from '@/shared/constants/image';
 
 interface EstimateTargetTabProps {
     photo: MediaFile;
@@ -14,13 +15,19 @@ interface EstimateTargetTabProps {
 }
 
 const EstimateTargetTab = ({ photo, active, done, showTime = true, onClick }: EstimateTargetTabProps) => (
-    <button
-        type='button'
-        data-target-id={photo.mediaFileId}
-        css={tabStyle(active)}
-        onClick={onClick}
-    >
-        <img src={photo.mediaLink} alt='' css={imgStyle} loading='lazy' />
+    <button type='button' data-target-id={photo.mediaFileId} css={tabStyle(active)} onClick={onClick}>
+        <img
+            src={photo.mediaLink}
+            alt=''
+            css={imgStyle}
+            loading='lazy'
+            onError={(e) => {
+                const img = e.currentTarget;
+                if (img.dataset.fallback === '1') return;
+                img.dataset.fallback = '1';
+                img.src = IMAGE_PLACEHOLDER;
+            }}
+        />
         {showTime && <span css={timeStyle}>{extractTimeOfDay(photo.recordDate) || '—'}</span>}
         {done && (
             <span css={doneStyle}>
