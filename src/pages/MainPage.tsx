@@ -14,6 +14,8 @@ import { toResult } from '@/libs/apis/shared/utils';
 import Button from '@/shared/components/common/Button';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import { ROUTES } from '@/shared/constants/route';
+import { STORAGE_KEYS } from '@/shared/constants/storage';
+import { COLORS } from '@/shared/constants/style';
 import { useMapScript } from '@/shared/hooks/useMapScript';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
@@ -44,8 +46,8 @@ const MainPage = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        sessionStorage.removeItem('imageDates');
-        sessionStorage.removeItem('cinematicResumeIdx');
+        sessionStorage.removeItem(STORAGE_KEYS.IMAGE_DATES);
+        sessionStorage.removeItem(STORAGE_KEYS.CINEMATIC_RESUME_IDX);
     }, []);
 
     useEffect(() => {
@@ -184,7 +186,7 @@ const logo = css`
     font-size: 17px;
     font-weight: 800;
     letter-spacing: -0.3px;
-    color: #0071e3;
+    color: ${COLORS.PRIMARY};
     user-select: none;
 `;
 
@@ -231,7 +233,7 @@ const badge = css`
     right: 2px;
     min-width: 16px;
     height: 16px;
-    background: #0071e3;
+    background: ${COLORS.PRIMARY};
     color: #ffffff;
     font-size: 10px;
     font-weight: 700;
@@ -279,7 +281,7 @@ const subtitle = css`
 `;
 
 const countAccent = css`
-    color: #0071e3;
+    color: ${COLORS.PRIMARY};
     font-weight: 700;
 `;
 
@@ -287,7 +289,7 @@ const addButton = css`
     width: 44px;
     height: 44px;
     border-radius: 50%;
-    background: #0071e3;
+    background: ${COLORS.PRIMARY};
     flex-shrink: 0;
     box-shadow: 0 4px 16px rgba(0, 113, 227, 0.35);
     transition:

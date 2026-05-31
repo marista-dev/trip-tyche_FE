@@ -14,6 +14,7 @@ import Indicator from '@/shared/components/common/Spinner/Indicator';
 import MultiMarkerMap from '@/shared/components/map/MultiMarkerMap';
 import { GOOGLE_MAPS_MAP_ID } from '@/shared/constants/map';
 import { ROUTES } from '@/shared/constants/route';
+import { STORAGE_KEYS } from '@/shared/constants/storage';
 import { COLORS } from '@/shared/constants/style';
 import { useMapScript } from '@/shared/hooks/useMapScript';
 import { useToastStore } from '@/shared/stores/useToastStore';
@@ -41,7 +42,7 @@ const ImageByDatePage = () => {
     const { data: imagesResult } = useMediaByDate(tripKey || '', date || '');
 
     useEffect(() => {
-        const ds: string[] = JSON.parse(sessionStorage.getItem('imageDates') || '[]');
+        const ds: string[] = JSON.parse(sessionStorage.getItem(STORAGE_KEYS.IMAGE_DATES) || '[]');
         setDates(ds);
     }, []);
 
@@ -244,7 +245,9 @@ const backButtonStyle = css`
     box-shadow:
         0 1px 0 rgba(255, 255, 255, 0.18) inset,
         0 10px 24px -12px rgba(0, 0, 0, 0.55);
-    transition: transform 360ms cubic-bezier(0.32, 0.72, 0, 1), background 240ms ease;
+    transition:
+        transform 360ms cubic-bezier(0.32, 0.72, 0, 1),
+        background 240ms ease;
 
     &:active {
         transform: scale(0.94);
@@ -310,7 +313,7 @@ const infoCardDot = css`
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: #0ea5e9;
+    background: ${COLORS.ACCENT};
     box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.18);
     flex-shrink: 0;
 `;
@@ -377,9 +380,12 @@ const thumbButton = (isActive: boolean) => css`
     padding: 0;
     background: transparent;
     cursor: pointer;
-    border: 2px solid ${isActive ? '#0ea5e9' : 'transparent'};
+    border: 2px solid ${isActive ? COLORS.ACCENT : 'transparent'};
     opacity: ${isActive ? 1 : 0.55};
-    transition: opacity 220ms ease, border 200ms ease, transform 200ms cubic-bezier(0.32, 0.72, 0, 1);
+    transition:
+        opacity 220ms ease,
+        border 200ms ease,
+        transform 200ms cubic-bezier(0.32, 0.72, 0, 1);
 
     &:active {
         transform: scale(0.94);

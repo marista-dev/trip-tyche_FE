@@ -3,6 +3,7 @@ import axios from 'axios';
 import { PresignedUrlResponse, MediaFile, MediaFileItem } from '@/domains/media/types';
 import { apiClient } from '@/libs/apis/shared/client';
 import { ApiResponse, MediaByDate, MediaByPinPoint, Result } from '@/libs/apis/shared/types';
+import { toResult } from '@/libs/apis/shared/utils';
 import { exceptTimeFromDateString } from '@/libs/utils/date';
 import { Location } from '@/shared/types/map';
 
@@ -23,17 +24,18 @@ export const mediaAPI = {
         return data.data;
     },
     // 미디어 파일 업로드를 위한 Presigned URL 생성
-    requestPresignedUrls: async (
+    requestPresignedUrls: (
         tripKey: string,
         imageNames: { fileName: string }[],
-    ): Promise<Result<PresignedUrlResponse[]>> => {
-        try {
-            const response = await apiClient.post(`/v1/trips/${tripKey}/presigned-url`, { files: imageNames });
-            return { success: true, data: response.data.presignedUrls };
-        } catch {
-            return { success: false, error: '서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' };
-        }
-    },
+    ): Promise<Result<PresignedUrlResponse[]>> =>
+        toResult(
+            async (): Promise<ApiResponse<{ presignedUrls: PresignedUrlResponse[] }>> =>
+                await apiClient.post(`/v1/trips/${tripKey}/presigned-url`, { files: imageNames }),
+            {
+                transform: (data) => data.presignedUrls,
+                errorMessage: '서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
+            },
+        ),
     // S3 스토리지로 미디어 파일 업로드
     // raw axios.put은 기본 timeout이 없어 느린/끊긴 네트워크에서 영원히 pending 상태가 됨.
     // 첫 onUploadProgress(=실제 전송 시작) 이후, 30초간 progress가 없으면 stall로 간주하고 abort.
@@ -94,23 +96,25 @@ export const mediaAPI = {
         }),
     updateTripStatusToImagesUploaded: async (tripKey: string): Promise<ApiResponse<string>> =>
         await apiClient.patch(`/v1/trips/${tripKey}/images-uploaded`),
-    triggerMediaProcessing: async (
+    triggerMediaProcessing: (
         tripKey: string,
         items: { mediaFileId: number; recordDate: string; latitude: number; longitude: number }[],
-    ): Promise<Result<MediaFileItem[]>> => {
-        try {
-            const response = await apiClient.post(`/v1/trips/${tripKey}/media-files/processing`, { items });
-            return { success: true, data: response.data.items };
-        } catch {
-            return { success: false, error: '미디어 처리 요청에 실패했습니다.' };
-        }
-    },
-    fetchUploadStatus: async (tripKey: string): Promise<Result<MediaFileItem[]>> => {
-        try {
-            const response = await apiClient.get(`/v1/trips/${tripKey}/media-files/upload-status`);
-            return { success: true, data: response.data.items };
-        } catch {
-            return { success: false, error: '업로드 상태를 불러오지 못했습니다.' };
-        }
-    },
+    ): Promise<Result<MediaFileItem[]>> =>
+        toResult(
+            async (): Promise<ApiResponse<{ items: MediaFileItem[] }>> =>
+                await apiClient.post(`/v1/trips/${tripKey}/media-files/processing`, { items }),
+            {
+                transform: (data) => data.items,
+                errorMessage: '미디어 처리 요청에 실패했습니다.',
+            },
+        ),
+    fetchUploadStatus: (tripKey: string): Promise<Result<MediaFileItem[]>> =>
+        toResult(
+            async (): Promise<ApiResponse<{ items: MediaFileItem[] }>> =>
+                await apiClient.get(`/v1/trips/${tripKey}/media-files/upload-status`),
+            {
+                transform: (data) => data.items,
+                errorMessage: '업로드 상태를 불러오지 못했습니다.',
+            },
+        ),
 };
