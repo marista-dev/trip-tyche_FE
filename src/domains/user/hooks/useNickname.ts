@@ -13,6 +13,8 @@ export const useNickname = (nickname: string, onSuccess?: () => void) => {
     const submitNickname = async () => {
         try {
             setIsSubmitting(true);
+            // 동일 에러가 연속 발생해도 useEffect(toast)가 다시 트리거되도록 매 시도마다 초기화
+            setError('');
             const checkResult = await toResult(() => userAPI.checkNicknameDuplication(nickname));
             if (!checkResult.success) throw Error(checkResult.error);
 
