@@ -61,9 +61,12 @@ export const useMapControl = (initialZoom: number, initialCenter: Location | nul
         if (options.zoom !== undefined) setZoom(options.zoom);
     }, []);
 
-    const updateMapCenter = useCallback((newCenter: Location) => {
-        moveCamera({ center: newCenter });
-    }, [moveCamera]);
+    const updateMapCenter = useCallback(
+        (newCenter: Location) => {
+            moveCamera({ center: newCenter });
+        },
+        [moveCamera],
+    );
 
     return {
         mapRef,

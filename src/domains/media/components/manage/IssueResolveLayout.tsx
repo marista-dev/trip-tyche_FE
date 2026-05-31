@@ -38,8 +38,8 @@ interface IssueResolveLayoutProps {
 
     onBack: () => void;
     onCancel: () => void;
-    onDeleteRequest: () => void;  // 헤더 삭제 버튼 클릭 → 보통 confirm modal 오픈
-    onDeleteConfirm: () => void;  // confirm modal에서 실제 삭제 실행
+    onDeleteRequest: () => void; // 헤더 삭제 버튼 클릭 → 보통 confirm modal 오픈
+    onDeleteConfirm: () => void; // confirm modal에서 실제 삭제 실행
     onTogglePhoto: (photo: MediaFile) => void;
     onToggleAll: () => void;
 

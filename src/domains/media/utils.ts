@@ -133,7 +133,6 @@ export const getTitleByStep = (step: ImageUploadStepType) => {
     }
 };
 
-
 export const getImageDateFromImage = (images: ClientImageFile[] | null) => {
     if (!images || images?.length === 0) return null;
     const imageDates = images?.map((image: ClientImageFile) => image.recordDate.split('T')[0]);

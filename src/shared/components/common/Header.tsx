@@ -2,6 +2,8 @@ import { css } from '@emotion/react';
 import { ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+import { COLORS } from '@/shared/constants/style';
+
 interface HeaderProps {
     title: string;
     isBackButton?: boolean;
@@ -18,8 +20,8 @@ const Header = ({ title, isBackButton, children, onBack }: HeaderProps) => {
         <div css={headerStyle}>
             <div css={defaultStyle}>
                 {isBackButton && (
-                    <button css={backButtonStyle} onClick={navigateBeforePage} aria-label="뒤로 가기">
-                        <ChevronLeft size={20} strokeWidth={1.5} aria-hidden="true" />
+                    <button css={backButtonStyle} onClick={navigateBeforePage} aria-label='뒤로 가기'>
+                        <ChevronLeft size={20} strokeWidth={1.5} aria-hidden='true' />
                     </button>
                 )}
                 <h1 css={titleStyle}>{title}</h1>
@@ -67,7 +69,7 @@ const backButtonStyle = css`
     border: none;
     background: none;
     cursor: pointer;
-    color: #0071e3;
+    color: ${COLORS.PRIMARY};
     border-radius: 8px;
     transition: opacity 0.15s;
     -webkit-tap-highlight-color: transparent;

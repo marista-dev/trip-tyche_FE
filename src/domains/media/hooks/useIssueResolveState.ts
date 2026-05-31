@@ -9,18 +9,12 @@ import { MediaFile } from '@/domains/media/types';
  * - selectedList: targets ∩ selected
  * - scope: 선택된 게 있으면 selectedList, 없으면 targets 전체 (빠른 액션이 일괄 처리에 사용)
  */
-export const useIssueResolveState = (
-    allImages: MediaFile[],
-    filterFn: (images: MediaFile[]) => MediaFile[],
-) => {
+export const useIssueResolveState = (allImages: MediaFile[], filterFn: (images: MediaFile[]) => MediaFile[]) => {
     const [selected, setSelected] = useState<Set<number>>(new Set());
 
     const targets = useMemo(() => filterFn(allImages), [allImages, filterFn]);
     const allSelected = targets.length > 0 && selected.size === targets.length;
-    const selectedList = useMemo(
-        () => targets.filter((p) => selected.has(p.mediaFileId)),
-        [targets, selected],
-    );
+    const selectedList = useMemo(() => targets.filter((p) => selected.has(p.mediaFileId)), [targets, selected]);
 
     const scope = selectedList.length > 0 ? selectedList : targets;
 
@@ -33,8 +27,7 @@ export const useIssueResolveState = (
         });
     };
 
-    const toggleAll = () =>
-        setSelected(allSelected ? new Set() : new Set(targets.map((p) => p.mediaFileId)));
+    const toggleAll = () => setSelected(allSelected ? new Set() : new Set(targets.map((p) => p.mediaFileId)));
 
     const clearSelection = () => setSelected(new Set());
 

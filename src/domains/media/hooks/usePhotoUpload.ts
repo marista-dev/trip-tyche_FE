@@ -39,7 +39,7 @@ export const usePhotoUpload = (tripKey: string) => {
 
     const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const inputEl = event.target;
-        const files = inputEl.files;
+        const { files } = inputEl;
 
         if (!files || files.length === 0) {
             inputEl.value = '';

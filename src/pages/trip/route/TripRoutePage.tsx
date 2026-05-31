@@ -3,23 +3,24 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { css } from '@emotion/react';
 import { useNavigate, useParams } from 'react-router-dom';
 
+import { removeDuplicateDates } from '@/domains/media/utils';
 import CinematicDroneMap from '@/domains/route/components/CinematicDroneMap';
 import MapControlButtons from '@/domains/route/components/MapControlButtons';
 import { useRoute } from '@/domains/route/hooks/queries';
 import { PinPoint } from '@/domains/route/types';
 import { sortPinPointByDate } from '@/domains/route/utils';
 import { addStartDateAndEndDateToImageDates } from '@/libs/utils/media';
-import { removeDuplicateDates } from '@/domains/media/utils';
 import BackButton from '@/shared/components/common/Button/BackButton';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import Map from '@/shared/components/map/Map';
 import { DEFAULT_CENTER, ZOOM_SCALE } from '@/shared/constants/map';
 import { ROUTES } from '@/shared/constants/route';
+import { STORAGE_KEYS } from '@/shared/constants/storage';
 import { MESSAGE } from '@/shared/constants/ui';
 import { useMapControl } from '@/shared/hooks/useMapControl';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
-const RESUME_KEY = 'cinematicResumeIdx';
+const RESUME_KEY = STORAGE_KEYS.CINEMATIC_RESUME_IDX;
 
 const TripRoutePage = () => {
     const { tripKey } = useParams();
@@ -35,12 +36,10 @@ const TripRoutePage = () => {
         }
         return { latitude: DEFAULT_CENTER.latitude, longitude: DEFAULT_CENTER.longitude };
     }, [result]);
-    const {
-        mapStatus,
-        isMapScriptLoaded,
-        isMapScriptLoadError,
-        handleMapRender,
-    } = useMapControl(ZOOM_SCALE.DEFAULT, initialCenter);
+    const { mapStatus, isMapScriptLoaded, isMapScriptLoadError, handleMapRender } = useMapControl(
+        ZOOM_SCALE.DEFAULT,
+        initialCenter,
+    );
 
     const [pinPoints, setPinPoints] = useState<PinPoint[]>([]);
     const [tripStartDate, setTripStartDate] = useState('');
@@ -79,12 +78,15 @@ const TripRoutePage = () => {
         }
     }, [result, navigate, showToast]);
 
-    const handlePhotoMarkerClick = useCallback((idx: number) => {
-        const pinPoint = pinPoints[idx];
-        if (!pinPoint) return;
-        sessionStorage.setItem(RESUME_KEY, String(idx));
-        navigate(ROUTES.PATH.TRIP.IMAGE.BY_PINPOINT(tripKey!, pinPoint.pinPointId));
-    }, [pinPoints, navigate, tripKey]);
+    const handlePhotoMarkerClick = useCallback(
+        (idx: number) => {
+            const pinPoint = pinPoints[idx];
+            if (!pinPoint) return;
+            sessionStorage.setItem(RESUME_KEY, String(idx));
+            navigate(ROUTES.PATH.TRIP.IMAGE.BY_PINPOINT(tripKey!, pinPoint.pinPointId));
+        },
+        [pinPoints, navigate, tripKey],
+    );
 
     const handleFlightStart = useCallback((targetIdx: number) => {
         setProgressIdx(targetIdx);
@@ -152,7 +154,7 @@ const TripRoutePage = () => {
 
     const handleDateViewClick = useCallback(() => {
         const dates = addStartDateAndEndDateToImageDates(tripStartDate, tripEndDate, imageDates);
-        sessionStorage.setItem('imageDates', JSON.stringify(dates));
+        sessionStorage.setItem(STORAGE_KEYS.IMAGE_DATES, JSON.stringify(dates));
         if (dates.length > 0) {
             navigate(ROUTES.PATH.TRIP.IMAGE.BY_DATE(tripKey!, dates[0]));
         }
@@ -167,7 +169,7 @@ const TripRoutePage = () => {
         return null;
     }
 
-    const startFromIdx = jumpStartIdx !== null ? jumpStartIdx : (tourKey === 0 ? initialResumeIdx : 0);
+    const startFromIdx = jumpStartIdx !== null ? jumpStartIdx : tourKey === 0 ? initialResumeIdx : 0;
     const currentPinPointDate = pinPoints[progressIdx]?.recordDate;
 
     return (

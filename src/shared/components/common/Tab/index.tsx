@@ -1,5 +1,7 @@
 import { css } from '@emotion/react';
 
+import { COLORS } from '@/shared/constants/style';
+
 interface TabProps {
     isActive: boolean;
     title: string;
@@ -28,13 +30,15 @@ const tab = css`
     color: #64748b;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
-    transition: color 0.2s ease, border-color 0.2s ease;
+    transition:
+        color 0.2s ease,
+        border-color 0.2s ease;
 `;
 
 const activeTab = css`
-    color: #0071e3;
+    color: ${COLORS.PRIMARY};
     font-weight: 600;
-    border-bottom: 2px solid #0071e3;
+    border-bottom: 2px solid ${COLORS.PRIMARY};
 `;
 
 export default Tab;

@@ -60,22 +60,13 @@ const MapControlButtons = ({
     return (
         <div css={barStyle}>
             {/* 날짜별 보기 */}
-            <button
-                css={iconBtnStyle}
-                onClick={handler.handleDateViewClick}
-                aria-label="날짜별 사진 보기"
-            >
+            <button css={iconBtnStyle} onClick={handler.handleDateViewClick} aria-label='날짜별 사진 보기'>
                 <CalendarDays size={18} />
             </button>
 
             {/* 일시정지 중에만 — 이전 핀 */}
             {showNav && (
-                <button
-                    css={navBtnStyle}
-                    onClick={handler.handlePrevPin}
-                    disabled={isFirst}
-                    aria-label="이전 핀"
-                >
+                <button css={navBtnStyle} onClick={handler.handlePrevPin} disabled={isFirst} aria-label='이전 핀'>
                     <ChevronLeft size={16} />
                 </button>
             )}
@@ -91,22 +82,13 @@ const MapControlButtons = ({
 
             {/* 일시정지 중에만 — 다음 핀 */}
             {showNav && (
-                <button
-                    css={navBtnStyle}
-                    onClick={handler.handleNextPin}
-                    disabled={isLast}
-                    aria-label="다음 핀"
-                >
+                <button css={navBtnStyle} onClick={handler.handleNextPin} disabled={isLast} aria-label='다음 핀'>
                     <ChevronRight size={16} />
                 </button>
             )}
 
             {/* 일시정지 / 재생 / 다시 재생 — 상태 기반 */}
-            <button
-                css={actionBtnStyle}
-                onClick={actionHandler}
-                aria-label={actionLabel}
-            >
+            <button css={actionBtnStyle} onClick={actionHandler} aria-label={actionLabel}>
                 <ActionIcon size={15} />
                 {actionLabel}
             </button>
@@ -119,10 +101,10 @@ const barStyle = css`
     bottom: calc(12px + env(safe-area-inset-bottom, 0px));
     left: 16px;
     right: 16px;
-    background: rgba(10, 10, 20, 0.80);
+    background: rgba(10, 10, 20, 0.8);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 20px;
     padding: 10px 12px;
     display: flex;
@@ -135,7 +117,7 @@ const iconBtnStyle = css`
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.10);
+    background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.12);
     color: rgba(255, 255, 255, 0.85);
     display: flex;
@@ -156,14 +138,16 @@ const navBtnStyle = css`
     height: 32px;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     color: rgba(255, 255, 255, 0.85);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     cursor: pointer;
-    transition: background 0.15s, opacity 0.15s;
+    transition:
+        background 0.15s,
+        opacity 0.15s;
     -webkit-tap-highlight-color: transparent;
 
     &:active:not(:disabled) {

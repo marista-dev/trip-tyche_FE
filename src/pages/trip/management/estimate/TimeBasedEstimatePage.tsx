@@ -49,9 +49,7 @@ const TimeBasedEstimatePage = () => {
             if (!current) return true;
             return !hasValidLocation({ latitude: current.latitude, longitude: current.longitude });
         });
-        return [...stillUnresolved].sort(
-            (a, b) => new Date(a.recordDate).getTime() - new Date(b.recordDate).getTime(),
-        );
+        return [...stillUnresolved].sort((a, b) => new Date(a.recordDate).getTime() - new Date(b.recordDate).getTime());
     }, [targets, pool]);
 
     const [activeId, setActiveId] = useState<number | null>(null);

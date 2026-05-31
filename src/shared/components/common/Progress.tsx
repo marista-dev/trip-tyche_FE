@@ -53,7 +53,11 @@ const getStepProgressFillStyle = (percentage: number, completed: boolean, size: 
     width: 100%;
     height: 100%;
     border-radius: 9999px;
-    background-color: ${size === 'lg' ? COLORS.PROGRESS.BLUE : completed ? COLORS.PROGRESS.GREEN : COLORS.PROGRESS.BLUE};
+    background-color: ${size === 'lg'
+        ? COLORS.PROGRESS.BLUE
+        : completed
+          ? COLORS.PROGRESS.GREEN
+          : COLORS.PROGRESS.BLUE};
     transform: scaleX(${percentage / 100});
     transform-origin: left;
     transition: transform 0.3s ease;

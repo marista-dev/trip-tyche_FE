@@ -6,6 +6,7 @@ import { easeInOutCubic, easeOutQuad } from '@/domains/route/easing';
 import { PinPoint } from '@/domains/route/types';
 import { bearing as calcBearing, calculateDistance } from '@/domains/route/utils';
 import { GOOGLE_MAPS_MAP_ID } from '@/shared/constants/map';
+import { COLORS } from '@/shared/constants/style';
 
 interface Props {
     pinPoints: PinPoint[];
@@ -39,7 +40,10 @@ function buildPhotoContent(mediaLink: string, onClick: () => void): HTMLElement 
     img.src = mediaLink;
     img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none;';
     wrapper.appendChild(img);
-    wrapper.onclick = (e) => { e.stopPropagation(); onClick(); };
+    wrapper.onclick = (e) => {
+        e.stopPropagation();
+        onClick();
+    };
     requestAnimationFrame(() => {
         wrapper.style.transform = 'translateY(-14px) scale(1)';
         wrapper.style.opacity = '1';
@@ -114,11 +118,27 @@ const CinematicDroneMap = ({
     // 직전 segment 모드 추적 — hold→hold면 도착 settle 짧게, wide면 줌인 보정 필요
     const lastModeRef = useRef<SegmentMode>('wide');
     const pausedRef = useRef(isPaused);
-    const callbacksRef = useRef({ onFlightStart, onDwellStart, onDwellEnd, onPhotoMarkerClick, onComplete, onVectorUnavailable });
+    const callbacksRef = useRef({
+        onFlightStart,
+        onDwellStart,
+        onDwellEnd,
+        onPhotoMarkerClick,
+        onComplete,
+        onVectorUnavailable,
+    });
 
-    useEffect(() => { pausedRef.current = isPaused; }, [isPaused]);
     useEffect(() => {
-        callbacksRef.current = { onFlightStart, onDwellStart, onDwellEnd, onPhotoMarkerClick, onComplete, onVectorUnavailable };
+        pausedRef.current = isPaused;
+    }, [isPaused]);
+    useEffect(() => {
+        callbacksRef.current = {
+            onFlightStart,
+            onDwellStart,
+            onDwellEnd,
+            onPhotoMarkerClick,
+            onComplete,
+            onVectorUnavailable,
+        };
     }, [onFlightStart, onDwellStart, onDwellEnd, onPhotoMarkerClick, onComplete, onVectorUnavailable]);
 
     useEffect(() => {
@@ -148,7 +168,7 @@ const CinematicDroneMap = ({
                         icon: {
                             path: google.maps.SymbolPath.CIRCLE,
                             scale: 3.5,
-                            fillColor: '#0071e3',
+                            fillColor: COLORS.PRIMARY,
                             fillOpacity: 1,
                             strokeColor: '#ffffff',
                             strokeWeight: 1,
@@ -163,7 +183,7 @@ const CinematicDroneMap = ({
                             scale: 7,
                             fillColor: '#ffffff',
                             fillOpacity: 1,
-                            strokeColor: '#0071e3',
+                            strokeColor: COLORS.PRIMARY,
                             strokeWeight: 2.5,
                         },
                         offset: '100%',
@@ -206,13 +226,14 @@ const CinematicDroneMap = ({
                 return;
             }
             try {
-                const { AdvancedMarkerElement, PinElement } =
-                    (await google.maps.importLibrary('marker')) as google.maps.MarkerLibrary;
+                const { AdvancedMarkerElement, PinElement } = (await google.maps.importLibrary(
+                    'marker',
+                )) as google.maps.MarkerLibrary;
                 if (cancelledRef.current) return;
                 pinPoints.forEach((p) => {
                     const pin = new PinElement({
                         scale: 1.3,
-                        background: '#0071e3',
+                        background: COLORS.PRIMARY,
                         borderColor: '#0055d4',
                         glyphColor: '#ffffff',
                     });
@@ -231,7 +252,10 @@ const CinematicDroneMap = ({
 
         const sleep = (ms: number): Promise<void> =>
             new Promise((resolve) => {
-                if (cancelledRef.current) { resolve(); return; }
+                if (cancelledRef.current) {
+                    resolve();
+                    return;
+                }
                 setTimeout(resolve, ms);
             });
 
@@ -247,11 +271,20 @@ const CinematicDroneMap = ({
                 let delta = targetHeading - startHeading;
                 if (delta > 180) delta -= 360;
                 if (delta < -180) delta += 360;
-                if (Math.abs(delta) < 0.5) { resolve(); return; }
+                if (Math.abs(delta) < 0.5) {
+                    resolve();
+                    return;
+                }
                 const startTime = performance.now();
                 const tick = (now: number) => {
-                    if (cancelledRef.current) { resolve(); return; }
-                    if (pausedRef.current) { resolve(); return; }
+                    if (cancelledRef.current) {
+                        resolve();
+                        return;
+                    }
+                    if (pausedRef.current) {
+                        resolve();
+                        return;
+                    }
                     const t = Math.min((now - startTime) / durationMs, 1);
                     const eased = easeInOutCubic(t);
                     map.moveCamera({
@@ -272,7 +305,10 @@ const CinematicDroneMap = ({
                 const startHeading = map.getHeading() ?? 0;
                 const startTime = performance.now();
                 const tick = (now: number) => {
-                    if (cancelledRef.current) { resolve(); return; }
+                    if (cancelledRef.current) {
+                        resolve();
+                        return;
+                    }
                     const t = Math.min((now - startTime) / durationMs, 1);
                     // easeOutQuad: 도착 즉시 빠르게 시작, 끝에서 부드럽게 정착 — 정지감 제거
                     const eased = easeOutQuad(t);
@@ -299,7 +335,10 @@ const CinematicDroneMap = ({
                 const startZoom = map.getZoom() ?? 17;
                 const startTime = performance.now();
                 const tick = (now: number) => {
-                    if (cancelledRef.current) { resolve(); return; }
+                    if (cancelledRef.current) {
+                        resolve();
+                        return;
+                    }
                     const t = Math.min((now - startTime) / durationMs, 1);
                     const eased = easeInOutCubic(t);
                     const z = lerp(startZoom, targetZoom, eased);
@@ -460,9 +499,15 @@ const CinematicDroneMap = ({
 
         const restoreCamera = (snap: CameraSnap, durationMs: number): Promise<void> => {
             return new Promise((resolve) => {
-                if (!isVectorRef.current) { resolve(); return; }
+                if (!isVectorRef.current) {
+                    resolve();
+                    return;
+                }
                 const startCenter = map.getCenter();
-                if (!startCenter) { resolve(); return; }
+                if (!startCenter) {
+                    resolve();
+                    return;
+                }
                 const startLat = startCenter.lat();
                 const startLng = startCenter.lng();
                 const startZoom = map.getZoom() ?? snap.zoom;
@@ -473,11 +518,17 @@ const CinematicDroneMap = ({
                 if (dh < -180) dh += 360;
                 const startTime = performance.now();
                 const tick = (now: number) => {
-                    if (cancelledRef.current) { resolve(); return; }
+                    if (cancelledRef.current) {
+                        resolve();
+                        return;
+                    }
                     const t = Math.min((now - startTime) / durationMs, 1);
                     const eased = easeInOutCubic(t);
                     map.moveCamera({
-                        center: { lat: lerp(startLat, snap.center.lat, eased), lng: lerp(startLng, snap.center.lng, eased) },
+                        center: {
+                            lat: lerp(startLat, snap.center.lat, eased),
+                            lng: lerp(startLng, snap.center.lng, eased),
+                        },
                         zoom: lerp(startZoom, snap.zoom, eased),
                         heading: startHeading + dh * eased,
                         tilt: lerp(startTilt, snap.tilt, eased),
@@ -637,7 +688,9 @@ const CinematicDroneMap = ({
         const isDetermined = rt === google.maps.RenderingType.VECTOR || rt === google.maps.RenderingType.RASTER;
         const listeners: google.maps.MapsEventListener[] = [];
         if (isDetermined) {
-            setTimeout(() => { if (!cancelledRef.current) checkAndStart(); }, 50);
+            setTimeout(() => {
+                if (!cancelledRef.current) checkAndStart();
+            }, 50);
         } else {
             // UNINITIALIZED — 확정될 때까지 대기. 가장 빨리 발생하는 이벤트로 시작.
             const oneShot = () => {
@@ -655,7 +708,9 @@ const CinematicDroneMap = ({
             if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
             drawnPolylineRef.current?.setMap(null);
             remainingPolylineRef.current?.setMap(null);
-            markersRef.current.forEach((m) => { m.map = null; });
+            markersRef.current.forEach((m) => {
+                m.map = null;
+            });
             markersRef.current = [];
             pinContentsRef.current = [];
         };

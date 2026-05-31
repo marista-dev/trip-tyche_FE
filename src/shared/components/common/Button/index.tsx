@@ -57,7 +57,9 @@ const baseStyles = css`
     font-size: 17px;
     font-weight: 400;
     letter-spacing: -0.374px;
-    transition: background-color 0.15s ease, opacity 0.15s ease;
+    transition:
+        background-color 0.15s ease,
+        opacity 0.15s ease;
     -webkit-tap-highlight-color: transparent;
     &:active {
         opacity: 0.85;
