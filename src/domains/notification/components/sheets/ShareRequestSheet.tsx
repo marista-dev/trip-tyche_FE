@@ -3,6 +3,7 @@ import { Plane } from 'lucide-react';
 
 import { buttonRow, outlineButton, sheetSubtitle, sheetTitle } from './styles';
 import { Notification } from '@/domains/notification/types';
+import { COLORS } from '@/shared/constants/style';
 
 interface ShareRequestSheetProps {
     notification: Notification;
@@ -102,7 +103,7 @@ const joinButton = css`
     flex: 2;
     padding: 12px 0;
     border-radius: 12px;
-    background: #0071e3;
+    background: ${COLORS.PRIMARY};
     border: none;
     color: #fff;
     font-size: 14px;

@@ -1,5 +1,7 @@
 import { css } from '@emotion/react';
 
+import { COLORS } from '@/shared/constants/style';
+
 export const sheetTitle = css`
     margin: 0;
     font-size: 18px;
@@ -19,7 +21,7 @@ export const primaryButton = css`
     width: 100%;
     padding: 12px 0;
     border-radius: 12px;
-    background: #0071e3;
+    background: ${COLORS.PRIMARY};
     border: none;
     color: #fff;
     font-size: 14px;
@@ -45,7 +47,7 @@ export const accentButton = css`
     flex: 2;
     padding: 12px 0;
     border-radius: 12px;
-    background: #0071e3;
+    background: ${COLORS.PRIMARY};
     border: none;
     color: #fff;
     font-size: 14px;

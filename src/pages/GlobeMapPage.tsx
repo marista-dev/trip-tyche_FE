@@ -25,11 +25,12 @@ import { toResult } from '@/libs/apis/shared/utils';
 import { validateUserNickName } from '@/libs/utils/validate';
 import { IMAGE_PLACEHOLDER } from '@/shared/constants/image';
 import { ROUTES } from '@/shared/constants/route';
+import { COLORS } from '@/shared/constants/style';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
 /* ─── design tokens ─────────────────────────────────────── */
-const ACCENT = '#0ea5e9';
-const ACCENT_HEX = 0x0ea5e9;
+const { ACCENT } = COLORS;
+const ACCENT_HEX = 0x0ea5e9; // COLORS.ACCENT('#0ea5e9')의 숫자 표현
 
 /* ─── globe constants ───────────────────────────────────── */
 const R = 0.78;
@@ -1389,4 +1390,3 @@ const nicknameSubmitBtn = (active: boolean) => css`
         transform: ${active ? 'scale(0.98)' : 'none'};
     }
 `;
-/* eslint-disable @typescript-eslint/no-unused-vars */

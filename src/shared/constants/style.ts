@@ -1,9 +1,12 @@
 import { ThemeType } from '@/shared/types';
 
-export const FONT_FAMILY = "'SF Pro Text', 'SF Pro Display', 'Apple SD Gothic Neo', 'Pretendard', 'Noto Sans KR', 'Helvetica Neue', Helvetica, Arial, sans-serif";
+export const FONT_FAMILY =
+    "'SF Pro Text', 'SF Pro Display', 'Apple SD Gothic Neo', 'Pretendard', 'Noto Sans KR', 'Helvetica Neue', Helvetica, Arial, sans-serif";
 
 export const COLORS = {
     PRIMARY: '#0071e3',
+    /** 지도/지구본 전용 액센트(sky-500). PRIMARY와 의도적으로 구분된 밝은 블루. */
+    ACCENT: '#0ea5e9',
     SECONDARY: '#1d1d1f',
     TICKET_BAND: '#0f172a',
     PRIMARY_HOVER: '#0077ed',

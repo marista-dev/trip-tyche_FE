@@ -5,13 +5,14 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import { getDays } from '@/domains/trip/utils';
 import { ROUTES } from '@/shared/constants/route';
+import { COLORS } from '@/shared/constants/style';
 
 interface DateSelectorProps {
     selectedDate: string;
     dates: string[];
 }
 
-const ACCENT = '#0071e3';
+const ACCENT = COLORS.PRIMARY;
 
 const DateSelector = React.memo(({ selectedDate, dates }: DateSelectorProps) => {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -111,8 +112,11 @@ const pillStyle = (isActive: boolean) => css`
     box-shadow: ${isActive
         ? '0 6px 14px -8px rgba(0, 113, 227, 0.5), 0 1px 0 rgba(255, 255, 255, 0.35) inset'
         : '0 1px 1px rgba(15, 23, 42, 0.03)'};
-    transition: transform 240ms cubic-bezier(0.32, 0.72, 0, 1), background 180ms ease,
-        color 180ms ease, box-shadow 220ms ease;
+    transition:
+        transform 240ms cubic-bezier(0.32, 0.72, 0, 1),
+        background 180ms ease,
+        color 180ms ease,
+        box-shadow 220ms ease;
 
     &:active {
         transform: scale(0.96);

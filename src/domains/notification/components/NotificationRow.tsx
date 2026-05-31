@@ -9,6 +9,7 @@ import {
 } from '@/domains/notification/constants';
 import { Notification } from '@/domains/notification/types';
 import { formatKoreanTime } from '@/libs/utils/date';
+import { COLORS } from '@/shared/constants/style';
 
 interface NotificationRowProps {
     notification: Notification;
@@ -137,8 +138,8 @@ const checkbox = (selected: boolean) => css`
     height: 22px;
     margin-top: 9px;
     border-radius: 50%;
-    border: 1.5px solid ${selected ? '#0071e3' : 'rgba(0, 0, 0, 0.2)'};
-    background: ${selected ? '#0071e3' : 'transparent'};
+    border: 1.5px solid ${selected ? COLORS.PRIMARY : 'rgba(0, 0, 0, 0.2)'};
+    background: ${selected ? COLORS.PRIMARY : 'transparent'};
     color: #fff;
     display: flex;
     align-items: center;
@@ -157,7 +158,7 @@ const iconCircle = (isUnread: boolean) => css`
     align-items: center;
     justify-content: center;
     background: ${isUnread ? 'rgba(0, 113, 227, 0.10)' : '#f1f5f9'};
-    color: ${isUnread ? '#0071e3' : '#94a3b8'};
+    color: ${isUnread ? COLORS.PRIMARY : '#94a3b8'};
 `;
 
 const contentCol = css`
@@ -224,7 +225,7 @@ const baseActionBtn = css`
 
 const acceptBtn = css`
     ${baseActionBtn};
-    background: #0071e3;
+    background: ${COLORS.PRIMARY};
     color: #ffffff;
     border: none;
 `;
@@ -258,7 +259,7 @@ const unreadDot = css`
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: #0071e3;
+    background: ${COLORS.PRIMARY};
     flex-shrink: 0;
     box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.12);
 `;

@@ -1,6 +1,7 @@
 import { CheckCircle2, ImageMinus, ImagePlus, LucideIcon, PenLine, Trash2, UserPlus, XCircle } from 'lucide-react';
 
 import { BannerMessage, BannerType } from './types';
+import { COLORS } from '@/shared/constants/style';
 
 export const BANNER_ICON: Record<BannerType, LucideIcon> = {
     SHARED_REQUEST: UserPlus,
@@ -54,7 +55,7 @@ export const BANNER_DESIGN = {
     icon: {
         size: 40,
         background: 'rgba(0,113,227,0.10)',
-        color: '#0071e3',
+        color: COLORS.PRIMARY,
         svgSize: 18,
     },
     surface: {
@@ -67,12 +68,12 @@ export const BANNER_DESIGN = {
     text: {
         title: { size: 14, weight: 700, color: '#111', letterSpacing: -0.2 },
         body: { size: 12, color: '#555', lineHeight: 1.4 },
-        time: { size: 11, weight: 600, color: '#0071e3' },
+        time: { size: 11, weight: 600, color: COLORS.PRIMARY },
     },
     boarding: { background: '#0f172a', radius: 14, padding: 16 },
     actions: {
         reject: { bg: 'rgba(0,0,0,0.04)', color: '#111' },
-        accept: { bg: '#0071e3', color: '#fff', shadow: '0 6px 16px rgba(0,113,227,0.35)' },
+        accept: { bg: COLORS.PRIMARY, color: '#fff', shadow: '0 6px 16px rgba(0,113,227,0.35)' },
     },
     timing: { autoDismissMs: 4000, swipeThresholdPx: 40 },
 } as const;

@@ -7,6 +7,7 @@ import { hasValidLocation } from '@/libs/utils/validate';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import Map from '@/shared/components/map/Map';
 import { DEFAULT_CENTER, ZOOM_SCALE } from '@/shared/constants/map';
+import { COLORS } from '@/shared/constants/style';
 import { Location, MapType } from '@/shared/types/map';
 
 interface MultiMarkerMapProps {
@@ -135,7 +136,7 @@ const pulseWrap = css`
 const pulseRing = (delaySeconds: number) => css`
     position: absolute;
     inset: 0;
-    border: 1.5px solid #0ea5e9;
+    border: 1.5px solid ${COLORS.ACCENT};
     border-radius: 50%;
     opacity: 0;
     animation: ${pinPulse} 1.8s linear infinite;
@@ -147,7 +148,7 @@ const pulseDot = css`
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    background: #0ea5e9;
+    background: ${COLORS.ACCENT};
     border: 2px solid #fff;
     box-shadow:
         0 0 0 1px rgba(14, 165, 233, 0.35),

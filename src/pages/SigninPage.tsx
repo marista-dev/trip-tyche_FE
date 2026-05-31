@@ -8,6 +8,7 @@ import LoginButton from '@/domains/user/components/LoginButton';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import { OAUTH_CONFIG } from '@/libs/apis/shared/constants';
 import { ROUTES } from '@/shared/constants/route';
+import { COLORS } from '@/shared/constants/style';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
 type Step = 0 | 1;
@@ -57,13 +58,13 @@ const SigninPage = () => {
         <main css={wrap}>
             {/* ── Step 1 · Hero ── */}
             <section css={[frame, step === 0 ? frameOn : frameOff]} aria-hidden={step !== 0}>
-                <img src={backgroundImage} css={heroBg} alt="" aria-hidden="true" />
-                <div css={heroGrad} aria-hidden="true" />
+                <img src={backgroundImage} css={heroBg} alt='' aria-hidden='true' />
+                <div css={heroGrad} aria-hidden='true' />
                 <div css={heroInner}>
                     <div css={brandRow}>
-                        <span css={brandMark} aria-hidden="true">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff">
-                                <path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 00-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5L21 16z" />
+                        <span css={brandMark} aria-hidden='true'>
+                            <svg width='12' height='12' viewBox='0 0 24 24' fill='#fff'>
+                                <path d='M21 16v-2l-8-5V3.5a1.5 1.5 0 00-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5L21 16z' />
                             </svg>
                         </span>
                         <span css={brandText}>TRIPTYCHE</span>
@@ -72,23 +73,30 @@ const SigninPage = () => {
                     <div css={heroCopy}>
                         <p css={eyebrow}>여행의 기억을 담다</p>
                         <h1 css={h1}>
-                            사진 한 장으로<br />
-                            그려지는<br />
+                            사진 한 장으로
+                            <br />
+                            그려지는
+                            <br />
                             나만의 여행 지도
                         </h1>
                         <p css={lede}>
                             찍는 순간마다 자동 완성되는 여행 티켓.
-                            <br />위치, 날짜, 경로를 모두 담아드려요.
+                            <br />
+                            위치, 날짜, 경로를 모두 담아드려요.
                         </p>
-                        <button
-                            type="button"
-                            css={cta}
-                            onClick={() => setStep(1)}
-                            aria-label="로그인 화면으로 이동"
-                        >
+                        <button type='button' css={cta} onClick={() => setStep(1)} aria-label='로그인 화면으로 이동'>
                             지금 시작하기
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M5 12h14M13 5l7 7-7 7" />
+                            <svg
+                                width='14'
+                                height='14'
+                                viewBox='0 0 24 24'
+                                fill='none'
+                                stroke='currentColor'
+                                strokeWidth='2.5'
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                            >
+                                <path d='M5 12h14M13 5l7 7-7 7' />
                             </svg>
                         </button>
                     </div>
@@ -97,31 +105,37 @@ const SigninPage = () => {
 
             {/* ── Step 2 · Auth ── */}
             <section css={[frame, step === 1 ? frameOn : frameOff]} aria-hidden={step !== 1}>
-                <img src={backgroundImage} css={authBg} alt="" aria-hidden="true" />
-                <div css={authOvl} aria-hidden="true" />
+                <img src={backgroundImage} css={authBg} alt='' aria-hidden='true' />
+                <div css={authOvl} aria-hidden='true' />
                 <div css={authInner}>
-                    <button
-                        type="button"
-                        css={backBtn}
-                        onClick={() => setStep(0)}
-                        aria-label="이전 화면으로"
-                    >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="15 18 9 12 15 6" />
+                    <button type='button' css={backBtn} onClick={() => setStep(0)} aria-label='이전 화면으로'>
+                        <svg
+                            width='18'
+                            height='18'
+                            viewBox='0 0 24 24'
+                            fill='none'
+                            stroke='#fff'
+                            strokeWidth='2'
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                        >
+                            <polyline points='15 18 9 12 15 6' />
                         </svg>
                     </button>
 
                     <div css={authBody}>
                         <p css={authEyebrow}>환영합니다</p>
                         <h2 css={h2}>
-                            간편하게<br />시작해보세요
+                            간편하게
+                            <br />
+                            시작해보세요
                         </h2>
 
                         <div css={btnStack}>
-                            <LoginButton provider="kakao" onClick={() => handleLoginButtonClick('KAKAO')} />
-                            <LoginButton provider="google" onClick={() => handleLoginButtonClick('GOOGLE')} />
+                            <LoginButton provider='kakao' onClick={() => handleLoginButtonClick('KAKAO')} />
+                            <LoginButton provider='google' onClick={() => handleLoginButtonClick('GOOGLE')} />
 
-                            <div css={divider} aria-hidden="true">
+                            <div css={divider} aria-hidden='true'>
                                 <span css={dividerLine} />
                                 <span css={dividerText}>또는</span>
                                 <span css={dividerLine} />
@@ -130,7 +144,7 @@ const SigninPage = () => {
                             <GuestButton onClick={handleGuestClick} />
 
                             {import.meta.env.DEV && (
-                                <button type="button" css={devBtn} onClick={handleDevLogin}>
+                                <button type='button' css={devBtn} onClick={handleDevLogin}>
                                     DEV 로그인
                                 </button>
                             )}
@@ -193,12 +207,7 @@ const heroBg = css`
 const heroGrad = css`
     position: absolute;
     inset: 0;
-    background: linear-gradient(
-        180deg,
-        rgba(0, 5, 20, 0.15) 0%,
-        rgba(0, 5, 20, 0.75) 70%,
-        rgba(0, 5, 20, 0.92) 100%
-    );
+    background: linear-gradient(180deg, rgba(0, 5, 20, 0.15) 0%, rgba(0, 5, 20, 0.75) 70%, rgba(0, 5, 20, 0.92) 100%);
 `;
 
 const heroInner = css`
@@ -219,7 +228,7 @@ const brandMark = css`
     width: 22px;
     height: 22px;
     border-radius: 7px;
-    background: #0071e3;
+    background: ${COLORS.PRIMARY};
     display: flex;
     align-items: center;
     justify-content: center;
@@ -279,7 +288,9 @@ const cta = css`
     gap: 10px;
     cursor: pointer;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
 
     @media (hover: hover) {
         &:hover {
@@ -418,7 +429,9 @@ const devBtn = css`
     letter-spacing: 1.5px;
     text-transform: uppercase;
     cursor: pointer;
-    transition: border-color 0.2s, color 0.2s;
+    transition:
+        border-color 0.2s,
+        color 0.2s;
 
     @media (hover: hover) {
         &:hover {

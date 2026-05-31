@@ -1,7 +1,9 @@
+import { COLORS } from '@/shared/constants/style';
+
 export const MANAGE_TOKENS = {
     bg: '#fafafa',
     card: '#ffffff',
-    accent: '#0071e3',
+    accent: COLORS.PRIMARY,
     accentSoft: 'rgba(0,113,227,0.10)',
     destructive: '#dc2626',
     destructiveSoft: '#fef2f2',

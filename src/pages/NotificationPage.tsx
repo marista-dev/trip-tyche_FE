@@ -16,6 +16,7 @@ import Header from '@/shared/components/common/Header';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import TabNavigation from '@/shared/components/common/Tab/TabNavigation';
 import { ROUTES } from '@/shared/constants/route';
+import { COLORS } from '@/shared/constants/style';
 import { MESSAGE } from '@/shared/constants/ui';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
@@ -315,7 +316,7 @@ const markAllButton = (disabled: boolean) => css`
     border-radius: 8px;
     background: transparent;
     border: none;
-    color: ${disabled ? '#cbd5e1' : '#0071e3'};
+    color: ${disabled ? '#cbd5e1' : COLORS.PRIMARY};
     font-size: 13px;
     font-weight: 600;
     cursor: ${disabled ? 'default' : 'pointer'};
@@ -331,7 +332,7 @@ const textActionBtn = css`
     border-radius: 8px;
     background: transparent;
     border: none;
-    color: #0071e3;
+    color: ${COLORS.PRIMARY};
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -363,7 +364,7 @@ const selectAllBtn = css`
     padding: 6px 4px;
     background: transparent;
     border: none;
-    color: #0071e3;
+    color: ${COLORS.PRIMARY};
     font-size: 13px;
     font-weight: 600;
     font-family: inherit;
