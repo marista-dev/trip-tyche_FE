@@ -12,7 +12,6 @@ import { ROUTES } from '@/shared/constants/route';
 
 const GlobeMapPage = lazy(() => import('@/pages/GlobeMapPage'));
 const MainPage = lazy(() => import('@/pages/MainPage'));
-const DevPreviewPage = lazy(() => import('@/pages/DevPreviewPage'));
 const SettingPage = lazy(() => import('@/pages/SettingPage'));
 const NotificationPage = lazy(() => import('@/pages/NotificationPage'));
 const TripImageUploadPage = lazy(() => import('@/pages/trip/management/TripImageUploadPage'));
@@ -58,14 +57,6 @@ const router = createBrowserRouter([
                 path: ROUTES.PATH.TICKETS,
                 element: protect(<MainPage />),
             },
-            ...(import.meta.env.DEV
-                ? [
-                      {
-                          path: 'preview',
-                          element: protect(<DevPreviewPage />),
-                      },
-                  ]
-                : []),
             {
                 path: ROUTES.PATH.SETTING,
                 element: protect(<SettingPage />),

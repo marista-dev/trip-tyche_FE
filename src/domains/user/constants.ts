@@ -6,7 +6,7 @@ export const NICKNAME_FORM = {
 
 /**
  * 설정 페이지 닉네임 중앙 다이얼로그(NicknameDialog) 전용 규칙.
- * 기존 NickNameForm(가입/생성 플로우, 2~10자)과 분리해 SettingPage 수정 경로에만 적용한다.
+ * 가입/생성 플로우의 NICKNAME_FORM(2~10자)과 분리해 SettingPage 수정 경로에만 적용한다.
  * 디자인 핸드오프 기준: 2~12자, 한글/영문/숫자/_ 허용.
  */
 export const NICKNAME_RULE = {
