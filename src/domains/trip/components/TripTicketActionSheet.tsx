@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 
 import { css } from '@emotion/react';
 import { ChevronRight, Edit, Image, Share2, Trash2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 import { getIataFromCountryString } from '@/domains/trip/airport';
 import { TICKET } from '@/domains/trip/constants';
@@ -82,37 +82,56 @@ const TripTicketActionSheet = ({
 
     const destinationIata = getIataFromCountryString(trip.country);
 
-    const actions = isOwner && !isGuest
-        ? [
-              { id: 'edit', label: '여행 정보 수정', sub: '제목, 날짜, 해시태그', Icon: Edit, tone: 'default' as const },
-              { id: 'photo', label: '사진 관리', sub: '추가 · 삭제 · 위치 수정', Icon: Image, tone: 'default' as const },
-              {
-                  id: 'share',
-                  label: '친구에게 공유',
-                  sub: '링크 복사 또는 앱으로 보내기',
-                  Icon: Share2,
-                  tone: 'default' as const,
-              },
-              { id: 'delete', label: '여행 삭제', sub: '복구할 수 없어요', Icon: Trash2, tone: 'danger' as const },
-          ]
-        : [
-              { id: 'edit', label: '정보 보기', sub: '제목, 날짜, 해시태그', Icon: Edit, tone: 'default' as const },
-              { id: 'photo', label: '사진 보기', sub: '추가 · 삭제 · 위치 수정', Icon: Image, tone: 'default' as const },
-              {
-                  id: 'share',
-                  label: '공유 정보',
-                  sub: '링크 복사 또는 앱으로 보내기',
-                  Icon: Share2,
-                  tone: 'default' as const,
-              },
-              {
-                  id: 'delete',
-                  label: '공유 해제',
-                  sub: '이 티켓에 더 이상 접근할 수 없어요',
-                  Icon: Trash2,
-                  tone: 'danger' as const,
-              },
-          ];
+    const actions =
+        isOwner && !isGuest
+            ? [
+                  {
+                      id: 'edit',
+                      label: '여행 정보 수정',
+                      sub: '제목, 날짜, 해시태그',
+                      Icon: Edit,
+                      tone: 'default' as const,
+                  },
+                  {
+                      id: 'photo',
+                      label: '사진 관리',
+                      sub: '추가 · 삭제 · 위치 수정',
+                      Icon: Image,
+                      tone: 'default' as const,
+                  },
+                  {
+                      id: 'share',
+                      label: '친구에게 공유',
+                      sub: '링크 복사 또는 앱으로 보내기',
+                      Icon: Share2,
+                      tone: 'default' as const,
+                  },
+                  { id: 'delete', label: '여행 삭제', sub: '복구할 수 없어요', Icon: Trash2, tone: 'danger' as const },
+              ]
+            : [
+                  { id: 'edit', label: '정보 보기', sub: '제목, 날짜, 해시태그', Icon: Edit, tone: 'default' as const },
+                  {
+                      id: 'photo',
+                      label: '사진 보기',
+                      sub: '추가 · 삭제 · 위치 수정',
+                      Icon: Image,
+                      tone: 'default' as const,
+                  },
+                  {
+                      id: 'share',
+                      label: '공유 정보',
+                      sub: '링크 복사 또는 앱으로 보내기',
+                      Icon: Share2,
+                      tone: 'default' as const,
+                  },
+                  {
+                      id: 'delete',
+                      label: '공유 해제',
+                      sub: '이 티켓에 더 이상 접근할 수 없어요',
+                      Icon: Trash2,
+                      tone: 'danger' as const,
+                  },
+              ];
 
     const handleAction = (id: string) => {
         onClose();
@@ -143,9 +162,9 @@ const TripTicketActionSheet = ({
                 `}
             />
             <div
-                role="dialog"
-                aria-modal="true"
-                aria-label="여행 액션 메뉴"
+                role='dialog'
+                aria-modal='true'
+                aria-label='여행 액션 메뉴'
                 css={css`
                     position: absolute;
                     left: 0;
@@ -162,7 +181,13 @@ const TripTicketActionSheet = ({
                 `}
             >
                 {/* Handle */}
-                <div css={css`display: flex; justify-content: center; padding: 10px 0 4px;`}>
+                <div
+                    css={css`
+                        display: flex;
+                        justify-content: center;
+                        padding: 10px 0 4px;
+                    `}
+                >
                     <div
                         css={css`
                             width: 40px;
@@ -196,12 +221,21 @@ const TripTicketActionSheet = ({
                         {trip.coverPhoto && (
                             <img
                                 src={trip.coverPhoto}
-                                alt=""
-                                css={css`width: 100%; height: 100%; object-fit: cover;`}
+                                alt=''
+                                css={css`
+                                    width: 100%;
+                                    height: 100%;
+                                    object-fit: cover;
+                                `}
                             />
                         )}
                     </div>
-                    <div css={css`min-width: 0; flex: 1;`}>
+                    <div
+                        css={css`
+                            min-width: 0;
+                            flex: 1;
+                        `}
+                    >
                         <div
                             css={css`
                                 font-size: 10px;
@@ -231,7 +265,13 @@ const TripTicketActionSheet = ({
                 </div>
 
                 {/* Action list */}
-                <ul css={css`list-style: none; margin: 0; padding: 4px 0;`}>
+                <ul
+                    css={css`
+                        list-style: none;
+                        margin: 0;
+                        padding: 4px 0;
+                    `}
+                >
                     {actions.map((action, i) => {
                         const isDanger = action.tone === 'danger';
                         return (
@@ -283,7 +323,12 @@ const TripTicketActionSheet = ({
                                     >
                                         <action.Icon size={18} strokeWidth={2} />
                                     </div>
-                                    <div css={css`flex: 1; min-width: 0;`}>
+                                    <div
+                                        css={css`
+                                            flex: 1;
+                                            min-width: 0;
+                                        `}
+                                    >
                                         <div
                                             css={css`
                                                 font-size: 14px;
@@ -305,7 +350,7 @@ const TripTicketActionSheet = ({
                                         </div>
                                     </div>
                                     {!isDanger && (
-                                        <ChevronRight size={16} strokeWidth={2} color="rgba(15, 23, 42, 0.25)" />
+                                        <ChevronRight size={16} strokeWidth={2} color='rgba(15, 23, 42, 0.25)' />
                                     )}
                                 </button>
                             </li>
@@ -314,7 +359,11 @@ const TripTicketActionSheet = ({
                 </ul>
 
                 {/* Cancel */}
-                <div css={css`padding: 4px 16px 0;`}>
+                <div
+                    css={css`
+                        padding: 4px 16px 0;
+                    `}
+                >
                     <button
                         onClick={onClose}
                         css={css`

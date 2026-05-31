@@ -4,11 +4,7 @@ import { useParams } from 'react-router-dom';
 
 import { DEFAULT_METADATA } from '@/domains/media/constants';
 import { useUploadSessionStore } from '@/domains/media/stores/useUploadSessionStore';
-import {
-    PresignedUrlResponse,
-    ClientImageFile,
-    MediaFileCategories,
-} from '@/domains/media/types';
+import { PresignedUrlResponse, ClientImageFile, MediaFileCategories } from '@/domains/media/types';
 import { filterWithoutDateMediaFile, filterWithoutLocationMediaFile } from '@/domains/media/utils';
 import { mediaAPI } from '@/libs/apis';
 import { convertHeicToJpg, extractMetadataFromImage, removeDuplicateImages } from '@/libs/utils/image';

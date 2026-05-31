@@ -3,8 +3,8 @@ import { useState } from 'react';
 import { css, keyframes } from '@emotion/react';
 import { Plus, Trash } from 'lucide-react';
 
-import ShareModal from '@/domains/share/components/ShareModal';
 import { useTripImages } from '@/domains/media/hooks/queries';
+import ShareModal from '@/domains/share/components/ShareModal';
 import { getIataFromCountryString } from '@/domains/trip/airport';
 import TripTicketActionSheet from '@/domains/trip/components/TripTicketActionSheet';
 import { TICKET } from '@/domains/trip/constants';
@@ -81,17 +81,13 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
                         <button
                             css={uncompletedActionStyle}
                             onClick={() => handler.edit(isCompletedTrip)}
-                            aria-label="여행 정보 이어서 작성하기"
+                            aria-label='여행 정보 이어서 작성하기'
                         >
-                            <Plus size={14} aria-hidden="true" /> 여행 정보 이어서 작성하기
+                            <Plus size={14} aria-hidden='true' /> 여행 정보 이어서 작성하기
                         </button>
-                        <div css={separatorStyle} aria-hidden="true" />
-                        <button
-                            css={uncompletedDeleteStyle}
-                            onClick={() => handler.delete()}
-                            aria-label="삭제하기"
-                        >
-                            <Trash size={14} aria-hidden="true" /> 삭제하기
+                        <div css={separatorStyle} aria-hidden='true' />
+                        <button css={uncompletedDeleteStyle} onClick={() => handler.delete()} aria-label='삭제하기'>
+                            <Trash size={14} aria-hidden='true' /> 삭제하기
                         </button>
                     </div>
                 </div>
@@ -100,9 +96,7 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
             <div onClick={handleCardClick} css={cardClickableStyle}>
                 {/* Photo Hero */}
                 <div css={photoHeroStyle(fallbackBg)}>
-                    {coverPhoto && (
-                        <img src={coverPhoto} alt={tripTitle} css={coverPhotoStyle} />
-                    )}
+                    {coverPhoto && <img src={coverPhoto} alt={tripTitle} css={coverPhotoStyle} />}
                     <div css={gradientTopStyle} />
                     <div css={gradientBottomStyle} />
 
@@ -137,18 +131,27 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
                             <div css={dashedLineStyle} />
                             {isAnimating && (
                                 <svg
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="#fff"
+                                    width='14'
+                                    height='14'
+                                    viewBox='0 0 24 24'
+                                    fill='#fff'
                                     css={planeTraverseStyle}
-                                    aria-hidden="true"
+                                    aria-hidden='true'
                                 >
-                                    <path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 00-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5L21 16z" />
+                                    <path d='M21 16v-2l-8-5V3.5a1.5 1.5 0 00-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5L21 16z' />
                                 </svg>
                             )}
                         </div>
-                        <div css={[routeCodeStyle, css`text-align: right;`]}>{destinationIata}</div>
+                        <div
+                            css={[
+                                routeCodeStyle,
+                                css`
+                                    text-align: right;
+                                `,
+                            ]}
+                        >
+                            {destinationIata}
+                        </div>
                     </div>
 
                     {/* Meta row */}
@@ -163,7 +166,16 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
                         </div>
                         <div>
                             <div css={metaLabelStyle}>PHOTOS</div>
-                            <div css={[metaValueStyle, css`color: ${COLORS.PRIMARY};`]}>{photosCount}</div>
+                            <div
+                                css={[
+                                    metaValueStyle,
+                                    css`
+                                        color: ${COLORS.PRIMARY};
+                                    `,
+                                ]}
+                            >
+                                {photosCount}
+                            </div>
                         </div>
                     </div>
 
@@ -174,13 +186,20 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
                                 .filter((tag) => tag !== '')
                                 .map((tag, i) => (
                                     <span key={i} css={tagChipStyle}>
-                                        <span css={css`color: ${COLORS.PRIMARY}; font-weight: 700;`}>#</span>
+                                        <span
+                                            css={css`
+                                                color: ${COLORS.PRIMARY};
+                                                font-weight: 700;
+                                            `}
+                                        >
+                                            #
+                                        </span>
                                         {tag}
                                     </span>
                                 ))}
                         </div>
                         <button
-                            aria-label="옵션 더보기"
+                            aria-label='옵션 더보기'
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setIsSheetOpen(true);
@@ -188,18 +207,18 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
                             css={moreButtonStyle}
                         >
                             <svg
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
+                                width='16'
+                                height='16'
+                                viewBox='0 0 24 24'
+                                fill='none'
+                                stroke='currentColor'
+                                strokeWidth='2.2'
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
                             >
-                                <circle cx="5" cy="12" r="1.5" />
-                                <circle cx="12" cy="12" r="1.5" />
-                                <circle cx="19" cy="12" r="1.5" />
+                                <circle cx='5' cy='12' r='1.5' />
+                                <circle cx='12' cy='12' r='1.5' />
+                                <circle cx='19' cy='12' r='1.5' />
                             </svg>
                         </button>
                     </div>

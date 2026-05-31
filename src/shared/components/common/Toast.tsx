@@ -35,11 +35,7 @@ const Toast: React.FC = () => {
     }
 
     return (
-        <div
-            css={[toastStyle, isAnimating ? toastEnterStyle : toastLeaveStyle]}
-            role="status"
-            aria-live="polite"
-        >
+        <div css={[toastStyle, isAnimating ? toastEnterStyle : toastLeaveStyle]} role='status' aria-live='polite'>
             {message}
         </div>
     );
@@ -64,8 +60,12 @@ const toastStyle = css`
     letter-spacing: -0.224px;
     line-height: 1.43;
     z-index: 1010;
-    transition: opacity 0.2s ease-in, transform 0.2s ease-in;
-    box-shadow: 0 4px 20px rgba(0, 113, 227, 0.28), 0 1px 4px rgba(0, 0, 0, 0.1);
+    transition:
+        opacity 0.2s ease-in,
+        transform 0.2s ease-in;
+    box-shadow:
+        0 4px 20px rgba(0, 113, 227, 0.28),
+        0 1px 4px rgba(0, 0, 0, 0.1);
 
     @media (prefers-reduced-motion: reduce) {
         transition: none;

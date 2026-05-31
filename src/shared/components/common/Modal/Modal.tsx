@@ -27,13 +27,8 @@ const Modal = ({ closeModal, isConfirm = false, children, customStyle, ariaLabel
 
     return createPortal(
         <React.Fragment>
-            <div css={overlayStyle} onClick={!isConfirm ? closeModal : undefined} aria-hidden="true"></div>
-            <div
-                css={modalStyle(customStyle)}
-                role="dialog"
-                aria-modal="true"
-                aria-label={ariaLabel}
-            >
+            <div css={overlayStyle} onClick={!isConfirm ? closeModal : undefined} aria-hidden='true'></div>
+            <div css={modalStyle(customStyle)} role='dialog' aria-modal='true' aria-label={ariaLabel}>
                 {children}
             </div>
         </React.Fragment>,

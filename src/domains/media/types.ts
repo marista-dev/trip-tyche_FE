@@ -30,7 +30,6 @@ export interface ClientImageFile extends MetaData {
     image: File;
 }
 
-
 export interface PresignedUrlResponse {
     mediaFileId: number;
     tempKey: string;

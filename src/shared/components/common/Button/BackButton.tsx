@@ -28,7 +28,9 @@ const buttonStyle = css`
     box-shadow:
         0 1px 0 rgba(255, 255, 255, 0.18) inset,
         0 10px 24px -12px rgba(0, 0, 0, 0.55);
-    transition: transform 360ms cubic-bezier(0.32, 0.72, 0, 1), background 240ms ease;
+    transition:
+        transform 360ms cubic-bezier(0.32, 0.72, 0, 1),
+        background 240ms ease;
 
     &:active {
         transform: scale(0.94);
