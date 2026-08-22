@@ -130,6 +130,44 @@ describe('extractMetadataFromImage', () => {
         expect(result[2].recordDate).toBe('');
     });
 
+    it('날짜 태그가 깨져 있어도 GPS는 살아남는다', async () => {
+        // 위치와 날짜를 하나의 try로 묶으면, 날짜 파싱이 던진 예외가 이미 정상 추출된
+        // GPS까지 함께 폐기시킨다. 이 앱은 EXIF GPS로 지도 핀을 찍으므로 가장 비싼 실패다.
+        const file = new File(['x'], 'broken-date.jpg', { type: 'image/jpeg' });
+        exifFixtures.set('broken-date.jpg', {
+            ...makeGpsFixture(37, 'N', 127, 'E'),
+            Exif: {
+                // IfdData의 값은 문자열이 아닐 수 있다 (손상된 파일에서 숫자가 들어오는 경우)
+                [ExifIFD.DateTimeOriginal]: 20230401,
+            },
+        });
+
+        const result = await extractMetadataFromImage([file]);
+
+        expect(result[0].latitude).toBe(37);
+        expect(result[0].longitude).toBe(127);
+        expect(result[0].recordDate).toBe(''); // 날짜만 미지정으로 떨어진다
+    });
+
+    it('GPS가 깨져 있어도 날짜는 살아남는다', async () => {
+        const file = new File(['x'], 'broken-gps.jpg', { type: 'image/jpeg' });
+        exifFixtures.set('broken-gps.jpg', {
+            GPS: {
+                [GPSIFD.GPSLatitude]: 'not-a-rational',
+                [GPSIFD.GPSLatitudeRef]: 'N',
+                [GPSIFD.GPSLongitude]: 'not-a-rational',
+                [GPSIFD.GPSLongitudeRef]: 'E',
+            },
+            ...makeDateFixture('2023:04:01 12:00:00'),
+        });
+
+        const result = await extractMetadataFromImage([file]);
+
+        expect(result[0].recordDate).toBe('2023-04-01T12:00:00');
+        expect(result[0].latitude).toBe(0);
+        expect(result[0].longitude).toBe(0);
+    });
+
     it('onProgress가 최종적으로 100에 도달한다', async () => {
         const files = Array.from({ length: 7 }, (_, i) => new File(['x'], `img${i}.jpg`, { type: 'image/jpeg' }));
         files.forEach((f) => exifFixtures.set(f.name, {}));
