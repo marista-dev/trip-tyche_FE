@@ -21,7 +21,12 @@
     },
     "dependencies": {
         "@capacitor/android": "^8.5.0",
+        "@capacitor/app": "^8.1.1",
+        "@capacitor/browser": "^8.0.4",
         "@capacitor/core": "^8.5.0",
+        "@capacitor/keyboard": "^8.0.5",
+        "@capacitor/splash-screen": "^8.0.2",
+        "@capacitor/status-bar": "^8.0.3",
         "@emotion/react": "^11.13.3",
         "@mantine/core": "^7.13.2",
         "@mantine/dates": "^7.13.2",

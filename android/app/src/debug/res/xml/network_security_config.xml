@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  debug 빌드 전용. release APK에는 포함되지 않는다.
+
+  에뮬레이터에서 호스트 머신의 로컬 백엔드(http://10.0.2.2:8080)를 호출하려면 평문 HTTP가 필요한데,
+  Android 9+는 기본으로 이를 차단한다. 도메인을 개발용 주소로만 한정해 열어둔다.
+  (10.0.2.2는 에뮬레이터가 호스트를 가리키는 고정 주소)
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

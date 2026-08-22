@@ -81,7 +81,17 @@ export const GOOGLE_MAPS_CONFIG = {
 VITE_GOOGLE_MAPS_API_KEY=<앱 전용 키>
 ```
 
-나머지 변수(`VITE_API_BASE_URL` 등)는 `.env`/`.env.local`에서 상속되므로 **다시 쓰지 않는다.** 앱에서 다른 값을 써야 하는 변수가 생기면 그때 추가한다.
+> **정정 (Phase 1-5에서 발견)**: 초판은 "나머지 변수는 `.env`/`.env.local`에서 상속되므로 다시 쓰지 않는다"고 적었으나 **틀렸다.** 우선순위가 `.env.app` > `.env.local` > `.env`이므로, 개발용 `.env.local`(`http://localhost:8080`)이 프로덕션 `.env`를 가려 **앱 빌드에 localhost가 박힌다.** 실제로 에뮬레이터에서 `Cleartext HTTP traffic to localhost not permitted`로 API가 전부 실패했다.
+
+따라서 API 주소도 `.env.app`에 **명시적으로 고정**한다:
+
+```
+VITE_GOOGLE_MAPS_API_KEY=<앱 전용 키>
+VITE_API_BASE_URL=https://api.triptyche.cloud
+VITE_WEBSOCKET_URL=wss://api.triptyche.cloud/ws
+```
+
+로컬 백엔드로 앱을 개발할 때는 `.env.app.local`(우선순위 최상위)에 에뮬레이터→호스트 주소인 `http://10.0.2.2:8080`을 넣어 덮어쓴다.
 
 **3) 커밋용 템플릿 추가**
 

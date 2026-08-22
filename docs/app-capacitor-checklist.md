@@ -37,27 +37,27 @@
 
 ## Phase 1. Capacitor 셸 구축
 
-- [ ] **1-1. Capacitor 설치 + 프로젝트 초기화**
+- [x] **1-1. Capacitor 설치 + 프로젝트 초기화**
   `@capacitor/core@7`, `@capacitor/cli@7`, `@capacitor/android@7` 설치(버전은 설치 시점에 `npm view`로 확인). 루트에 `capacitor.config.ts` 작성: `appId: 'cloud.triptyche.app'`, `appName: '트립티케'`, `webDir: 'dist'`, `server.androidScheme: 'https'`.
   ✓기준: `npx cap doctor` 통과.
 
-- [ ] **1-2. Android 프로젝트 생성 + 빌드 스크립트**
+- [x] **1-2. Android 프로젝트 생성 + 빌드 스크립트**
   `npx cap add android`로 `android/` 생성. `package.json`에 `cap:sync`(`vite build && cap sync`), `cap:android`(`cap:sync && cap open android`) 스크립트 추가. `android/` 커밋 대상 확인(.gitignore 조정 — 생성물 중 build 산출물만 제외).
   ✓기준: `npm run cap:sync` 성공, Android Studio에서 프로젝트 열림.
 
-- [ ] **1-3. 플랫폼 분기 구조 + 웹 회귀 방지**
+- [x] **1-3. 플랫폼 분기 구조 + 웹 회귀 방지**
   `src/platform/index.ts` 신설: `isNative()`/`isAndroid()` 헬퍼(`Capacitor.isNativePlatform()` 래핑). `src/shared/hooks/useBrowserCheck.ts`에 `isNative()` 가드 추가(앱에서 Android UA 경고 모달 미발화).
   ✓기준: 웹 빌드 동작 변화 없음 + 에뮬레이터에서 경고 모달 안 뜸.
 
-- [ ] **1-4. 에뮬레이터 첫 구동 확인**
+- [x] **1-4. 에뮬레이터 첫 구동 확인**
   `npx cap run android`로 앱 로드. 로그인 없이 접근 가능한 화면(온보딩/로그인)과 3D 지구본 렌더 확인.
   ✓기준: 웹 자산이 WebView에서 로드되고 주요 화면이 렌더됨. (API 호출은 CORS로 실패할 수 있음 — 1-5에서 처리)
 
-- [ ] **1-5. 개발 단계 API 연결 결정: CapacitorHttp 활성화**
+- [x] **1-5. 개발 단계 API 연결 결정: CapacitorHttp 활성화**
   Phase 6(BE CORS 수정) 전까지 앱에서 API를 검증하기 위해 `capacitor.config.ts`에 `plugins.CapacitorHttp.enabled: true`(네이티브 HTTP — CORS 미적용) 설정, axios 동작 확인.
   ✓기준: 에뮬레이터에서 비인증 API(예: 게스트 발급) 응답 수신. ⚠️ STOMP WebSocket은 우회 불가 — 실시간 알림은 Phase 6 후 검증. 정식 해법은 6-1 CORS이며 이 항목은 개발 편의용.
 
-- [ ] **1-6. 앱 셸 UX: 상태바·스플래시·백버튼·외부링크**
+- [x] **1-6. 앱 셸 UX: 상태바·스플래시·백버튼·외부링크**
   `@capacitor/status-bar`·`@capacitor/splash-screen` 설정, `@capacitor/app`의 `backButton` 리스너 → react-router history 연동(루트에서는 앱 종료), 외부 링크는 `@capacitor/browser`로 열기. 담당 모듈 `src/platform/native/appShell.ts` 신설.
   ✓기준: 하드웨어 백버튼이 화면 스택을 따라 동작, 외부 링크가 WebView를 이탈시키지 않음.
 
@@ -191,3 +191,10 @@
 - [ ] 3D 지구본·Google Maps·드론뷰 프레임 확인(저사양 1대 포함)
 - [ ] `vitest` 유닛 + Cypress(웹) 회귀 통과 — 웹 동작 무회귀 확인
 - [ ] Play 내부 테스트 트랙 재업로드 → 테스터 설치 검증
+
+---
+
+## Phase 1 진행 중 발견 (후속 처리 필요)
+
+- **SigninPage 내부 step과 하드웨어 백버튼 미연동** — 로그인 화면은 별도 라우트가 아니라 같은 라우트의 Step 2라 히스토리가 쌓이지 않는다. Step 2에서 백버튼을 누르면 Step 1로 가지 않고 앱이 종료된다(화면 자체 ‹ 버튼은 정상 동작). 라우터 레벨 백버튼은 의도대로 작동하므로, 스텝을 가진 화면이 자체 핸들러를 등록하는 방식으로 해결한다.
+- **게스트 로그인 세션이 WebView에서 유지되지 않음** — `POST /v1/auth/guest`는 200을 반환하지만 이후 온보딩으로 되돌아간다. 쿠키 기반 세션이 WebView에 남지 않기 때문으로, Phase 3-1/3-2(토큰 저장 + Bearer 주입)에서 해결된다. Phase 1 범위의 결함은 아니다.
