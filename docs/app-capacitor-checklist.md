@@ -153,9 +153,10 @@
 
 ---
 
-## Phase 6. **[추후 실행] Backend** — FE 작업 완료 후 착수
+## Phase 6. **Backend** — FE 작업 완료, 착수 가능
 
-> 상세 스펙: `backend-prd-app-release.md`. 대상 repo: `triptyche-backend`.
+> 📄 **실행 문서: [`backend-app-release/`](backend-app-release/README.md)** — 요구사항 분석서, API 계약, 검증 절차
+> 대상 repo: `triptyche-backend`. FE는 이 작업 중 수정이 필요 없도록 완료·푸시되어 있다.
 
 - [ ] **6-1. CORS 앱 origin 허용 (2곳 + 외부화)**
   `SecurityConfig.corsConfigurationSource()`와 `WebSocketConfig.registerStompEndpoints()` **양쪽**에 `https://localhost`(androidScheme https 기준) 추가, origin 목록 application.yml 외부화.
