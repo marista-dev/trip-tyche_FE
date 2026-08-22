@@ -1,7 +1,9 @@
 # 트립티케 App 프론트엔드 구체 작업 명세
 
-> 작성일: 2026-06-07 · 전제: Capacitor 채택, 같은 레포 + `src/platform/` 분기
+> 작성일: 2026-06-07 · 갱신일: 2026-08-22 · 전제: Capacitor 채택, 같은 레포 + `src/platform/` 분기
 > 대상 독자: FE 개발자 (실행 가능한 수준의 구체 명세)
+> 범위(2026-08-22 확정): **Android 단독 선출시** — iOS 전용 항목은 `[iOS 후속]` 표기
+> 실행 순서·진행 추적: `app-capacitor-checklist.md` (본 문서는 스펙 상세)
 
 ---
 
@@ -73,8 +75,10 @@ ios/  android/               # 네이티브 프로젝트 (cap add 생성물)
 | `@capawesome/capacitor-file-picker` | 갤러리에서 **원본 파일** 선택 (다중) | EXIF 보존 위해 Android에 `ACCESS_MEDIA_LOCATION` 권한 필요 |
 | (비권장) `@capacitor/camera` | 카메라/갤러리 | **EXIF(특히 GPS) 제거됨** → 본 앱 핵심 기능과 충돌, 회피 |
 
-> 기존 `heic2any`/`browser-image-compression`/`piexifjs`는 **그대로 유지**.
-> File Picker로 받은 원본 Blob에 기존 EXIF 추출 파이프라인 연결.
+> 기존 `heic2any`/`piexifjs`는 **그대로 유지**. File Picker로 받은 원본 Blob에
+> 기존 EXIF 추출 파이프라인 연결.
+> ⚠️ (2026-08-22 확인) `browser-image-compression`과 `@deck.gl/*` 5종은 `src/`
+> import 0건인 **미사용 의존성** — 앱 번들 측정 전 제거할 것 (Epic 0 참조).
 
 ### 1.5 앱 셸 / UX
 
@@ -153,7 +157,7 @@ ios/  android/               # 네이티브 프로젝트 (cap add 생성물)
   → 압축 → presigned URL → S3 업로드(`useImageUpload.ts`).
 - Android: `ACCESS_MEDIA_LOCATION` 권한 추가(매니페스트 + 런타임 요청), 미허용
   시 GPS 누락 → 기존 "위치 미지정 처리" 플로우로 자연 폴백.
-- iOS: 사진 라이브러리 권한(`NSPhotoLibraryUsageDescription`) 문구.
+- [iOS 후속] 사진 라이브러리 권한(`NSPhotoLibraryUsageDescription`) 문구.
 
 수정 대상:
 - `src/pages/trip/management/TripImageUploadPage.tsx`
@@ -172,12 +176,27 @@ ios/  android/               # 네이티브 프로젝트 (cap add 생성물)
 
 ### 2.6 WebGL 성능 검증
 
-- 실기기(저사양 Android 포함)에서 GlobeMapPage(Three.js) + Deck.gl 경로
+- 실기기(저사양 Android 포함)에서 GlobeMapPage(Three.js 지구본) + 드론뷰
   프레임레이트 측정. 필요 시 LOD/파티클/틸트 디테일 조정, 저사양 폴백 모드.
+  (Deck.gl은 미사용 의존성으로 확인 — 측정 대상 아님)
+- Google Maps JS API 키: HTTP referrer 제한이 Capacitor WebView origin에
+  적용되지 않음 → 앱 전용 키 분리 + 쿼터/사용량 알림 설정 (Epic 0 참조).
 
 ---
 
 ## 3. 작업 분류 (WBS)
+
+### Epic 0. 선행 정리 (플랫폼 무관 — 앱 작업 전 처리 권장, 2026-08-22 추가)
+- O1. 미사용 의존성 제거: `@deck.gl/*` 5종, `browser-image-compression`
+- O2. `src/libs/utils/exif.ts` 날짜 태그 수정: `0th`/`ImageIFD.DateTime`(저장시각)
+  → `Exif`/`ExifIFD.DateTimeOriginal`(촬영시각). 편집·메신저 저장 사진의
+  여행 타임라인 왜곡 버그
+- O3. `src/libs/utils/image.ts` 메타데이터 추출 개선: 파일당 base64 전체 읽기
+  2회(위치·날짜 각각) → 1회 읽기 공유 + 동시성 상한 (WebView 대량 업로드 OOM 예방)
+- O4. `src/shared/hooks/useBrowserCheck.ts` 네이티브 분기: Android UA 경고 모달이
+  앱 실행마다 발화하지 않도록 `Capacitor.isNativePlatform()` 가드
+- O5. Google Maps JS 키 전략: 앱 전용 키 분리 + 쿼터/사용량 알림
+  (referrer 제한이 WebView origin에 미적용)
 
 ### Epic A. Capacitor 기반 구축
 - A1. Capacitor 설치/`cap init`/`capacitor.config.ts`
@@ -189,12 +208,12 @@ ios/  android/               # 네이티브 프로젝트 (cap add 생성물)
 - B1. Axios 클라이언트/인터셉터 Bearer 토큰화 (앱 분기)
 - B2. `@capacitor/browser` OAuth + 딥링크 콜백 핸들러
 - B3. 토큰 저장/리프레시(`@capacitor/preferences`)
-- B4. iOS URL Scheme / Android intent-filter 등록
-- B5. (Apple 4.8) Sign in with Apple 추가 — iOS
+- B4. Android intent-filter 등록 (iOS URL Scheme은 [iOS 후속])
+- B5. [iOS 후속] (Apple 4.8) Sign in with Apple 추가
 - B6. (2차) 카카오/구글 네이티브 SDK 로그인 고도화
 
 ### Epic C. 푸시 알림 (출시 필수)
-- C1. Firebase 프로젝트, `google-services.json`, APNs .p8
+- C1. Firebase 프로젝트, `google-services.json` (APNs .p8은 [iOS 후속])
 - C2. `@capacitor-firebase/messaging` 통합 + 권한/토큰 획득
 - C3. 디바이스 토큰 백엔드 등록 훅
 - C4. 포그라운드 배너 연결 + 알림 탭 딥링크 라우팅
@@ -208,12 +227,12 @@ ios/  android/               # 네이티브 프로젝트 (cap add 생성물)
 
 ### Epic E. 마감/심사
 - E1. WebGL 실기기 성능 검증·튜닝
-- E2. 권한 사용 설명 문구(Info.plist/매니페스트), 개인정보 처리방침
-- E3. TestFlight / Play 내부 테스트 업로드, 심사 체크리스트
+- E2. 권한 사용 설명 문구(Android 매니페스트; Info.plist는 [iOS 후속]), 개인정보 처리방침
+- E3. Play 내부 테스트 업로드, 심사 체크리스트 (TestFlight는 [iOS 후속])
 - E4. (옵션) `@capgo/capacitor-updater` OTA 구성
 
 ### 우선순위 / 의존성
-- **출시 필수(MVP)**: A → B(B1~B5) → C → D → E
+- **출시 필수(MVP, Android)**: 0 → A → B(B1~B4) → C → D → E (B5는 [iOS 후속])
 - **2차(고도화)**: B6(네이티브 SDK 로그인), E4(OTA)
 - C(푸시)·B(인증)는 **백엔드 작업 의존** → `backend-prd-app-release.md` 동기화 필요
 
@@ -221,13 +240,13 @@ ios/  android/               # 네이티브 프로젝트 (cap add 생성물)
 
 ## 4. 검증 (E2E)
 
-1. `npm run cap:sync` 후 `cap run ios`/`cap run android` 구동.
-2. 3D 지구본·Google Maps·Deck.gl 오버레이·드론뷰 정상 + 프레임 확인(저사양 1대).
+1. `npm run cap:sync` 후 `cap run android` 구동 (`cap run ios`는 [iOS 후속]).
+2. 3D 지구본·Google Maps·드론뷰 정상 + 프레임 확인(저사양 1대).
 3. 카카오/구글 로그인 → 인앱 브라우저 → 딥링크 복귀 → 토큰 저장 → 재시작 세션 유지.
 4. 갤러리 사진(GPS/날짜 포함, HEIC 포함) 선택 → EXIF 추출 → S3 업로드 성공.
 5. 앱 종료 상태에서 공유요청/미디어처리 이벤트 → 네이티브 푸시 도착 → 탭 시 딥링크 진입.
 6. `vitest` 유닛, Cypress(웹) 회귀 통과.
-7. TestFlight/Play 내부 테스트 트랙 업로드.
+7. Play 내부 테스트 트랙 업로드 (TestFlight는 [iOS 후속]).
 
 ---
 

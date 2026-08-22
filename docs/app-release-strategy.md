@@ -1,7 +1,22 @@
 # 트립티케 모바일 앱 출시 전략 — 네이티브 vs Capacitor
 
-> 작성일: 2026-06-07 · 대상: iOS / Android 스토어 출시
+> 작성일: 2026-06-07 · 갱신일: 2026-08-22 · 대상: 모바일 스토어 출시
 > 결론: **Capacitor 채택 + 같은 레포 단일 코드베이스 유지**
+> 범위(2026-08-22 확정): **Android 단독 선출시** — iOS(Sign in with Apple·APNs·App Store 심사)는 후속 단계로 이연
+
+---
+
+## 0. 결정 기록 (2026-08-22)
+
+FE·BE 저장소 코드 레벨 재검증을 거쳐 다음을 확정한다.
+
+- **Capacitor 채택 재확정** — "개발 수고로움 배제, 사용자 경험 최우선" 기준으로 재평가해도 결론 동일:
+  - 핵심 문제(안드로이드 사진 업로드 시 EXIF GPS 소실)는 네이티브/Capacitor 모두 **동일한 방법**(`ACCESS_MEDIA_LOCATION` + 원본 보존 파일 피커)으로 해결된다. Capacitor 앱도 네이티브 앱이므로 이 지점에서 네이티브 재작성의 추가 이득이 없다.
+  - 앱의 간판 경험(Three.js 3D 지구본 `GlobeMapPage.tsx` 1,392 LOC, Google Maps 시네마틱 드론뷰 `CinematicDroneMap.tsx` 722 LOC)은 순수 WebGL/DOM이라 네이티브 재작성 시 동급 대체물이 없어 품질 저하 또는 WebView 임베드 회귀가 강제된다 — 사용자 경험이 오히려 나빠진다.
+  - 하드웨어 의존이 사실상 0(getUserMedia·geolocation·서비스워커·Web Share 미사용). 네이티브가 진짜 우위인 지점(백그라운드 대량 업로드 등)은 Capacitor 셸 안의 부분 네이티브 코드로 확보 가능하다.
+  - 단일 코드베이스 유지 = 웹·앱 기능 동시 배포, 버그 이원화 없음. 검증된 기존 코드를 래핑하는 쪽이 재작성 대비 결함 리스크도 낮다.
+- **Android 단독 선출시** — EXIF 문제의 당사자가 안드로이드 유저이고, iOS 웹은 현재도 EXIF가 보존된다. iOS 전용 P0(Sign in with Apple, APNs .p8, App Store 심사 대응)는 후속 단계로 이연한다.
+- 초판 문서의 정정 사항과 선행 수정 백로그는 **7장** 참조.
 
 ---
 
@@ -16,10 +31,10 @@
 |------|------|----------------|
 | 프레임워크 | React 18.3 + Vite 5.4 + TypeScript (순수 SPA/CSR) | WebView 구동에 이상적 |
 | UI | Mantine 7 + Emotion (CSS-in-JS) | **웹 전용** — RN 비호환 |
-| 지도/3D | Google Maps JS + Deck.gl + Three.js | **WebGL/DOM 전용** — RN 재구현 필요 |
-| 시그니처 기능 | 3D 지구본, Deck.gl 경로 오버레이, Cinematic 드론뷰 | 앱의 핵심 가치, 전부 웹 기술 |
+| 지도/3D | Google Maps JS + Three.js (Deck.gl은 미사용 의존성 — 7.1 참조) | **WebGL/DOM 전용** — RN 재구현 필요 |
+| 시그니처 기능 | 3D 지구본(Three.js), Cinematic 드론뷰(Google Maps Vector) | 앱의 핵심 가치, 전부 웹 기술 |
 | 상태/통신 | Zustand, TanStack Query, Axios, STOMP WebSocket | 플랫폼 무관 (재사용 가능) |
-| 이미지 | EXIF 추출(piexifjs), HEIC 변환(heic2any), 압축 | 갤러리 파일 기반 (실시간 카메라 X) |
+| 이미지 | EXIF 추출(piexifjs), HEIC 변환(heic2any) — 압축 라이브러리는 미사용(7.1 참조) | 갤러리 파일 기반 (실시간 카메라 X) |
 | 위치 | 사진 EXIF GPS 추출 | **실시간 GPS 권한 불필요** |
 | 인증 | 쿠키 기반 OAuth (카카오/구글) | 모바일용 토큰 방식 전환 필요 |
 | 푸시 | WebSocket 배너 (포그라운드 한정) | 네이티브 푸시(FCM/APNs) 추가 필요 |
@@ -36,7 +51,7 @@
 
 | 기준 | **Capacitor (✅ 채택)** | React Native / Expo | Flutter |
 |------|------------------------|---------------------|---------|
-| 3D 지구본·Deck.gl·드론뷰 | WebView에서 **그대로 동작** | 전면 재구현 (expo-gl/three, react-native-maps는 Deck.gl 미지원) | 전면 재구현 |
+| 3D 지구본·드론뷰 | WebView에서 **그대로 동작** | 전면 재구현 (expo-gl/three, react-native-maps는 커스텀 WebGL 경험 미지원) | 전면 재구현 |
 | UI(Mantine/Emotion) | **100% 재사용** | 전면 재작성 | 전면 재작성 (Dart) |
 | 코드 재사용률 | **~95%+** | ~30~40% (api/store/유틸만) | ~0% (언어 다름) |
 | 출시까지 기간 | **수 주** | 수 개월 | 수 개월~ |
@@ -50,8 +65,8 @@
 ### 2.2 왜 네이티브 재작성이 부적합한가
 
 - 앱의 **시그니처 가치 = WebGL 시각화**인데, 이것이 가장 재구현하기 어려운
-  부분이다. react-native-maps는 Deck.gl 오버레이/Cinematic 드론뷰를 지원하지
-  않아, 지도 경험 전체를 네이티브 GL로 새로 만들어야 한다.
+  부분이다. react-native-maps는 Three.js 지구본/Cinematic 드론뷰 같은 커스텀
+  WebGL 경험을 지원하지 않아, 지도 경험 전체를 네이티브 GL로 새로 만들어야 한다.
 - "코드 재사용 70~80%"라는 통념은 비즈니스 로직 기준이며, **본 앱은 시각화
   레이어가 비용의 대부분**이라 실제 재사용률이 30~40%로 떨어진다.
 - 웹/앱 코드가 갈라져 **이중 유지보수**가 발생한다. 신규 기능마다 두 번 구현.
@@ -59,7 +74,7 @@
 ### 2.3 왜 Capacitor가 최적인가
 
 - 기존 Vite 빌드(`dist/`)를 **WkWebView/Android WebView에 그대로 탑재**.
-  Three.js·Deck.gl·Google Maps JS 모두 WebView WebGL에서 동작.
+  Three.js·Google Maps JS 모두 WebView WebGL에서 동작.
 - 네이티브가 꼭 필요한 부분(푸시·인증 딥링크·갤러리·스플래시)만 **플러그인**
   으로 보강.
 - React/Vite/TS 기존 역량을 그대로 활용, 학습비용 최소.
@@ -73,7 +88,7 @@
 
 ### 3.1 분리(별도 레포/프론트)의 함정
 
-- 핵심 자산(3D 지구본·Deck.gl·드론뷰·Mantine UI)을 **중복 보유하거나 재구현**
+- 핵심 자산(3D 지구본·드론뷰·Mantine UI)을 **중복 보유하거나 재구현**
   해야 함 → 자산 가치 훼손.
 - 이후 모든 기능을 **웹/앱 양쪽에 이중 포팅** → 시간이 갈수록 drift(불일치),
   버그 2배, "앱에선 왜 안 되지?"가 반복.
@@ -116,7 +131,8 @@
 
 ## 5. 출시 범위 (사용자 확정 사항 반영)
 
-- ✅ **네이티브 푸시 알림 = 출시 필수** → FCM/APNs 통합 포함 (백엔드 작업 동반)
+- ✅ **(2026-08-22) Android 단독 선출시** — iOS 전용 항목(Sign in with Apple, APNs .p8, TestFlight/App Store 심사)은 후속 단계
+- ✅ **네이티브 푸시 알림 = 출시 필수** → FCM 통합 포함 (백엔드 작업 동반; APNs는 iOS 단계)
 - ✅ **쿠키 OAuth → 토큰 기반 전환 가능(권장)** → 모바일 인증 재설계 포함
 - ✅ 단일 레포 + 플랫폼 분기 구조 채택
 
@@ -126,16 +142,44 @@
 
 | 리스크 | 영향 | 대응 |
 |--------|------|------|
-| WebView WebGL 성능 (저사양 Android) | 3D 지구본/Deck.gl 프레임 저하 | 실기기 프레임 검증, 디테일/파티클 조정, 필요 시 저사양 모드 |
-| Apple 4.2 (최소 기능) 거절 | 순수 웹뷰 래퍼 반려 | 네이티브 푸시·갤러리·딥링크·스플래시로 네이티브 가치 충족 |
-| Apple 4.8 (로그인) | 소셜 로그인 시 반려 | **Sign in with Apple** 동등 제공 추가 (iOS) |
+| WebView WebGL 성능 (저사양 Android) | 3D 지구본/드론뷰 프레임 저하 | 실기기 프레임 검증, 디테일/파티클 조정, 필요 시 저사양 모드 |
+| (iOS 단계) Apple 4.2 (최소 기능) 거절 | 순수 웹뷰 래퍼 반려 | 네이티브 푸시·갤러리·딥링크·스플래시로 네이티브 가치 충족 |
+| (iOS 단계) Apple 4.8 (로그인) | 소셜 로그인 시 반려 | **Sign in with Apple** 동등 제공 추가 |
 | EXIF GPS 손실 | 위치 자동추출 기능 붕괴 | Camera 플러그인 대신 File Picker + `ACCESS_MEDIA_LOCATION` 권한 |
 | WebView 쿠키/세션 불안정 | 로그인 풀림 | 토큰 기반(@capacitor/preferences) 전환 |
 
 ---
 
-## 7. 관련 문서
+## 7. 코드 레벨 재검증 결과 (2026-08-22)
 
+### 7.1 초판 정정 사항
+
+- **Deck.gl은 실제로 미사용**: `@deck.gl/*` 5개 패키지가 package.json에 있으나
+  `src/` 내 import 0건. `browser-image-compression`도 동일. → 마이그레이션
+  리스크·E2E 검증 항목에서 제외하고, 앱 번들 측정 전 **의존성 제거** 권장.
+  초판의 리스크·재사용률 서술은 이 두 패키지를 실사용으로 가정하고 있었다.
+- **CORS 수정 위치 명시**: 허용 origin 3개가 백엔드
+  `SecurityConfig.corsConfigurationSource()`와 `WebSocketConfig`(STOMP 엔드포인트)
+  **2곳에 하드코딩**되어 있다. Capacitor origin 추가 시 두 곳 모두 수정 필요 —
+  application.yml로 외부화 권장. 누락 시 첫 실기기 빌드부터 전 API가 차단된다.
+- **Google Maps JS API 키 제한**: 현행 HTTP referrer 제한은 Capacitor WebView
+  origin에 적용되지 않는다. 앱 전용 키 분리 + 쿼터/사용량 알림 등 키 전략
+  재검토 필요 (보안·과금 이슈).
+
+### 7.2 플랫폼 무관 선행 수정 백로그 (앱 작업 전 처리 권장)
+
+| 항목 | 위치 | 내용 |
+|------|------|------|
+| EXIF 날짜 태그 오독 | FE `src/libs/utils/exif.ts` | `0th` IFD의 `ImageIFD.DateTime`(저장시각)을 읽음 → `Exif` IFD의 `ExifIFD.DateTimeOriginal`(촬영시각)로 수정. 편집·메신저 저장 사진에서 여행 타임라인 왜곡 |
+| 메타데이터 추출 메모리 | FE `src/libs/utils/image.ts` | 파일당 base64 전체 읽기 2회(위치·날짜 각각) × 전체 파일 동시 실행 — WebView 메모리 제약에서 대량 업로드 시 OOM 위험. EXIF 1회 읽기 공유 + 동시성 상한 도입 |
+| STOMP 구독 가드 누락 | BE `StompTopicAuthInterceptor` | `/topic/media-processed/{userId}`만 cross-user 구독 차단, `/topic/share-notifications/{recipientId}`는 무방비. 앱과 무관하게 즉시 수정 권장 |
+| Android UA 경고 모달 | FE `src/shared/hooks/useBrowserCheck.ts` | UA에 `android` 포함 시 경고 모달 → Capacitor 앱 실행마다 발화. `Capacitor.isNativePlatform()` 분기 필요 |
+
+---
+
+## 8. 관련 문서
+
+- `docs/app-capacitor-checklist.md` — **실행 순서 체크리스트 (작업 추적은 이 문서에서)**
 - `docs/app-frontend-tasks.md` — 프론트 구체 작업·필요 라이브러리·작업 분류
 - `docs/backend-prd-app-release.md` — 백엔드 수정요소 PRD
 

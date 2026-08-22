@@ -2,8 +2,9 @@ import { Dispatch, SetStateAction } from 'react';
 
 import { MEDIA_FORMAT } from '@/domains/media/constants';
 import { ClientImageFile } from '@/domains/media/types';
+import { runWithPool } from '@/libs/utils/async';
 import { formatToISOLocal } from '@/libs/utils/date';
-import { extractDateFromImage, extractLocationFromImage } from '@/libs/utils/exif';
+import { extractMetadataFromExif } from '@/libs/utils/exif';
 
 // 중복 이미지 제거.
 // 정확도: 파일명 단독 비교는 같은 이름의 다른 사진을 silent하게 잃을 수 있음 → name+size+lastModified
@@ -19,38 +20,44 @@ export const removeDuplicateImages = (images: File[]): File[] => {
     return Array.from(imageMap.values());
 };
 
-// 이미지 메타데이터 추출
+// 메타데이터 추출 단계의 동시성 상한. DecodeQueue의 기본값과 동일 — FileReader는 I/O 바운드라
+// 4개면 처리량이 충분히 난다. 대량 업로드(수백 장)에서 base64 문자열이 한꺼번에 힙에 쌓이는 것을 막는다.
+const METADATA_EXTRACTION_CONCURRENCY = 4;
+
+// 이미지 메타데이터 추출.
+// 파일당 EXIF를 정확히 1회만 읽고(extractMetadataFromExif), 동시에 시작되는 워커 수를
+// METADATA_EXTRACTION_CONCURRENCY로 제한한다. runWithPool은 결과를 인덱스 위치에 직접 쓰므로
+// 완료 순서가 뒤섞여도 반환 배열의 순서는 입력 순서(images)와 항상 동일하게 유지된다.
+// ⚠️ 이 순서는 useImageUpload에서 presignedUrls/fileArray와 인덱스로 매칭되므로 절대 깨서는 안 된다.
 export const extractMetadataFromImage = async (
     images: readonly File[],
     onProgress?: Dispatch<SetStateAction<{ metadata: number; upload: number }>>,
 ): Promise<ClientImageFile[]> => {
     if (images.length === 0) return [];
 
-    let process = 0;
+    let processed = 0;
+    const fileList = Array.from(images);
 
-    return await Promise.all(
-        Array.from(images).map(async (image) => {
-            const location = await extractLocationFromImage(image);
-            const date = await extractDateFromImage(image);
+    return runWithPool(fileList, METADATA_EXTRACTION_CONCURRENCY, async (image) => {
+        const { location, date } = await extractMetadataFromExif(image);
 
-            process++;
+        processed++;
 
-            if (onProgress) {
-                const progressPercent = Math.round((process / images.length) * 100);
-                onProgress((prev) => ({
-                    ...prev,
-                    metadata: progressPercent,
-                }));
-            }
+        if (onProgress) {
+            const progressPercent = Math.round((processed / fileList.length) * 100);
+            onProgress((prev) => ({
+                ...prev,
+                metadata: progressPercent,
+            }));
+        }
 
-            return {
-                image,
-                recordDate: formatToISOLocal(date),
-                latitude: location?.latitude || 0,
-                longitude: location?.longitude || 0,
-            };
-        }),
-    );
+        return {
+            image,
+            recordDate: formatToISOLocal(date),
+            latitude: location?.latitude || 0,
+            longitude: location?.longitude || 0,
+        };
+    });
 };
 
 // Heic -> jpeg 확장자 변경
