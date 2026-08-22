@@ -63,12 +63,13 @@ export const GOOGLE_MAPS_CONFIG = {
 
 **1) Google Cloud 콘솔 — 앱 전용 키 발급**
 
-- [ ] **웹 키와 동일한 GCP 프로젝트**에서 새 API 키 생성 (아래 Map ID 항목 참조)
-- [ ] **API 제한**: Maps JavaScript API, Places API, Geocoding API 세 개만 허용
+- [x] **웹 키와 동일한 GCP 프로젝트**에서 새 API 키 생성 (아래 Map ID 항목 참조)
+- [x] **API 제한**: Maps JavaScript API, Places API, Geocoding API 세 개만 허용
   - Places는 `libraries: ['places']`(SearchPlaceInput), Geocoding은 `useReverseGeocode.ts`·`useAddressAggregation.ts`가 사용
-- [ ] **애플리케이션 제한**: 아래 "정직한 한계"를 읽고 결정. 우선 `https://localhost/*` referrer 제한을 걸어보고, Phase 1에서 실기기 동작을 확인한 뒤 조정
-- [ ] **할당량 상한** 설정 — 일일 요청 수를 예상 사용량의 2~3배로 제한
-- [ ] **예산 알림** 설정 — 임계값 초과 시 메일 수신
+- [x] **애플리케이션 제한**: 아래 "정직한 한계"를 읽고 결정. 우선 `https://localhost/*` referrer 제한을 걸어보고, Phase 1에서 실기기 동작을 확인한 뒤 조정
+  - ⚠️ Phase 1-4(에뮬레이터 첫 구동)에서 `RefererNotAllowedMapError` 없이 지도가 뜨는지 **반드시 재확인**. 막히면 referrer 제한을 풀고 쿼터·알림으로만 통제한다
+- [x] **할당량 상한** 설정 — 일일 요청 수를 예상 사용량의 2~3배로 제한
+- [x] **예산 알림** 설정 — 임계값 초과 시 메일 수신
 
 > 알림 임계값을 정할 때: [`MainPage.tsx:27`](../../src/pages/MainPage.tsx#L27)이 지도 진입 전 프리워밍으로 스크립트를 로드한다. 따라서 앱 키의 사용량은 *지도 페이지 방문 수*가 아니라 **세션 수**에 가깝게 움직인다.
 
@@ -151,11 +152,11 @@ Map ID는 **키가 아니라 GCP 프로젝트에 귀속**된다. 따라서:
 
 ## 검증
 
-- [ ] `npx vite build --mode app` 후 번들에서 추출한 키가 앱 전용 키다 (위 5번 명령)
-- [ ] `npm run build`(모드 없음) 후 번들의 키는 **여전히 웹 키**다 — 웹 배포에 영향이 없어야 한다
-- [ ] Google Cloud 콘솔에서 앱 키의 API 제한·할당량·예산 알림이 설정되어 있다
-- [ ] `.env.app`이 git에 잡히지 않는다 (`git status`에 안 보임)
-- [ ] `.env.app.example`은 커밋 대상으로 잡힌다
+- [x] `npx vite build --mode app` 후 번들에서 추출한 키가 앱 전용 키다 (위 5번 명령)
+- [x] `npm run build`(모드 없음) 후 번들의 키는 **여전히 웹 키**다 — 웹 배포에 영향이 없어야 한다
+- [x] Google Cloud 콘솔에서 앱 키의 API 제한·할당량·예산 알림이 설정되어 있다
+- [x] `.env.app`이 git에 잡히지 않는다 (`git status`에 안 보임)
+- [x] `.env.app.example`은 커밋 대상으로 잡힌다 — **값이 아닌 플레이스홀더만** 들어 있어야 한다
 - [ ] (Phase 1 이후) 실기기에서 지도·드론뷰가 정상 렌더되고, 콘솔에 `RefererNotAllowedMapError`가 없다
 
 ## 리스크

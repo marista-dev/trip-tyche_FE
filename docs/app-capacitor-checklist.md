@@ -29,7 +29,7 @@
   파일당 base64 전체 읽기 2회(위치·날짜 각각) → **1회 읽어 EXIF 객체 공유**, `Promise.all` 전체 동시 실행 → **동시성 상한(예: 5)** 도입. 진행률 콜백 유지.
   ✓기준: 기존 업로드 플로우 회귀 없음(수십 장 업로드 정상), 파일당 FileReader 호출 1회.
 
-- [ ] **0-4. Google Maps 앱 전용 API 키 분리** → [상세](phase-0-cleanup/04-maps-api-key.md)
+- [x] **0-4. Google Maps 앱 전용 API 키 분리** → [상세](phase-0-cleanup/04-maps-api-key.md)
   Google Cloud 콘솔에서 앱용 키 신규 발급(**웹과 동일 GCP 프로젝트**에서 키만 추가 — Map ID 유지), API 제한·쿼터 상한·예산 알림 설정. 주입은 **빌드타임 `--mode app` + `.env.app`** 방식으로 확정(코드 변경 없음), `cap:sync` 스크립트 반영은 1-2에서.
   ✓기준: `npx vite build --mode app` 후 번들에서 추출한 키가 앱 전용 키이고, 모드 없는 빌드는 웹 키 유지.
 
