@@ -4,6 +4,8 @@ import useUserStore from '@/domains/user/stores/useUserStore';
 import { apiClient } from '@/libs/apis/shared/client';
 import { API_BASE_URL } from '@/libs/apis/shared/constants';
 import { ApiResponse } from '@/libs/apis/shared/types';
+import { isNative } from '@/platform';
+import { clearAccessToken, getAccessToken } from '@/platform/native/auth';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
 interface CustomRequestConfing extends InternalAxiosRequestConfig {
@@ -22,6 +24,12 @@ export const setupRequestInterceptor = (instance: AxiosInstance) => {
                     ...config,
                     signal: controller.signal,
                 };
+            }
+
+            // 앱에서는 쿠키가 살아남지 않으므로 저장된 토큰을 헤더로 싣는다.
+            if (isNative()) {
+                const accessToken = getAccessToken();
+                if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
             }
 
             return config;
@@ -67,6 +75,17 @@ export const setupResponseInterceptor = (instance: AxiosInstance) => {
                 const { status } = error.response.data ?? {};
 
                 if (status === 401) {
+                    /*
+                     * 앱에는 갱신할 쿠키가 없다. 현행 /v1/auth/refresh는 refresh 토큰을 쿠키에서만
+                     * 읽으므로(백엔드 M1에서 body 기반 경로가 생긴다), 지금은 토큰을 버리고
+                     * 로그인 화면으로 보낸다.
+                     */
+                    if (isNative()) {
+                        await clearAccessToken();
+                        useUserStore.getState().setUnauthenticated();
+                        return Promise.reject(error);
+                    }
+
                     try {
                         await axios.post(`${API_BASE_URL}/v1/auth/refresh`, {}, { withCredentials: true });
                         return apiClient(originalRequest);

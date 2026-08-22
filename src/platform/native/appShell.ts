@@ -4,6 +4,7 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { StatusBar, Style } from '@capacitor/status-bar';
 
 import { isNative } from '@/platform';
+import { hydrateAccessToken } from '@/platform/native/auth';
 
 /*
  * 네이티브 셸에서만 필요한 초기화. 웹에서는 전부 no-op이다.
@@ -38,6 +39,9 @@ const setupBackButton = async () => {
 
 export const initAppShell = async () => {
     if (!isNative()) return;
+
+    // 저장된 토큰을 먼저 메모리로 올린다. 이후 첫 API 요청이 인증 헤더를 실을 수 있어야 한다.
+    await hydrateAccessToken();
 
     await setupStatusBar();
     await setupBackButton();

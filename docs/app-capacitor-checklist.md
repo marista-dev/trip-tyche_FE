@@ -91,15 +91,15 @@
 
 ## Phase 3. 인증 — FE 단독 가능분 먼저
 
-- [ ] **3-1. 토큰 저장소** — `src/platform/native/auth.ts` 신설
+- [x] **3-1. 토큰 저장소** — `src/platform/native/auth.ts` 신설
   `@capacitor/preferences`로 access/refresh 저장·로드·삭제 유틸.
   ✓기준: 저장→앱 재시작→로드 왕복 동작.
 
-- [ ] **3-2. API 클라이언트 Bearer 분기** — `src/libs/apis/shared/client.ts`, `interceptors.ts`
+- [x] **3-2. API 클라이언트 Bearer 분기** — `src/libs/apis/shared/client.ts`, `interceptors.ts`
   `isNative()`면 `withCredentials` 대신 저장 토큰을 `Authorization: Bearer`로 주입, 401 시 토큰 폐기→로그인 화면(리프레시 연동은 [BE 의존] — 현행 `/v1/auth/refresh`는 쿠키 전용).
   ✓기준: 웹 쿠키 흐름 회귀 없음 + 앱에서 Bearer 헤더 첨부 확인.
 
-- [ ] **3-3. 게스트 로그인으로 Bearer 경로 검증 (백엔드 무변경)**
+- [x] **3-3. 게스트 로그인으로 Bearer 경로 검증 (백엔드 무변경)**
   기존 `POST /v1/auth/guest`가 body로 토큰을 반환하고 백엔드 `JWTAuthenticationFilter`가 Bearer를 이미 수용하므로, **게스트 모드로 앱의 토큰 인증 전체 경로를 지금 검증할 수 있다.**
   ✓기준: 앱에서 게스트 시작 → 보호 API(여행 목록 등) 정상 호출 → 재시작 후 세션 유지(4h 만료 내).
 
