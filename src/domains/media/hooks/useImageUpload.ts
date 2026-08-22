@@ -7,6 +7,7 @@ import { useUploadSessionStore } from '@/domains/media/stores/useUploadSessionSt
 import { PresignedUrlResponse, ClientImageFile, MediaFileCategories } from '@/domains/media/types';
 import { filterWithoutDateMediaFile, filterWithoutLocationMediaFile } from '@/domains/media/utils';
 import { mediaAPI } from '@/libs/apis';
+import { runWithPool } from '@/libs/utils/async';
 import { convertHeicToJpg, extractMetadataFromImage, removeDuplicateImages } from '@/libs/utils/image';
 
 // HTTP/2 엔드포인트(OCI compat S3 포함)는 단일 TCP 위에서 100+ stream을 동시 처리 가능 →
@@ -17,25 +18,6 @@ const MAX_CONCURRENT_S3_UPLOADS = 200;
 
 // 일시적 네트워크 단절(iOS '네트워크 연결이 유실되었습니다' 등)을 자동 흡수하기 위한 per-file 재시도.
 const UPLOAD_RETRY_ATTEMPTS = 2; // 첫 시도 + 2회 재시도 = 최대 3회
-
-// limit개의 워커가 풀처럼 items를 소비. Promise.all을 그대로 쓰면 N개 모두를 동시 시작하므로 부적합.
-async function runWithPool<T, R>(
-    items: T[],
-    limit: number,
-    worker: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-    const results: R[] = new Array(items.length);
-    let next = 0;
-    const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
-        let i = next++;
-        while (i < items.length) {
-            results[i] = await worker(items[i], i);
-            i = next++;
-        }
-    });
-    await Promise.all(runners);
-    return results;
-}
 
 async function uploadWithRetry(presignedPutUrl: string, file: File, signal: AbortSignal): Promise<void> {
     let lastErr: unknown;
