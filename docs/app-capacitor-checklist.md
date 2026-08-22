@@ -78,11 +78,11 @@
   `src/pages/trip/management/TripImageUploadPage.tsx`(및 `usePhotoUpload`/`useImageUpload` 진입부)에서 `isNative()`면 `gallery.ts` 피커, 웹이면 기존 `<input type="file">`. 이후 파이프라인(HEIC 변환 → EXIF 추출 → presigned 업로드)은 **기존 코드 그대로 재사용**.
   ✓기준: 앱·웹 양쪽에서 선택→메타데이터 추출까지 동일하게 진행.
 
-- [ ] **2-4. 권한 거부 폴백 확인**
+- [x] **2-4. 권한 거부 폴백 확인**
   권한 거부/GPS 없는 사진 → 기존 "위치 미지정" 플로우(`NoLocationResolvePage`, `MapPickPage`)로 자연 진입하는지 확인. 필요 시 안내 문구만 보강.
   ✓기준: 권한 거부 상태에서 업로드해도 기능이 깨지지 않고 수동 지정으로 이어짐.
 
-- [ ] **2-5. ★핵심 마일스톤: 실기기 EXIF 보존 검증**
+- [x] **2-5. ★핵심 마일스톤: 실기기 EXIF 보존 검증**
   실제 Android 기기에서 GPS 포함 사진 선택 → lat/lng·**촬영시각**(0-2 수정분) 추출값 확인.
   **HEIC 1장을 반드시 테스트 케이스에 포함** — 현재 파이프라인은 EXIF 추출 **전에** heic2any 변환을 돌리므로 HEIC는 GPS를 잃을 수 있다(안드로이드 기본 JPEG은 변환을 거치지 않아 무관하나, 삼성 HEIF 옵션·공유받은 아이폰 사진이 해당). 손실이 확인되면 별도 작업으로 분리 — 배경은 [`phase-0-cleanup/README.md` 추가 발견 A](phase-0-cleanup/README.md#a-heic-사진의-exif-손실-가능성) 참조.
   ✓기준: 웹에서 GPS가 지워지던 동일 사진이 앱에서는 좌표가 추출됨. **이게 통과되면 앱 프로젝트의 존재 이유가 실증된 것.** (S3 업로드까지의 최종 확인은 Phase 6 후 E2E)
@@ -209,9 +209,19 @@
 
 즉 "네이티브 앱이면 ACCESS_MEDIA_LOCATION으로 GPS를 얻는다"는 기획 단계의 전제가 **Photo Picker 경로에서는 성립하지 않는다.**
 
-**적용한 해결책(실측 미완)**: `pickFiles()`로 전환했다. 이쪽은 타입을 와일드카드로 보내 Photo Picker 리다이렉트를 피하고 SAF 문서 피커를 띄우며, documents provider는 이미지를 문서로 취급해 위치 메타데이터를 유지한다. 대신 UI가 갤러리 격자가 아닌 파일 브라우저다.
+**해결책 — 실측 완료 ✅**: `pickFiles()`로 전환했다. 이쪽은 타입을 와일드카드로 보내 Photo Picker 리다이렉트를 피하고 SAF 문서 피커를 띄우며, documents provider는 이미지를 문서로 취급해 위치 메타데이터를 유지한다. 대신 UI가 갤러리 격자가 아닌 파일 브라우저다.
 
-- [ ] **★ pickFiles 경로로 GPS가 실제 보존되는지 실측** — 이게 실패하면 커스텀 네이티브 플러그인(MediaStore 쿼리 + `setRequireOriginal()`)이 필요하다. 검증용 사진은 에뮬레이터 `/sdcard/Pictures/gps-test.jpg`에 있다.
+- [x] **★ pickFiles 경로로 GPS가 실제 보존되는지 실측 — 성공**
+
+  실기기에서 같은 사진을 SAF 경로로 업로드한 뒤 서버 DB를 확인한 결과:
+
+  | 항목 | 사진에 넣은 값 | Photo Picker 경로 | **SAF 경로** |
+  |---|---|---|---|
+  | 촬영시각 | `2023:07:04 15:20:30` | `2023-07-04T15:20:30` ✅ | `2023-07-04T15:20:30` ✅ |
+  | 위도 | 37.5665 | 0.0 ❌ | **37.5665** ✅ |
+  | 경도 | 126.9780 | 0.0 ❌ | **126.978** ✅ |
+
+  **앱을 만드는 이유가 실증됐다.** 웹에서 안드로이드 유저가 잃던 EXIF GPS가 앱에서는 그대로 보존된다.
 
 **부수 확인**: Maps 앱 키의 referrer 제한이 WebView에서 실제로 `RefererNotAllowedMapError`를 냈다(Phase 0-4에서 예고한 사안). 제한을 풀고 쿼터·예산 알림으로만 통제하는 쪽으로 전환이 필요하다.
 
