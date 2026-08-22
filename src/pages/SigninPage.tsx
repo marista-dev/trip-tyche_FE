@@ -6,7 +6,9 @@ import backgroundImage from '@/assets/images/background-mobile.webp';
 import GuestButton from '@/domains/user/components/GuestButton';
 import LoginButton from '@/domains/user/components/LoginButton';
 import useUserStore from '@/domains/user/stores/useUserStore';
-import { OAUTH_CONFIG } from '@/libs/apis/shared/constants';
+import { API_BASE_URL, OAUTH_CONFIG } from '@/libs/apis/shared/constants';
+import { isNative } from '@/platform';
+import { saveAccessToken } from '@/platform/native/auth';
 import { ROUTES } from '@/shared/constants/route';
 import { COLORS } from '@/shared/constants/style';
 import { useToastStore } from '@/shared/stores/useToastStore';
@@ -33,21 +35,26 @@ const SigninPage = () => {
 
     const handleDevLogin = async () => {
         try {
-            const res = await fetch('http://localhost:8080/v1/auth/test-token', {
+            // API 주소를 하드코딩하지 않는다 — 에뮬레이터에서 localhost는 호스트가 아니라 기기 자신이다.
+            const res = await fetch(`${API_BASE_URL}/v1/auth/test-token`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: 'test@test.com', provider: 'google' }),
             });
             const json = await res.json();
-            console.log('[DEV] test-token response:', json);
             const token = json?.data?.accessToken;
             if (!token) {
                 console.error('[DEV] accessToken not found in response', json);
                 return;
             }
-            document.cookie = `access_token=${token}; path=/`;
-            console.log('[DEV] cookie set:', document.cookie);
-            await new Promise((r) => setTimeout(r, 2000));
+
+            // 앱은 쿠키가 유지되지 않으므로 토큰 저장소를 쓴다. 웹은 기존 쿠키 방식 그대로.
+            if (isNative()) {
+                await saveAccessToken(token);
+            } else {
+                document.cookie = `access_token=${token}; path=/`;
+            }
+
             window.location.replace(ROUTES.PATH.HOME);
         } catch (e) {
             console.error('[DEV] login failed:', e);
