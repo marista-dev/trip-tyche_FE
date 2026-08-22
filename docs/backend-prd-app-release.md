@@ -1,7 +1,9 @@
 # [PRD] 트립티케 앱 출시에 따른 Backend 수정요소
 
-> 작성일: 2026-06-07 · 작성자: FE → BE 협의용
-> 전제: FE는 Capacitor 하이브리드 앱(iOS/Android)으로 출시. 단일 코드베이스.
+> 작성일: 2026-06-07 · 갱신일: 2026-08-22 · 작성자: FE → BE 협의용
+> 전제: FE는 Capacitor 하이브리드 앱으로 출시. 단일 코드베이스.
+> 범위(2026-08-22 확정): **Android 단독 선출시** — M3(Sign in with Apple)·APNs는 iOS 후속 단계로 이연.
+> 실행 시점: **FE(Capacitor) 작업 완료 후 착수** — 순서는 `app-capacitor-checklist.md` Phase 6 참조.
 > 본 문서는 **앱 출시를 위해 백엔드에서 신규/변경되어야 하는 요소**를 실무
 > 관점으로 정리한다.
 
@@ -14,7 +16,7 @@
 | # | 영역 | 핵심 작업 | 우선순위 |
 |---|------|----------|---------|
 | 1 | **인증** | 쿠키 → **토큰(Bearer)** 발급/리프레시 + OAuth 콜백 **딥링크** 리다이렉트 | P0 (출시 필수) |
-| 2 | **푸시 알림** | 디바이스 토큰 등록 API + 기존 알림 이벤트의 **FCM/APNs 발송** | P0 (출시 필수) |
+| 2 | **푸시 알림** | 디바이스 토큰 등록 API + 기존 알림 이벤트의 **FCM 발송** (APNs는 iOS 후속) | P0 (출시 필수) |
 | 3 | **앱 운영** | 클라이언트 식별/버전 정책, CORS·딥링크 도메인, 강제 업데이트 | P1 |
 
 > 인증·푸시는 FE 단독으로 불가하며 **BE 동반 작업이 출시 차단요소(blocker)**.
@@ -60,11 +62,16 @@
 - **API 인증 방식**: 앱 요청은 `Authorization: Bearer <access_token>` 허용.
   → 기존 쿠키 인증과 **양립**(웹은 쿠키 유지) 하도록 Security 설정에서
   Bearer + Cookie 둘 다 수용.
+  - ✅ **(2026-08-22 코드 확인) 이미 충족**: `JWTAuthenticationFilter`가
+    `Authorization: Bearer` → `access_token` 쿠키 → `?token=` 쿼리 순으로 수용
+    중이라 보호 API는 헤더 인증으로 현재도 동작한다. 남은 작업은 **토큰 "획득"
+    경로**(R1/R2 엔드포인트)뿐. body로 토큰을 반환하는 기존 선례:
+    `POST /v1/auth/guest`, `TestTokenController`.
 
 **(R3) 게스트 로그인 유지**
 - 기존 `POST /v1/auth/guest`도 토큰 방식으로 응답 일치시킴.
 
-### 1.3 Sign in with Apple (Apple 4.8 대응)
+### 1.3 [iOS 후속] Sign in with Apple (Apple 4.8 대응)
 - iOS 앱에서 소셜 로그인(카카오/구글) 제공 시, Apple 정책상 **프라이버시
   보장 대체 로그인(Sign in with Apple) 동등 제공**이 사실상 필요.
 - BE: Apple OAuth(애플 ID 토큰 검증, 이메일 relay 처리) 추가, 사용자 계정
@@ -76,7 +83,7 @@
 - [ ] 토큰 발급/리프레시/교환 엔드포인트
 - [ ] Security 설정: Bearer + Cookie 동시 수용
 - [ ] refresh 토큰 저장/회전(rotation)·무효화
-- [ ] Sign in with Apple 연동 (iOS 심사 대응)
+- [ ] [iOS 후속] Sign in with Apple 연동 (iOS 심사 대응)
 
 ---
 
@@ -106,8 +113,8 @@
 - 발송 로직: 이벤트 발생 지점에서
   1. 온라인(WebSocket 세션 있음) → 기존 STOMP 배너
   2. **항상 또는 오프라인** → FCM/APNs 푸시 (정책 결정 필요, 아래 R6)
-- **Firebase Admin SDK**(서버) 사용, iOS는 APNs .p8 키를 Firebase에 등록하여
-  FCM 단일 채널로 발송.
+- **Firebase Admin SDK**(서버) 사용. [iOS 후속] iOS는 APNs .p8 키를 Firebase에
+  등록하여 FCM 단일 채널로 발송.
 
 **(R6) 중복/정책 결정 (협의 필요)**
 - 포그라운드 WebSocket 수신 시 푸시 중복 방지: 푸시 payload에 `data` 동봉,
@@ -130,9 +137,9 @@
 
 ### 2.3 인프라
 - Firebase 프로젝트 생성(또는 기존 활용), 서버에 Admin 자격증명(서비스 계정 키).
-- APNs 인증키(.p8) 발급 → Firebase Cloud Messaging 등록.
-- Android `google-services.json`, iOS `GoogleService-Info.plist`는 **FE 빌드**에
-  포함되나, **발송은 BE**가 담당.
+- [iOS 후속] APNs 인증키(.p8) 발급 → Firebase Cloud Messaging 등록.
+- Android `google-services.json`([iOS 후속] `GoogleService-Info.plist`)은
+  **FE 빌드**에 포함되나, **발송은 BE**가 담당.
 
 ### 2.4 BE 작업 체크리스트
 - [ ] `device` 테이블/엔티티 (user, token, platform, appVersion, updatedAt)
@@ -148,9 +155,14 @@
 ## 3. 앱 운영 / 인프라 부수 작업
 
 ### 3.1 CORS / 도메인 / 딥링크
-- [ ] **CORS**: Capacitor WebView origin 허용. iOS는 `capacitor://localhost`,
-  Android는 `https://localhost`(`server.androidScheme: 'https'` 기준) origin이
-  요청에 실림 → 허용 목록 추가. (또는 토큰 방식이므로 `withCredentials` 의존 ↓)
+- [ ] **CORS**: Capacitor WebView origin 허용. Android는 `https://localhost`
+  (`server.androidScheme: 'https'` 기준), [iOS 후속] `capacitor://localhost`
+  origin이 요청에 실림 → 허용 목록 추가. (또는 토큰 방식이므로 `withCredentials` 의존 ↓)
+  - ⚠️ **(2026-08-22 코드 확인) 수정 위치 2곳**: 허용 origin 3개가
+    `SecurityConfig.corsConfigurationSource()`와
+    `WebSocketConfig.registerStompEndpoints()`에 **각각 하드코딩** — 두 곳 모두
+    수정해야 하며 application.yml로 외부화 권장. 누락 시 첫 실기기 빌드부터
+    전 API(및 STOMP)가 차단된다.
 - [ ] **Universal Links / App Links**(권장, 선택): 커스텀 스킴 대신
   `https://triptyche.cloud/...` 딥링크 쓰려면 `apple-app-site-association`,
   `assetlinks.json`을 도메인에 호스팅.
@@ -170,6 +182,10 @@
 - [ ] 토큰 탈취 대비 refresh 회전 + 디바이스 바인딩 고려.
 - [ ] 푸시/인증 신규 엔드포인트 rate limit.
 - [ ] 앱 트래픽 구분 로깅(클라이언트별 에러율 모니터링).
+- [ ] **(앱 무관, 즉시 수정 권장 — 2026-08-22 발견)** STOMP
+  `/topic/share-notifications/{recipientId}`에 cross-user 구독 가드 없음 —
+  `StompTopicAuthInterceptor`는 `/topic/media-processed/{userId}`만 보호하고
+  있어 타 유저의 알림 구독이 가능한 상태.
 
 ---
 
@@ -179,12 +195,13 @@
 |------|---------|---------|
 | M1 (P0) | 토큰 인증 + OAuth 딥링크 콜백 | FE 로그인 플로우(B Epic) |
 | M2 (P0) | 디바이스 등록 API + 푸시 발송 | FE 푸시 등록/수신(C Epic) |
-| M3 (P0) | Sign in with Apple | iOS 심사 |
+| M3 (iOS 후속) | Sign in with Apple | iOS 심사 |
 | M4 (P1) | CORS/딥링크 도메인, 버전 정책 | 앱 셸/강제 업데이트 |
 | M5 (P1) | 알림 설정 API | 설정 화면 |
 
-> **출시 블로커**: M1, M2, M3. FE/BE 병렬 진행하되 인터페이스(토큰 응답 형식,
-> 딥링크 스킴, 푸시 payload 규격)를 **선합의**해야 통합 지연을 막는다.
+> **출시 블로커(Android)**: M1, M2. (M3는 iOS 후속 단계의 블로커.)
+> FE/BE 병렬 진행하되 인터페이스(토큰 응답 형식, 딥링크 스킴, 푸시 payload
+> 규격)를 **선합의**해야 통합 지연을 막는다.
 
 ---
 
