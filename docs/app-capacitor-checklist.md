@@ -17,15 +17,15 @@
 > 📄 **상세 개선 계획: [`phase-0-cleanup/`](phase-0-cleanup/README.md)** — 각 항목의 문제·근거·설계·검증
 > 순서: 01·04는 독립(병렬 가능), **02 → 03**은 같은 파일을 건드리므로 순서 유지
 
-- [ ] **0-1. 미사용 의존성 제거** → [상세](phase-0-cleanup/01-remove-unused-deps.md)
+- [x] **0-1. 미사용 의존성 제거** → [상세](phase-0-cleanup/01-remove-unused-deps.md)
   `package.json`에서 `@deck.gl/core`·`geo-layers`·`google-maps`·`layers`·`mesh-layers` 5종과 `browser-image-compression` 제거.
   ✓기준: `npm run build` 성공, `src/` 어디서도 import 없음 확인(현재 0건).
 
-- [ ] **0-2. EXIF 촬영시각 태그 수정** — `src/libs/utils/exif.ts` → [상세](phase-0-cleanup/02-exif-datetime-fix.md)
+- [x] **0-2. EXIF 촬영시각 태그 수정** — `src/libs/utils/exif.ts` → [상세](phase-0-cleanup/02-exif-datetime-fix.md)
   `extractDateFromImage`가 `0th`/`ImageIFD.DateTime`(저장시각)을 읽는 것을 `Exif`/`ExifIFD.DateTimeOriginal`(촬영시각) 우선, 없으면 기존 태그 폴백으로 수정.
   ✓기준: 편집된 사진(저장시각≠촬영시각)으로 촬영시각이 추출됨.
 
-- [ ] **0-3. 메타데이터 추출 메모리 개선** — `src/libs/utils/image.ts`, `src/libs/utils/exif.ts` → [상세](phase-0-cleanup/03-metadata-memory.md)
+- [x] **0-3. 메타데이터 추출 메모리 개선** — `src/libs/utils/image.ts`, `src/libs/utils/exif.ts` → [상세](phase-0-cleanup/03-metadata-memory.md)
   파일당 base64 전체 읽기 2회(위치·날짜 각각) → **1회 읽어 EXIF 객체 공유**, `Promise.all` 전체 동시 실행 → **동시성 상한(예: 5)** 도입. 진행률 콜백 유지.
   ✓기준: 기존 업로드 플로우 회귀 없음(수십 장 업로드 정상), 파일당 FileReader 호출 1회.
 
