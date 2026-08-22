@@ -76,19 +76,22 @@ const extractGpsFromExifData = (exifObj: Exif): Location | null => {
     }
 };
 
-// EXIF 데이터에서 촬영시각 태그를 우선순위에 따라 조회
-// Exif.DateTimeOriginal(셔터 촬영 시각) → Exif.DateTimeDigitized(디지털화 시각) → 0th.DateTime(파일 기록/수정 시각) 순으로 폴백
-// 편집·재저장되거나 메신저를 거친 사진은 0th.DateTime만 오늘 날짜로 덮어써지므로, 촬영시각 태그를 우선해야 한다
-export const readDateTimeTag = (exifData: Exif): string | undefined => {
-    const exifIfd = exifData['Exif'];
-    const zerothIfd = exifData['0th'];
+// 촬영시각 후보 태그 — 우선순위 순
+// DateTimeOriginal(셔터를 누른 시각) → DateTimeDigitized(디지털화 시각) → 0th.DateTime(파일 기록/수정 시각).
+// 편집·재저장되거나 메신저를 거친 사진은 0th.DateTime만 덮어써지므로 촬영시각 태그를 우선한다.
+const DATETIME_TAG_CANDIDATES = [
+    ['Exif', piexif.ExifIFD.DateTimeOriginal],
+    ['Exif', piexif.ExifIFD.DateTimeDigitized],
+    ['0th', piexif.ImageIFD.DateTime],
+] as const;
 
-    return (
-        (exifIfd?.[piexif.ExifIFD.DateTimeOriginal] as string | undefined) ??
-        (exifIfd?.[piexif.ExifIFD.DateTimeDigitized] as string | undefined) ??
-        (zerothIfd?.[piexif.ImageIFD.DateTime] as string | undefined)
+// 우선순위 순으로 촬영시각 후보를 모두 반환한다.
+// IfdData의 값은 문자열이 아닐 수 있으므로(숫자·유리수 배열 등) 문자열만 통과시킨다.
+// 이 필터가 없으면 파싱 단계의 raw.match가 TypeError를 던진다.
+export const readDateTimeTags = (exifData: Exif): string[] =>
+    DATETIME_TAG_CANDIDATES.map(([ifd, tag]) => exifData[ifd]?.[tag]).filter(
+        (value): value is string => typeof value === 'string',
     );
-};
 
 // EXIF 날짜 형식: "YYYY:MM:DD HH:mm:ss" (예: "2023:04:01 12:34:56")
 const EXIF_DATETIME_PATTERN = /^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})$/;
@@ -128,13 +131,18 @@ export const parseExifDateTime = (raw: string): Date | null => {
 };
 
 // EXIF 객체 → Date 순수 함수 (File 접근 없이 테스트 가능)
+// 후보를 우선순위대로 시도해 처음 파싱에 성공한 값을 쓴다.
+// 첫 후보만 보고 파싱하면 무효한 DateTimeOriginal("0000:00:00 00:00:00" 등) 하나가
+// 하위 태그에 남아 있는 멀쩡한 촬영시각을 가려버린다.
 export const extractDateFromExif = (exifData: Exif | null): Date | null => {
     if (!exifData) return null;
 
-    const dateTimeTag = readDateTimeTag(exifData);
-    if (!dateTimeTag) return null;
+    for (const raw of readDateTimeTags(exifData)) {
+        const parsed = parseExifDateTime(raw);
+        if (parsed) return parsed;
+    }
 
-    return parseExifDateTime(dateTimeTag);
+    return null;
 };
 
 // 파일에서 EXIF를 정확히 1회만 읽어 위치·날짜를 함께 추출한다.
@@ -143,18 +151,38 @@ export const extractDateFromExif = (exifData: Exif | null): Date | null => {
 export const extractMetadataFromExif = async (
     file: File,
 ): Promise<{ location: Location | null; date: Date | null }> => {
-    try {
-        const exifData = await readExifData(file);
-        if (!exifData) return { location: null, date: null };
+    let exifData: Exif | null;
 
-        return {
-            location: extractGpsFromExifData(exifData),
-            date: extractDateFromExif(exifData),
-        };
+    try {
+        exifData = await readExifData(file);
     } catch (error) {
-        console.error(`${file.name} 메타데이터 추출 실패: `, error);
+        console.error(`${file.name} EXIF 읽기 실패: `, error);
         return { location: null, date: null };
     }
+
+    if (!exifData) return { location: null, date: null };
+
+    /*
+     * 위치와 날짜는 서로 독립적으로 실패해야 한다.
+     * 하나의 try로 묶으면 깨진 날짜 태그 하나가 이미 정상 추출된 GPS까지 함께 폐기시킨다.
+     * 이 앱은 사진 EXIF의 GPS로 지도 핀을 찍으므로 위치 손실이 가장 비싼 실패다.
+     */
+    let location: Location | null = null;
+    let date: Date | null = null;
+
+    try {
+        location = extractGpsFromExifData(exifData);
+    } catch (error) {
+        console.error(`${file.name} 위치 추출 실패: `, error);
+    }
+
+    try {
+        date = extractDateFromExif(exifData);
+    } catch (error) {
+        console.error(`${file.name} 날짜 추출 실패: `, error);
+    }
+
+    return { location, date };
 };
 
 // 이미지에서 위치 추출
