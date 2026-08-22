@@ -61,7 +61,7 @@ export const extractMetadataFromImage = async (
 };
 
 // Heic -> jpeg 확장자 변경
-export const convertHeicToJpg = async (images: FileList) => {
+export const convertHeicToJpg = async (images: FileList | File[]) => {
     const convertedImages = await Promise.all(
         Array.from(images).map(async (image) => {
             const actualType = await getActualFileType(image);

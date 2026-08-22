@@ -20,6 +20,7 @@ import { TripInfo } from '@/domains/trip/types';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import { mediaAPI, tripAPI } from '@/libs/apis';
 import { toResult } from '@/libs/apis/shared/utils';
+import { pickImagesFromGallery } from '@/platform/native/gallery';
 import Button from '@/shared/components/common/Button';
 import Header from '@/shared/components/common/Header';
 import ConfirmModal from '@/shared/components/common/Modal/ConfirmModal';
@@ -107,6 +108,18 @@ const TripImageUploadPage = () => {
         const selectedImages = event.target.files;
         if (!selectedImages || selectedImages.length === 0) return;
 
+        await processSelectedImages(Array.from(selectedImages));
+    };
+
+    // 네이티브 갤러리 피커 — EXIF 원본을 보존해서 File[]로 돌려준다.
+    const handleNativePick = async () => {
+        const pickedImages = await pickImagesFromGallery();
+        if (pickedImages.length === 0) return;
+
+        await processSelectedImages(pickedImages);
+    };
+
+    const processSelectedImages = async (selectedImages: File[]) => {
         setStep('processing');
         const uniqueFiles = await prepareUploadFiles(selectedImages);
         // S3 업로드는 백그라운드로 진행되며, 정보 입력 화면 진입을 막지 않는다.
@@ -130,7 +143,7 @@ const TripImageUploadPage = () => {
     const renderMainSection = () => {
         switch (step) {
             case 'upload':
-                return <UploadStep onImageSelect={handleImageUpload} />;
+                return <UploadStep onImageSelect={handleImageUpload} onNativePick={handleNativePick} />;
             case 'processing':
                 return <ProcessingStep progress={progress} />;
             case 'review':

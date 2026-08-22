@@ -61,23 +61,20 @@
   `@capacitor/status-bar`·`@capacitor/splash-screen` 설정, `@capacitor/app`의 `backButton` 리스너 → react-router history 연동(루트에서는 앱 종료), 외부 링크는 `@capacitor/browser`로 열기. 담당 모듈 `src/platform/native/appShell.ts` 신설.
   ✓기준: 하드웨어 백버튼이 화면 스택을 따라 동작, 외부 링크가 WebView를 이탈시키지 않음.
 
-- [ ] **1-7. Safe-area 전수 점검**
-  15개 라우트에서 `100dvh` + 상태바/제스처바 겹침 점검. 현재 `env(safe-area-inset-*)` 적용은 3곳뿐(`MapControlButtons`, `BannerCard`, `NotificationPage`) — 필요한 화면에 확대 적용.
-  ✓기준: 에뮬레이터(노치 기기 프로필)에서 전 화면 상·하단 UI 잘림 없음.
 
 ---
 
 ## Phase 2. 갤러리 피커 + EXIF GPS 보존 — ★ 앱을 만드는 이유
 
-- [ ] **2-1. 네이티브 파일 피커 도입** — `src/platform/native/gallery.ts` 신설
+- [x] **2-1. 네이티브 파일 피커 도입** — `src/platform/native/gallery.ts` 신설
   `@capawesome/capacitor-file-picker` 설치, 다중 이미지 선택 → `File[]` 변환 래퍼 작성. ⚠️ `@capacitor/camera`는 EXIF GPS를 제거하므로 사용 금지.
   ✓기준: 앱에서 갤러리 다중 선택 → File 객체로 기존 타입과 호환.
 
-- [ ] **2-2. `ACCESS_MEDIA_LOCATION` 권한 연동**
+- [x] **2-2. `ACCESS_MEDIA_LOCATION` 권한 연동**
   `android/app/src/main/AndroidManifest.xml`에 권한 선언 + 사진 선택 전 런타임 요청 흐름(거부 시 안내 후 진행). `gallery.ts`에 권한 체크 포함.
   ✓기준: 권한 허용 상태에서 선택한 사진의 EXIF에 GPS가 남아 있음(로그로 확인).
 
-- [ ] **2-3. 업로드 진입점 분기 연결**
+- [x] **2-3. 업로드 진입점 분기 연결**
   `src/pages/trip/management/TripImageUploadPage.tsx`(및 `usePhotoUpload`/`useImageUpload` 진입부)에서 `isNative()`면 `gallery.ts` 피커, 웹이면 기존 `<input type="file">`. 이후 파이프라인(HEIC 변환 → EXIF 추출 → presigned 업로드)은 **기존 코드 그대로 재사용**.
   ✓기준: 앱·웹 양쪽에서 선택→메타데이터 추출까지 동일하게 진행.
 
@@ -197,4 +194,5 @@
 ## Phase 1 진행 중 발견 (후속 처리 필요)
 
 - **SigninPage 내부 step과 하드웨어 백버튼 미연동** — 로그인 화면은 별도 라우트가 아니라 같은 라우트의 Step 2라 히스토리가 쌓이지 않는다. Step 2에서 백버튼을 누르면 Step 1로 가지 않고 앱이 종료된다(화면 자체 ‹ 버튼은 정상 동작). 라우터 레벨 백버튼은 의도대로 작동하므로, 스텝을 가진 화면이 자체 핸들러를 등록하는 방식으로 해결한다.
+- **⚠️ Phase 2-4/2-5가 Phase 3에 막혀 있음** — 앱에서 업로드 화면까지 도달하려면 로그인 세션이 필요한데, 아래 사유로 인증이 유지되지 않는다. 실기기 EXIF 검증(2-5)은 **Phase 3-1/3-2(토큰 저장 + Bearer 주입) 완료 후** 수행한다. 검증용 GPS 사진은 에뮬레이터 `/sdcard/Pictures/gps-test.jpg`에 넣어 두었다(촬영시각 2023-07-04, 저장시각 2026-01-01로 달라 0-2 수정도 함께 확인 가능).
 - **게스트 로그인 세션이 WebView에서 유지되지 않음** — `POST /v1/auth/guest`는 200을 반환하지만 이후 온보딩으로 되돌아간다. 쿠키 기반 세션이 WebView에 남지 않기 때문으로, Phase 3-1/3-2(토큰 저장 + Bearer 주입)에서 해결된다. Phase 1 범위의 결함은 아니다.
