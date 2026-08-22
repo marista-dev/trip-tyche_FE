@@ -4,7 +4,10 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { StatusBar, Style } from '@capacitor/status-bar';
 
 import { isNative } from '@/platform';
-import { hydrateAccessToken } from '@/platform/native/auth';
+import { exchangeCodeForTokens, hydrateTokens } from '@/platform/native/auth';
+
+// 백엔드와 합의된 OAuth 콜백 스킴. AndroidManifest의 intent-filter와 반드시 일치해야 한다.
+export const AUTH_CALLBACK_SCHEME = 'triptyche://auth/callback';
 
 /*
  * 네이티브 셸에서만 필요한 초기화. 웹에서는 전부 no-op이다.
@@ -37,14 +40,48 @@ const setupBackButton = async () => {
     }
 };
 
+/*
+ * OAuth 딥링크 수신. 백엔드가 인증 성공 후 아래 형태로 302 리다이렉트한다.
+ *   triptyche://auth/callback?code=<1회용 code>
+ * code를 토큰으로 교환한 뒤 홈으로 보낸다. 실패해도 로그인 화면에 머무를 뿐 앱은 죽지 않는다.
+ */
+const setupAuthDeepLink = async () => {
+    try {
+        await App.addListener('appUrlOpen', async ({ url }) => {
+            if (!url.startsWith(AUTH_CALLBACK_SCHEME)) return;
+
+            // 커스텀 스킴은 URL 파서가 쿼리를 못 읽는 경우가 있어 직접 잘라낸다.
+            const query = url.includes('?') ? url.slice(url.indexOf('?') + 1) : '';
+            const code = new URLSearchParams(query).get('code');
+
+            if (!code) {
+                console.error('인증 콜백에 code가 없습니다: ', url);
+                return;
+            }
+
+            try {
+                await Browser.close();
+            } catch {
+                // 인앱 브라우저가 이미 닫혔을 수 있다. 무시하고 진행한다.
+            }
+
+            const exchanged = await exchangeCodeForTokens(code);
+            if (exchanged) window.location.replace('/');
+        });
+    } catch (error) {
+        console.warn('딥링크 리스너 등록 실패: ', error);
+    }
+};
+
 export const initAppShell = async () => {
     if (!isNative()) return;
 
     // 저장된 토큰을 먼저 메모리로 올린다. 이후 첫 API 요청이 인증 헤더를 실을 수 있어야 한다.
-    await hydrateAccessToken();
+    await hydrateTokens();
 
     await setupStatusBar();
     await setupBackButton();
+    await setupAuthDeepLink();
 
     try {
         await SplashScreen.hide();

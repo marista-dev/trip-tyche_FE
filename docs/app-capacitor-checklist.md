@@ -103,7 +103,7 @@
   기존 `POST /v1/auth/guest`가 body로 토큰을 반환하고 백엔드 `JWTAuthenticationFilter`가 Bearer를 이미 수용하므로, **게스트 모드로 앱의 토큰 인증 전체 경로를 지금 검증할 수 있다.**
   ✓기준: 앱에서 게스트 시작 → 보호 API(여행 목록 등) 정상 호출 → 재시작 후 세션 유지(4h 만료 내).
 
-- [ ] **3-4. 소셜 로그인 골격: 인앱 브라우저 + 딥링크 수신** `[BE 의존]`
+- [x] **3-4. 소셜 로그인 골격: 인앱 브라우저 + 딥링크 수신** `[BE 의존]`
   `@capacitor/browser`로 OAuth URL 오픈하는 `SigninPage.tsx` `isNative()` 분기, `AndroidManifest.xml`에 `triptyche://` intent-filter, `@capacitor/app` `appUrlOpen` 리스너에서 one-time code 파싱→교환 호출 골격(`auth.ts`).
   ✓기준: `adb shell am start -a android.intent.action.VIEW -d "triptyche://auth/callback?code=test"`로 딥링크가 앱에 수신되고 파서까지 도달. 실제 카카오/구글 E2E는 Phase 6-2 후.
 

@@ -5,7 +5,7 @@ import { apiClient } from '@/libs/apis/shared/client';
 import { API_BASE_URL } from '@/libs/apis/shared/constants';
 import { ApiResponse } from '@/libs/apis/shared/types';
 import { isNative } from '@/platform';
-import { clearAccessToken, getAccessToken } from '@/platform/native/auth';
+import { clearTokens, getAccessToken, refreshAccessToken } from '@/platform/native/auth';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
 interface CustomRequestConfing extends InternalAxiosRequestConfig {
@@ -81,7 +81,11 @@ export const setupResponseInterceptor = (instance: AxiosInstance) => {
                      * 로그인 화면으로 보낸다.
                      */
                     if (isNative()) {
-                        await clearAccessToken();
+                        // 앱에는 갱신에 쓸 쿠키가 없으므로 저장된 refresh 토큰을 body로 보낸다.
+                        const refreshed = await refreshAccessToken();
+                        if (refreshed) return apiClient(originalRequest);
+
+                        await clearTokens();
                         useUserStore.getState().setUnauthenticated();
                         return Promise.reject(error);
                     }

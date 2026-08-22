@@ -22,6 +22,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- OAuth 콜백 딥링크. 백엔드가 인증 성공 후 triptyche://auth/callback?code=... 로 리다이렉트한다.
+                 스킴을 바꾸면 src/platform/native/appShell.ts의 AUTH_CALLBACK_SCHEME도 함께 바꿔야 한다. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="triptyche" android:host="auth" />
+            </intent-filter>
+
         </activity>
 
         <provider

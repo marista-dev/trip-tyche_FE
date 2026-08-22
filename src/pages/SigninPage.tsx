@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { Browser } from '@capacitor/browser';
 import { css } from '@emotion/react';
 
 import backgroundImage from '@/assets/images/background-mobile.webp';
@@ -8,6 +9,7 @@ import LoginButton from '@/domains/user/components/LoginButton';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import { API_BASE_URL, OAUTH_CONFIG } from '@/libs/apis/shared/constants';
 import { isNative } from '@/platform';
+import { AUTH_CALLBACK_SCHEME } from '@/platform/native/appShell';
 import { saveAccessToken } from '@/platform/native/auth';
 import { ROUTES } from '@/shared/constants/route';
 import { COLORS } from '@/shared/constants/style';
@@ -20,7 +22,20 @@ const SigninPage = () => {
     const loginAsGuest = useUserStore((s) => s.loginAsGuest);
     const showToast = useToastStore((s) => s.showToast);
 
-    const handleLoginButtonClick = (provider: keyof typeof OAUTH_CONFIG.PATH) => {
+    const handleLoginButtonClick = async (provider: keyof typeof OAUTH_CONFIG.PATH) => {
+        /*
+         * 앱에서는 인앱 브라우저로 OAuth를 진행한다.
+         * WebView에서 location.href로 열면 앱 화면이 제공자 페이지로 대체돼 돌아올 수 없고,
+         * 인증 성공 후 백엔드가 심는 쿠키도 WebView에 남지 않는다.
+         * 백엔드는 client=app 파라미터를 보고 triptyche://auth/callback?code=... 로 리다이렉트하며,
+         * 그 딥링크는 appShell의 리스너가 받아 토큰으로 교환한다.
+         */
+        if (isNative()) {
+            const authUrl = `${OAUTH_CONFIG.PATH[provider]}?client=app&redirect_uri=${encodeURIComponent(AUTH_CALLBACK_SCHEME)}`;
+            await Browser.open({ url: authUrl });
+            return;
+        }
+
         window.location.href = OAUTH_CONFIG.PATH[provider];
     };
 
