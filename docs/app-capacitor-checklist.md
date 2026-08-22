@@ -191,6 +191,32 @@
 
 ---
 
+## ★ Phase 2 실측 결과 — 프로젝트 전제를 뒤집는 발견
+
+실기기(Android 16 / API 36)에서 GPS EXIF가 박힌 사진으로 검증한 결과다.
+
+**결과: 촬영시각은 보존, GPS는 제거됨.**
+
+| 항목 | 사진에 넣은 값 | 서버에 저장된 값 |
+|---|---|---|
+| 촬영시각 | `2023:07:04 15:20:30` | `2023-07-04T15:20:30` ✅ |
+| 저장시각(교란용) | `2026:01:01 00:00:00` | (사용 안 됨 — 0-2 수정 정상 동작) |
+| 위도/경도 | 37.5665 / 126.9780 | **0.0 / 0.0** ❌ |
+
+`ACCESS_MEDIA_LOCATION` 권한은 `granted=true`로 확인했는데도 좌표만 사라졌다.
+
+**원인**: 플러그인의 `pickImages()`는 `ACTION_GET_CONTENT`에 이미지 전용 타입을 실어 보내는데, Android 13+는 이를 **시스템 Photo Picker로 리다이렉트**한다. Photo Picker는 프라이버시 설계상 `ACCESS_MEDIA_LOCATION` 권한을 **무시하고 위치를 무조건 제거**한다. 플러그인 소스에도 `MediaStore.setRequireOriginal()` 호출이 없다.
+
+즉 "네이티브 앱이면 ACCESS_MEDIA_LOCATION으로 GPS를 얻는다"는 기획 단계의 전제가 **Photo Picker 경로에서는 성립하지 않는다.**
+
+**적용한 해결책(실측 미완)**: `pickFiles()`로 전환했다. 이쪽은 타입을 와일드카드로 보내 Photo Picker 리다이렉트를 피하고 SAF 문서 피커를 띄우며, documents provider는 이미지를 문서로 취급해 위치 메타데이터를 유지한다. 대신 UI가 갤러리 격자가 아닌 파일 브라우저다.
+
+- [ ] **★ pickFiles 경로로 GPS가 실제 보존되는지 실측** — 이게 실패하면 커스텀 네이티브 플러그인(MediaStore 쿼리 + `setRequireOriginal()`)이 필요하다. 검증용 사진은 에뮬레이터 `/sdcard/Pictures/gps-test.jpg`에 있다.
+
+**부수 확인**: Maps 앱 키의 referrer 제한이 WebView에서 실제로 `RefererNotAllowedMapError`를 냈다(Phase 0-4에서 예고한 사안). 제한을 풀고 쿼터·예산 알림으로만 통제하는 쪽으로 전환이 필요하다.
+
+---
+
 ## Phase 1 진행 중 발견 (후속 처리 필요)
 
 - **SigninPage 내부 step과 하드웨어 백버튼 미연동** — 로그인 화면은 별도 라우트가 아니라 같은 라우트의 Step 2라 히스토리가 쌓이지 않는다. Step 2에서 백버튼을 누르면 Step 1로 가지 않고 앱이 종료된다(화면 자체 ‹ 버튼은 정상 동작). 라우터 레벨 백버튼은 의도대로 작동하므로, 스텝을 가진 화면이 자체 핸들러를 등록하는 방식으로 해결한다.

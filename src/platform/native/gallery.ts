@@ -53,13 +53,29 @@ const toFile = async (picked: PickedFile): Promise<File | null> => {
     }
 };
 
+const IMAGE_MIME_PREFIX = 'image/';
+
 export const pickImagesFromGallery = async (): Promise<File[]> => {
     await ensureMediaLocationPermission();
 
-    // limit 0 = 무제한 다중 선택. readData는 기본값(false) 그대로 두어 base64 적재를 피한다.
-    const { files } = await FilePicker.pickImages({ limit: 0 });
+    /*
+     * pickImages가 아니라 pickFiles를 쓰는 이유 — 이 앱에서 가장 중요한 선택이다.
+     *
+     * pickImages는 ACTION_GET_CONTENT에 이미지 전용 타입을 실어 보내는데, Android 13+는 이를
+     * 시스템 Photo Picker로 리다이렉트한다. Photo Picker는 ACCESS_MEDIA_LOCATION 권한이
+     * 부여돼 있어도 위치 EXIF를 무조건 제거한다(설계상 프라이버시 기능).
+     * 실측으로 확인했다: 촬영시각은 정확히 나오는데 좌표만 0,0으로 들어왔다.
+     *
+     * pickFiles는 타입을 모든 파일(와일드카드)로 보내 Photo Picker 리다이렉트를 피하고 SAF 문서 피커를 띄운다.
+     * documents provider는 이미지를 문서로 취급해 위치 메타데이터를 그대로 넘긴다.
+     * 대신 UI가 갤러리 격자가 아닌 파일 브라우저라 덜 예쁘지만, GPS 보존이 앱의 존재 이유다.
+     */
+    const { files } = await FilePicker.pickFiles({ limit: 0 });
 
-    const converted = await runWithPool(files, FILE_CONVERSION_CONCURRENCY, toFile);
+    // 모든 파일 타입으로 열었으므로 이미지가 아닌 선택은 걸러낸다.
+    const imageFiles = files.filter((file) => (file.mimeType ?? '').startsWith(IMAGE_MIME_PREFIX));
+
+    const converted = await runWithPool(imageFiles, FILE_CONVERSION_CONCURRENCY, toFile);
 
     return converted.filter((file): file is File => file !== null);
 };
