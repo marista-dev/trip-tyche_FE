@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 스플래시를 background로 그대로 쓰면 이미지가 화면 비율에 맞춰 늘어난다.
+     흰 배경 위에 로고를 원본 비율로 가운데 배치한다. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@android:color/white" />
+    <item>
+        <bitmap android:gravity="center" android:src="@drawable/splash" />
+    </item>
+</layer-list>

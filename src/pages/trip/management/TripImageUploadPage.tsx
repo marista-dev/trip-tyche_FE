@@ -20,12 +20,14 @@ import { TripInfo } from '@/domains/trip/types';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import { mediaAPI, tripAPI } from '@/libs/apis';
 import { toResult } from '@/libs/apis/shared/utils';
+import { pickImagesFromGallery } from '@/platform/native/gallery';
 import Button from '@/shared/components/common/Button';
 import Header from '@/shared/components/common/Header';
 import ConfirmModal from '@/shared/components/common/Modal/ConfirmModal';
 import { ROUTES } from '@/shared/constants/route';
 import { COLORS } from '@/shared/constants/style';
 import { MESSAGE } from '@/shared/constants/ui';
+import { useAppDownloadUrl } from '@/shared/hooks/useAppDownloadUrl';
 import useBrowserCheck from '@/shared/hooks/useBrowserCheck';
 
 const stepIndex = (step: ImageUploadStepType): 0 | 1 | 2 => {
@@ -40,6 +42,7 @@ const TripImageUploadPage = () => {
     const [coverPhotoUrl, setCoverPhotoUrl] = useState<string | undefined>();
 
     const { isModalOpen, closeModal } = useBrowserCheck();
+    const downloadUrl = useAppDownloadUrl(isModalOpen);
 
     const { isFormComplete } = useTripFormValidation(tripForm);
     const { images, progress, prepareUploadFiles, uploadImagesToS3, retryFailedUploads, waitForBackgroundUpload } =
@@ -107,6 +110,18 @@ const TripImageUploadPage = () => {
         const selectedImages = event.target.files;
         if (!selectedImages || selectedImages.length === 0) return;
 
+        await processSelectedImages(Array.from(selectedImages));
+    };
+
+    // 네이티브 갤러리 피커 — EXIF 원본을 보존해서 File[]로 돌려준다.
+    const handleNativePick = async () => {
+        const pickedImages = await pickImagesFromGallery();
+        if (pickedImages.length === 0) return;
+
+        await processSelectedImages(pickedImages);
+    };
+
+    const processSelectedImages = async (selectedImages: File[]) => {
         setStep('processing');
         const uniqueFiles = await prepareUploadFiles(selectedImages);
         // S3 업로드는 백그라운드로 진행되며, 정보 입력 화면 진입을 막지 않는다.
@@ -130,7 +145,7 @@ const TripImageUploadPage = () => {
     const renderMainSection = () => {
         switch (step) {
             case 'upload':
-                return <UploadStep onImageSelect={handleImageUpload} />;
+                return <UploadStep onImageSelect={handleImageUpload} onNativePick={handleNativePick} />;
             case 'processing':
                 return <ProcessingStep progress={progress} />;
             case 'review':
@@ -189,13 +204,16 @@ const TripImageUploadPage = () => {
 
             {isModalOpen && (
                 <ConfirmModal
-                    title='더 나은 경험을 위한 안내'
-                    description='안드로이드 환경에서는 사진 업로드가 제한될 수 있어요. 데스크탑으로 접속해주세요!'
-                    confirmText='알겠어요'
-                    cancelText='계속 진행할래요'
+                    title='사진 위치가 지워질 수 있어요'
+                    description={
+                        '안드로이드 브라우저는 사진을 올릴 때 위치 정보를 제거해요.\n' +
+                        '앱으로 올리면 사진에 담긴 위치가 그대로 지도에 표시됩니다.'
+                    }
+                    confirmText='앱 설치하기'
+                    cancelText='웹으로 계속하기'
                     confirmModal={() => {
+                        window.open(downloadUrl, '_blank', 'noopener,noreferrer');
                         closeModal();
-                        navigate(-1);
                     }}
                     closeModal={closeModal}
                 />

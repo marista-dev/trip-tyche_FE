@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import { UserInfo } from '@/domains/user/types';
 import { userAPI } from '@/libs/apis';
+import { unregisterDeviceToken } from '@/platform/native/push';
 import { queryClient } from '@/shared/providers/TanStackProvider';
 
 export type AuthStatus = 'unknown' | 'authenticated' | 'unauthenticated';
@@ -38,6 +39,18 @@ const useUserStore = create<UserState>()((set, get) => ({
         await userAPI.postGuestLogin();
     },
     login: (userInfo: UserInfo) => {
+        /*
+         * toResult는 응답 body가 비어도 success로 판정하므로(`const { data } = await fn()`),
+         * 호출부가 success를 확인해도 userInfo가 undefined로 넘어올 수 있다.
+         * 여기서 예외가 나면 AuthProvider가 렌더를 끝내지 못해 앱 전체가 로딩 화면에 갇힌다.
+         * 인증 정보가 없는 것이므로 미인증으로 떨어뜨린다 — 라우터 가드가 로그인으로 보낸다.
+         */
+        if (!userInfo) {
+            console.error('로그인 처리 실패: 사용자 정보가 비어 있습니다.');
+            get().setUnauthenticated();
+            return;
+        }
+
         set({
             status: 'authenticated',
             userInfo,
@@ -53,6 +66,8 @@ const useUserStore = create<UserState>()((set, get) => ({
         set(() => ({ isLoggingOut: true }));
 
         try {
+            // 순서가 중요하다 — 로그아웃 뒤에는 Bearer 토큰이 없어 디바이스 해제가 401이 난다.
+            await unregisterDeviceToken();
             await userAPI.requestLogout();
         } catch {
             // API 실패해도 클라이언트 세션은 반드시 초기화

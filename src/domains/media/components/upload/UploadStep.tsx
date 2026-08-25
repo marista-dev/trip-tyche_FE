@@ -3,10 +3,13 @@ import { useState } from 'react';
 import { css } from '@emotion/react';
 import { Upload } from 'lucide-react';
 
+import { isNative } from '@/platform';
 import { COLORS } from '@/shared/constants/style';
 
 interface UploadStepProps {
     onImageSelect: (event: React.ChangeEvent<HTMLInputElement>) => void;
+    // 네이티브에서는 file input 대신 EXIF 원본을 보존하는 갤러리 피커를 연다.
+    onNativePick: () => void;
 }
 
 const ACCENT = COLORS.PRIMARY;
@@ -15,8 +18,9 @@ const SHADOW = 'rgba(0, 113, 227, 0.28)';
 
 const CHIPS = ['GPS 자동 인식', '최대 20MB', '다중 선택 가능'];
 
-const UploadStep = ({ onImageSelect }: UploadStepProps) => {
+const UploadStep = ({ onImageSelect, onNativePick }: UploadStepProps) => {
     const [hover, setHover] = useState(false);
+    const native = isNative();
 
     return (
         <div css={container}>
@@ -33,8 +37,21 @@ const UploadStep = ({ onImageSelect }: UploadStepProps) => {
                 </p>
             </div>
 
-            <label onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} css={uploadCard(hover)}>
-                <input type='file' accept='image/*' multiple css={hiddenInput} onChange={onImageSelect} />
+            <label
+                onMouseEnter={() => setHover(true)}
+                onMouseLeave={() => setHover(false)}
+                onClick={native ? onNativePick : undefined}
+                css={uploadCard(hover)}
+            >
+                {!native && (
+                    <input
+                        type='file'
+                        accept='image/*,image/heic,image/heif'
+                        multiple
+                        css={hiddenInput}
+                        onChange={onImageSelect}
+                    />
+                )}
                 <div css={iconBox(hover)}>
                     <Upload size={26} color={hover ? '#fff' : ACCENT} strokeWidth={1.8} />
                 </div>

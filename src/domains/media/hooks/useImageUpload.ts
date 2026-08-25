@@ -76,7 +76,7 @@ export const useImageUpload = () => {
 
     const { tripKey } = useParams();
 
-    const prepareUploadFiles = useCallback(async (images: FileList): Promise<File[]> => {
+    const prepareUploadFiles = useCallback(async (images: FileList | File[]): Promise<File[]> => {
         const imagesWithoutHeic = await convertHeicToJpg(images);
         const uniqueImages = removeDuplicateImages(imagesWithoutHeic);
         return uniqueImages;

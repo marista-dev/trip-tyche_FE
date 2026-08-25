@@ -2,6 +2,8 @@ import { Client } from '@stomp/stompjs';
 
 import { BannerType } from '@/domains/notification/banner/types';
 import { useBannerStore } from '@/domains/notification/banner/useBannerStore';
+import { isNative } from '@/platform';
+import { getAccessToken } from '@/platform/native/auth';
 import { SOCKET_URL } from '@/shared/constants/socket';
 import { queryClient } from '@/shared/providers/TanStackProvider';
 
@@ -26,6 +28,18 @@ export const addStompConnectListener = (listener: () => void): (() => void) => {
     return () => connectListeners.delete(listener);
 };
 
+/*
+ * 웹은 WebSocket handshake에 쿠키가 자동으로 실려 인증되지만, 앱은 쿠키가 없다.
+ * handshake는 커스텀 헤더를 실을 수 없어 백엔드가 ?token= 쿼리 파라미터를 지원한다.
+ * (JWTAuthenticationFilter가 헤더 → 쿠키 → 쿼리 순으로 토큰을 찾는다)
+ */
+const buildBrokerUrl = (): string => {
+    if (!isNative()) return SOCKET_URL.BASE;
+
+    const accessToken = getAccessToken();
+    return accessToken ? `${SOCKET_URL.BASE}?token=${encodeURIComponent(accessToken)}` : SOCKET_URL.BASE;
+};
+
 const connect = (userId: string) => {
     if (state.client && state.isConnected && state.userId === userId) {
         return state.client;
@@ -34,7 +48,7 @@ const connect = (userId: string) => {
     state.userId = userId;
 
     const client = new Client({
-        brokerURL: `${SOCKET_URL.BASE}`,
+        brokerURL: buildBrokerUrl(),
         reconnectDelay: 5000,
         heartbeatIncoming: 25000,
         heartbeatOutgoing: 25000,

@@ -4,6 +4,8 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { PendingPhoto } from '@/domains/media/components/manage/DateGroupSection';
 import { useImageUpload } from '@/domains/media/hooks/useImageUpload';
+import { isNative } from '@/platform';
+import { pickImagesFromGallery } from '@/platform/native/gallery';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
 type UploadPhase = 'idle' | 'extracting' | 'uploading';
@@ -32,8 +34,16 @@ export const usePhotoUpload = (tripKey: string) => {
     const [uploadPhase, setUploadPhase] = useState<UploadPhase>('idle');
     const [pendingByDate, setPendingByDate] = useState<Record<string, PendingPhoto[]>>({});
 
-    const openFilePicker = () => {
+    // 네이티브에서는 EXIF 원본을 보존하는 갤러리 피커를, 웹에서는 기존 file input을 쓴다.
+    const openFilePicker = async () => {
         if (uploadPhase !== 'idle') return;
+
+        if (isNative()) {
+            const pickedFiles = await pickImagesFromGallery();
+            if (pickedFiles.length > 0) await processFiles(pickedFiles);
+            return;
+        }
+
         fileInputRef.current?.click();
     };
 
@@ -46,7 +56,13 @@ export const usePhotoUpload = (tripKey: string) => {
             return;
         }
 
-        const fileArray: File[] = Array.from(files);
+        await processFiles(Array.from(files), () => {
+            inputEl.value = '';
+        });
+    };
+
+    // 파일 출처(웹 input / 네이티브 피커)와 무관한 공통 업로드 시퀀스.
+    const processFiles = async (fileArray: File[], resetInput?: () => void) => {
         const createdUrls: string[] = [];
 
         // INSTANT: extractMetaData가 끝나기 전에 미리보기 placeholder를 그리드에 즉시 띄움.
@@ -71,7 +87,7 @@ export const usePhotoUpload = (tripKey: string) => {
         setUploadPhase('extracting');
 
         try {
-            const uniqueFiles = await prepareUploadFiles(files);
+            const uniqueFiles = await prepareUploadFiles(fileArray);
             setUploadPhase('uploading');
             // uploadImagesToS3는 백그라운드 chain을 띄우고 즉시 return → waitForBackgroundUpload로
             // 실제 S3 PUT + metadata POST 완료까지 await.
@@ -85,7 +101,7 @@ export const usePhotoUpload = (tripKey: string) => {
         } finally {
             setUploadPhase('idle');
             setPendingByDate({});
-            inputEl.value = '';
+            resetInput?.();
             // blob URL은 React가 다음 paint에서 DOM을 제거한 뒤 회수 (broken image 깜빡임 방지)
             const urlsToRevoke = createdUrls.slice();
             requestAnimationFrame(() => {

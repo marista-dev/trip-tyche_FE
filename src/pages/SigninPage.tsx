@@ -1,12 +1,16 @@
 import { useState } from 'react';
 
+import { Browser } from '@capacitor/browser';
 import { css } from '@emotion/react';
 
 import backgroundImage from '@/assets/images/background-mobile.webp';
 import GuestButton from '@/domains/user/components/GuestButton';
 import LoginButton from '@/domains/user/components/LoginButton';
 import useUserStore from '@/domains/user/stores/useUserStore';
-import { OAUTH_CONFIG } from '@/libs/apis/shared/constants';
+import { API_BASE_URL, OAUTH_CONFIG } from '@/libs/apis/shared/constants';
+import { isNative } from '@/platform';
+import { AUTH_CALLBACK_SCHEME } from '@/platform/native/appShell';
+import { saveAccessToken } from '@/platform/native/auth';
 import { ROUTES } from '@/shared/constants/route';
 import { COLORS } from '@/shared/constants/style';
 import { useToastStore } from '@/shared/stores/useToastStore';
@@ -18,7 +22,20 @@ const SigninPage = () => {
     const loginAsGuest = useUserStore((s) => s.loginAsGuest);
     const showToast = useToastStore((s) => s.showToast);
 
-    const handleLoginButtonClick = (provider: keyof typeof OAUTH_CONFIG.PATH) => {
+    const handleLoginButtonClick = async (provider: keyof typeof OAUTH_CONFIG.PATH) => {
+        /*
+         * 앱에서는 인앱 브라우저로 OAuth를 진행한다.
+         * WebView에서 location.href로 열면 앱 화면이 제공자 페이지로 대체돼 돌아올 수 없고,
+         * 인증 성공 후 백엔드가 심는 쿠키도 WebView에 남지 않는다.
+         * 백엔드는 client=app 파라미터를 보고 triptyche://auth/callback?code=... 로 리다이렉트하며,
+         * 그 딥링크는 appShell의 리스너가 받아 토큰으로 교환한다.
+         */
+        if (isNative()) {
+            const authUrl = `${OAUTH_CONFIG.PATH[provider]}?client=app&redirect_uri=${encodeURIComponent(AUTH_CALLBACK_SCHEME)}`;
+            await Browser.open({ url: authUrl });
+            return;
+        }
+
         window.location.href = OAUTH_CONFIG.PATH[provider];
     };
 
@@ -33,21 +50,26 @@ const SigninPage = () => {
 
     const handleDevLogin = async () => {
         try {
-            const res = await fetch('http://localhost:8080/v1/auth/test-token', {
+            // API 주소를 하드코딩하지 않는다 — 에뮬레이터에서 localhost는 호스트가 아니라 기기 자신이다.
+            const res = await fetch(`${API_BASE_URL}/v1/auth/test-token`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: 'test@test.com', provider: 'google' }),
             });
             const json = await res.json();
-            console.log('[DEV] test-token response:', json);
             const token = json?.data?.accessToken;
             if (!token) {
                 console.error('[DEV] accessToken not found in response', json);
                 return;
             }
-            document.cookie = `access_token=${token}; path=/`;
-            console.log('[DEV] cookie set:', document.cookie);
-            await new Promise((r) => setTimeout(r, 2000));
+
+            // 앱은 쿠키가 유지되지 않으므로 토큰 저장소를 쓴다. 웹은 기존 쿠키 방식 그대로.
+            if (isNative()) {
+                await saveAccessToken(token);
+            } else {
+                document.cookie = `access_token=${token}; path=/`;
+            }
+
             window.location.replace(ROUTES.PATH.HOME);
         } catch (e) {
             console.error('[DEV] login failed:', e);

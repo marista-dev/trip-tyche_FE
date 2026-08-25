@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "606400727685",
+    "project_id": "feelingmemory",
+    "storage_bucket": "feelingmemory.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:606400727685:android:4d7e68662bfa7aa5a577ec",
+        "android_client_info": {
+          "package_name": "cloud.triptyche.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "606400727685-7m6gj4dqsqj01k5bv4geeld7jr11gpv6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBXJBPk6-iVdL70UaUPaOG5wl00UhI18fQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "606400727685-7m6gj4dqsqj01k5bv4geeld7jr11gpv6.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
