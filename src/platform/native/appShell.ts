@@ -5,6 +5,7 @@ import { StatusBar, Style } from '@capacitor/status-bar';
 
 import { isNative } from '@/platform';
 import { exchangeCodeForTokens, hydrateTokens } from '@/platform/native/auth';
+import { setupPushNotifications } from '@/platform/native/push';
 
 // 백엔드와 합의된 OAuth 콜백 스킴. AndroidManifest의 intent-filter와 반드시 일치해야 한다.
 export const AUTH_CALLBACK_SCHEME = 'triptyche://auth/callback';
@@ -82,6 +83,9 @@ export const initAppShell = async () => {
     await setupStatusBar();
     await setupBackButton();
     await setupAuthDeepLink();
+
+    // await 하지 않는다 — 여기서 기다리면 앱 화면이 뜨기 전에 알림 권한 팝업이 먼저 뜬다.
+    void setupPushNotifications();
 
     try {
         await SplashScreen.hide();

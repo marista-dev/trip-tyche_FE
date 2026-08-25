@@ -67,3 +67,8 @@ package-lock.json
 # 디자인 핸드오프
 design_handoff_*/
 *.zip
+
+# 릴리스 서명 자격증명 — 절대 커밋 금지
+android/*.jks
+android/*.keystore
+android/keystore.properties
