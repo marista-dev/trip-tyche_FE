@@ -5,4 +5,4 @@
  * 배포할 때 gradle의 versionCode·versionName과 이 값을 함께 올린다.
  * scripts/build-release-apk.sh가 빌드 끝에 gradle 버전을 출력하므로 대조할 수 있다.
  */
-export const APP_VERSION_NAME = '1.0.0';
+export const APP_VERSION_NAME = '1.0.1';
