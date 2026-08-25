@@ -21,6 +21,9 @@
         "apk:release": "bash scripts/build-release-apk.sh",
         "apk:publish": "bash scripts/publish-apk-release.sh"
     },
+    "engines": {
+        "node": ">=22"
+    },
     "dependencies": {
         "@capacitor/android": "^8.5.0",
         "@capacitor/app": "^8.1.1",
