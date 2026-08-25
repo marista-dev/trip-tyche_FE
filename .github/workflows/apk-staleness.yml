@@ -1,0 +1,67 @@
+# 앱에 반영되지 않은 변경이 쌓였는지 알린다.
+#
+# 앱은 웹사이트를 불러오는 게 아니라 빌드 시점의 웹 자산을 APK 안에 복사해서 쓴다.
+# 그래서 FE를 고쳐 웹에 배포해도 앱 사용자는 옛 화면을 계속 본다.
+# 웹만 배포하고 앱 재배포를 잊는 것이 가장 흔한 실수라, main이 움직일 때마다 확인한다.
+
+name: APK Staleness
+
+on:
+    push:
+        branches: [main]
+
+jobs:
+    check:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Check for unreleased app changes
+              run: |
+                  set -euo pipefail
+
+                  LAST_TAG="$(git tag -l 'v*' --sort=-v:refname | head -1)"
+
+                  if [ -z "$LAST_TAG" ]; then
+                      echo "릴리스가 아직 없다. 확인을 건너뛴다."
+                      exit 0
+                  fi
+
+                  # APK에 담기는 것들. 이 경로가 바뀌면 앱 사용자에게 닿으려면 재배포가 필요하다.
+                  # docs·스크립트·워크플로우는 앱 동작과 무관하므로 제외한다.
+                  CHANGED="$(git diff --name-only "$LAST_TAG..HEAD" -- \
+                      src/ android/ capacitor.config.ts package.json index.html public/ || true)"
+
+                  if [ -z "$CHANGED" ]; then
+                      echo "✅ $LAST_TAG 이후 앱에 영향을 주는 변경이 없다."
+                      echo "### ✅ APK 최신" >> "$GITHUB_STEP_SUMMARY"
+                      echo "" >> "$GITHUB_STEP_SUMMARY"
+                      echo "\`$LAST_TAG\` 이후 앱에 영향을 주는 변경이 없다." >> "$GITHUB_STEP_SUMMARY"
+                      exit 0
+                  fi
+
+                  COUNT="$(git log --oneline --no-merges "$LAST_TAG..HEAD" -- \
+                      src/ android/ capacitor.config.ts package.json index.html public/ | wc -l | tr -d ' ')"
+
+                  echo "::warning::$LAST_TAG 이후 앱에 반영되지 않은 변경이 ${COUNT}건 있다. npm run apk:publish 로 재배포할 것."
+
+                  {
+                      echo "### ⚠️ APK 재배포 필요"
+                      echo ""
+                      echo "\`$LAST_TAG\` 이후 앱에 영향을 주는 변경이 **${COUNT}건** 쌓였다."
+                      echo "웹은 이미 배포됐지만, 앱은 빌드 시점의 자산을 담고 있어 **재배포 전까지 옛 화면을 보여준다.**"
+                      echo ""
+                      echo '```bash'
+                      echo "npm run apk:publish patch"
+                      echo '```'
+                      echo ""
+                      echo "<details><summary>변경된 파일 (${COUNT}개 커밋)</summary>"
+                      echo ""
+                      echo '```'
+                      echo "$CHANGED"
+                      echo '```'
+                      echo "</details>"
+                  } >> "$GITHUB_STEP_SUMMARY"

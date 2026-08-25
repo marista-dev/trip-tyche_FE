@@ -6,11 +6,28 @@
 ## 1. 배포 (한 줄)
 
 ```bash
-npm run apk:publish 1.1.0
+npm run apk:publish patch     # 1.0.0 → 1.0.1
+npm run apk:publish minor     # 1.0.0 → 1.1.0
+npm run apk:publish major     # 1.0.0 → 2.0.0
+npm run apk:publish 1.2.3     # 명시
 ```
 
-이 명령 하나가 빌드 → 검증 → 태그 → GitHub Release까지 하고, Release가 발행되면
-CI(`.github/workflows/apk-publish.yml`)가 **OCI 업로드와 구버전 삭제**를 이어받는다.
+**버전은 스크립트가 알아서 올린다.** `build.gradle`의 versionCode·versionName과
+`appVersion.ts`를 한 번에 맞추고 커밋까지 한다. versionCode는 항상 +1 된다.
+
+빌드가 실패하면 버전 변경을 되돌리므로, 실패한 채로 버전만 올라가는 일은 없다.
+
+이 명령 하나가 버전 상향 → 빌드 → 검증 → 커밋 → 태그 → GitHub Release까지 하고,
+Release가 발행되면 CI(`.github/workflows/apk-publish.yml`)가 **OCI 업로드와 구버전 삭제**를
+이어받는다. 릴리스 노트에는 직전 릴리스 이후의 커밋이 자동으로 담긴다.
+
+### 앱 재배포를 잊지 않도록
+
+앱은 웹사이트를 불러오는 게 아니라 **빌드 시점의 웹 자산을 APK 안에 담는다.**
+그래서 FE를 고쳐 웹에 배포해도 **앱 사용자는 재배포 전까지 옛 화면을 본다.**
+
+`main`이 움직일 때마다 `APK Staleness` 워크플로우가 마지막 릴리스 이후 앱에 영향을 주는
+변경이 쌓였는지 확인하고, 있으면 Actions 요약에 경고를 남긴다.
 
 빌드만 하고 싶으면:
 
@@ -76,9 +93,14 @@ versionName "1.1.0"  // semver
 export const APP_VERSION_NAME = '1.1.0';   // build.gradle의 versionName과 동일하게
 ```
 
-두 곳에 있는 이유는 gradle(네이티브 빌드)과 JS 번들이 서로를 읽을 수 없기 때문이다. 빌드 스크립트가 끝에 gradle 버전을 출력하니 대조할 것.
+두 곳에 있는 이유는 gradle(네이티브 빌드)과 JS 번들이 서로를 읽을 수 없기 때문이다.
+**①②는 `apk:publish`가 자동으로 맞추므로 직접 고칠 필요가 없다.**
 
-**③ 서버의 앱 버전 정책** — 환경변수로 덮어쓴다.
+**③ 서버의 앱 버전 정책** — 환경변수로 덮어쓴다. **여기만 수동이다** (백엔드 배포 권한 필요).
+
+> 백엔드는 버전을 비교하지 않는다. 이 세 값을 그대로 내려줄 뿐이고, 비교는 앱이 한다
+> (`src/platform/native/appUpdate.ts`). 그래서 이 값을 올리지 않으면 새 APK를 올려도
+> 기존 사용자는 업데이트 안내를 받지 못한다.
 ```
 APP_LATEST_VERSION=1.1.0
 APP_MIN_SUPPORTED_VERSION=1.0.0    # 이 미만은 앱이 차단된다

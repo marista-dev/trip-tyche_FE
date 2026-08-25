@@ -5,6 +5,7 @@ import { apiClient } from '@/libs/apis/shared/client';
 import { API_BASE_URL } from '@/libs/apis/shared/constants';
 import { ApiResponse } from '@/libs/apis/shared/types';
 import { isNative } from '@/platform';
+import { APP_VERSION_NAME } from '@/platform/native/appVersion';
 import { clearTokens, getAccessToken, refreshAccessToken } from '@/platform/native/auth';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
@@ -31,6 +32,14 @@ export const setupRequestInterceptor = (instance: AxiosInstance) => {
                 const accessToken = getAccessToken();
                 if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
             }
+
+            /*
+             * 서버가 로그에 남기는 클라이언트 식별자.
+             * APK는 스토어를 거치지 않아 구버전이 오래 남는데, 이 값이 없으면 어떤 버전이
+             * 얼마나 쓰이는지 알 수 없어 minSupportedVersion을 올릴 판단 근거가 없다.
+             */
+            config.headers['X-Client'] = isNative() ? 'app-android' : 'web';
+            if (isNative()) config.headers['X-App-Version'] = APP_VERSION_NAME;
 
             return config;
         },
