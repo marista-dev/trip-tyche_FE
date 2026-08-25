@@ -7,6 +7,7 @@ import WebSocketBanner from '@/domains/notification/banner/WebSocketBanner';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import { socket } from '@/libs/socket';
 import AppUpdateGate from '@/platform/native/components/AppUpdateGate';
+import AndroidAppPrompt from '@/shared/components/app/AndroidAppPrompt';
 import Toast from '@/shared/components/common/Toast';
 import theme from '@/shared/styles/theme';
 
@@ -30,6 +31,7 @@ const RootLayout = () => {
             <Toast />
             <WebSocketBanner />
             <AppUpdateGate />
+            <AndroidAppPrompt />
         </div>
     );
 };
