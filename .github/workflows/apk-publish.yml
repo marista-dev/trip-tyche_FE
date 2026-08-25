@@ -1,0 +1,116 @@
+# APK를 OCI Object Storage에 배포한다.
+#
+# APK 빌드는 CI가 하지 않는다. 서명 키스토어를 GitHub Secrets에 올리면 저장소나 시크릿이
+# 뚫렸을 때 공격자가 '정품 트립티케'로 서명된 APK를 만들어 기존 앱의 업데이트로 가장할 수 있다.
+# 그래서 빌드·서명은 로컬에서만 하고(`npm run apk:release`), CI는 배포와 정리만 맡는다.
+#
+# 흐름
+#   로컬:  npm run apk:release  →  npm run apk:publish v1.1.0
+#          (빌드·검증 → 태그 + GitHub Release 생성 + APK 첨부)
+#   CI:    Release 발행 감지 → APK 내려받기 → 검증 → OCI 업로드 → 구버전 삭제
+
+name: Publish APK
+
+on:
+    release:
+        types: [published]
+
+jobs:
+    publish:
+        # 태그가 v로 시작하는 릴리스만 처리한다.
+        if: startsWith(github.event.release.tag_name, 'v')
+        runs-on: ubuntu-latest
+
+        env:
+            BUCKET: triptyche-storage
+            PREFIX: app
+            AWS_ACCESS_KEY_ID: ${{ secrets.OCI_ACCESS_KEY }}
+            AWS_SECRET_ACCESS_KEY: ${{ secrets.OCI_SECRET_KEY }}
+            AWS_DEFAULT_REGION: ap-chuncheon-1
+            OCI_S3_ENDPOINT: ${{ secrets.OCI_S3_ENDPOINT }}
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Download APK from release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  gh release download "${{ github.event.release.tag_name }}" \
+                      --pattern '*.apk' --dir ./dist-apk --clobber
+                  ls -la ./dist-apk
+
+            - name: Verify APK matches the tag
+              run: |
+                  set -euo pipefail
+
+                  APK="$(find ./dist-apk -name '*.apk' | head -1)"
+                  [ -n "$APK" ] || { echo "::error::릴리스에 APK가 첨부되지 않았다"; exit 1; }
+
+                  # v1.1.0 → 1.1.0
+                  TAG_VERSION="${{ github.event.release.tag_name }}"
+                  TAG_VERSION="${TAG_VERSION#v}"
+
+                  # 저장소의 versionName과 태그가 다르면 잘못된 버전을 배포하는 것이다.
+                  GRADLE_VERSION="$(grep -oE 'versionName "[^"]+"' android/app/build.gradle | cut -d'"' -f2)"
+                  TS_VERSION="$(grep -oE "APP_VERSION_NAME = '[^']+'" src/platform/native/appVersion.ts | cut -d"'" -f2)"
+
+                  echo "태그=$TAG_VERSION  gradle=$GRADLE_VERSION  appVersion.ts=$TS_VERSION"
+
+                  if [ "$TAG_VERSION" != "$GRADLE_VERSION" ] || [ "$TAG_VERSION" != "$TS_VERSION" ]; then
+                      echo "::error::버전이 일치하지 않는다. 세 곳(태그·build.gradle·appVersion.ts)을 맞출 것"
+                      exit 1
+                  fi
+
+                  echo "APK_PATH=$APK" >> "$GITHUB_ENV"
+                  echo "VERSION=$TAG_VERSION" >> "$GITHUB_ENV"
+
+            - name: Upload to OCI Object Storage
+              run: |
+                  set -euo pipefail
+
+                  # 버전별 파일 — 이력·롤백용
+                  aws s3 cp "$APK_PATH" "s3://$BUCKET/$PREFIX/triptyche-$VERSION.apk" \
+                      --endpoint-url "$OCI_S3_ENDPOINT" \
+                      --content-type application/vnd.android.package-archive
+
+                  # 고정 이름 — 사용자에게 안내하는 다운로드 링크가 바뀌지 않도록 매번 덮어쓴다.
+                  # 캐시 때문에 구버전이 내려가지 않도록 no-cache를 건다.
+                  aws s3 cp "$APK_PATH" "s3://$BUCKET/$PREFIX/triptyche-latest.apk" \
+                      --endpoint-url "$OCI_S3_ENDPOINT" \
+                      --content-type application/vnd.android.package-archive \
+                      --cache-control "no-cache, max-age=0"
+
+                  echo "업로드 완료: $PREFIX/triptyche-$VERSION.apk"
+
+            - name: Delete previous APKs
+              run: |
+                  set -euo pipefail
+
+                  KEEP_VERSIONED="$PREFIX/triptyche-$VERSION.apk"
+                  KEEP_LATEST="$PREFIX/triptyche-latest.apk"
+
+                  aws s3 ls "s3://$BUCKET/$PREFIX/" --endpoint-url "$OCI_S3_ENDPOINT" \
+                      | awk '{print $4}' | grep -E '\.apk$' | while read -r name; do
+                      key="$PREFIX/$name"
+                      if [ "$key" = "$KEEP_VERSIONED" ] || [ "$key" = "$KEEP_LATEST" ]; then
+                          continue
+                      fi
+                      echo "삭제: $key"
+                      aws s3 rm "s3://$BUCKET/$key" --endpoint-url "$OCI_S3_ENDPOINT"
+                  done
+
+            - name: Summary
+              run: |
+                  {
+                      echo "### APK 배포 완료"
+                      echo ""
+                      echo "| 항목 | 값 |"
+                      echo "|---|---|"
+                      echo "| 버전 | \`$VERSION\` |"
+                      echo "| 고정 링크 | \`$PREFIX/triptyche-latest.apk\` |"
+                      echo "| 버전 링크 | \`$PREFIX/triptyche-$VERSION.apk\` |"
+                      echo ""
+                      echo "⚠️ 서버의 \`APP_LATEST_VERSION\`을 \`$VERSION\`으로 올려야 앱이 업데이트를 안내한다."
+                  } >> "$GITHUB_STEP_SUMMARY"
