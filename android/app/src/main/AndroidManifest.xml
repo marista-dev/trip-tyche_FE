@@ -33,6 +33,12 @@
 
         </activity>
 
+        <!-- 선언이 없으면 알림이 시스템 기본 중요도로 떨어져 헤드업 배너가 뜨지 않는다.
+             값은 src/platform/native/push.ts의 CHANNEL_ID와 반드시 일치해야 한다. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="triptyche_default" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

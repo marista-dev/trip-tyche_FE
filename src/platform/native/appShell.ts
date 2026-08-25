@@ -6,6 +6,7 @@ import { StatusBar, Style } from '@capacitor/status-bar';
 import { isNative } from '@/platform';
 import { exchangeCodeForTokens, hydrateTokens } from '@/platform/native/auth';
 import { setupPushNotifications } from '@/platform/native/push';
+import { useToastStore } from '@/shared/stores/useToastStore';
 
 // 백엔드와 합의된 OAuth 콜백 스킴. AndroidManifest의 intent-filter와 반드시 일치해야 한다.
 export const AUTH_CALLBACK_SCHEME = 'triptyche://auth/callback';
@@ -53,17 +54,34 @@ const setupAuthDeepLink = async () => {
 
             // 커스텀 스킴은 URL 파서가 쿼리를 못 읽는 경우가 있어 직접 잘라낸다.
             const query = url.includes('?') ? url.slice(url.indexOf('?') + 1) : '';
-            const code = new URLSearchParams(query).get('code');
-
-            if (!code) {
-                console.error('인증 콜백에 code가 없습니다: ', url);
-                return;
-            }
+            const params = new URLSearchParams(query);
+            const code = params.get('code');
+            const error = params.get('error');
 
             try {
                 await Browser.close();
             } catch {
                 // 인앱 브라우저가 이미 닫혔을 수 있다. 무시하고 진행한다.
+            }
+
+            /*
+             * 서버는 인증 실패도 딥링크로 돌려보낸다. 안내가 없으면 사용자는
+             * 아무 반응 없는 로그인 화면을 보게 된다. Custom Tab을 중간에 닫은 경우도 여기로 온다.
+             */
+            if (error) {
+                useToastStore
+                    .getState()
+                    .showToast(
+                        error === 'email_already_registered'
+                            ? '이미 다른 방법으로 가입된 이메일이에요.'
+                            : '로그인에 실패했어요. 다시 시도해 주세요.',
+                    );
+                return;
+            }
+
+            if (!code) {
+                console.error('인증 콜백에 code가 없습니다: ', url);
+                return;
             }
 
             const exchanged = await exchangeCodeForTokens(code);

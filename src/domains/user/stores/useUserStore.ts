@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import { UserInfo } from '@/domains/user/types';
 import { userAPI } from '@/libs/apis';
+import { unregisterDeviceToken } from '@/platform/native/push';
 import { queryClient } from '@/shared/providers/TanStackProvider';
 
 export type AuthStatus = 'unknown' | 'authenticated' | 'unauthenticated';
@@ -65,6 +66,8 @@ const useUserStore = create<UserState>()((set, get) => ({
         set(() => ({ isLoggingOut: true }));
 
         try {
+            // 순서가 중요하다 — 로그아웃 뒤에는 Bearer 토큰이 없어 디바이스 해제가 401이 난다.
+            await unregisterDeviceToken();
             await userAPI.requestLogout();
         } catch {
             // API 실패해도 클라이언트 세션은 반드시 초기화

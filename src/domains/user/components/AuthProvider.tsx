@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import { userAPI } from '@/libs/apis';
 import { toResult } from '@/libs/apis/shared/utils';
+import { registerDeviceToken } from '@/platform/native/push';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 
 /**
@@ -31,6 +32,8 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
             if (result.success) {
                 login(result.data);
+                // 디바이스 등록은 인증이 필요하다. 여기가 앱에서 인증이 확정되는 유일한 지점이다.
+                void registerDeviceToken();
             } else {
                 setUnauthenticated();
             }
