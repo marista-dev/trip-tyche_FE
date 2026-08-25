@@ -31,6 +31,11 @@ jobs:
             AWS_ACCESS_KEY_ID: ${{ secrets.OCI_ACCESS_KEY }}
             AWS_SECRET_ACCESS_KEY: ${{ secrets.OCI_SECRET_KEY }}
             AWS_DEFAULT_REGION: ap-chuncheon-1
+            # AWS CLI v2.23+는 업로드에 무결성 체크섬을 기본 적용하며 aws-chunked 인코딩을 쓴다.
+            # OCI의 S3 호환 API는 이를 지원하지 않아 PutObject가 NotImplemented로 거부된다.
+            # 체크섬을 '필요할 때만'으로 낮춰 일반 업로드에서 chunked 인코딩을 쓰지 않게 한다.
+            AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+            AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
             RAW_ENDPOINT: ${{ secrets.OCI_S3_ENDPOINT }}
             TAG: ${{ github.event.release.tag_name || inputs.tag }}
 
