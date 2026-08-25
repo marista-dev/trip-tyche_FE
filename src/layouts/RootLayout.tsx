@@ -6,6 +6,7 @@ import { Outlet } from 'react-router-dom';
 import WebSocketBanner from '@/domains/notification/banner/WebSocketBanner';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import { socket } from '@/libs/socket';
+import AppUpdateGate from '@/platform/native/components/AppUpdateGate';
 import Toast from '@/shared/components/common/Toast';
 import theme from '@/shared/styles/theme';
 
@@ -28,6 +29,7 @@ const RootLayout = () => {
             <Outlet />
             <Toast />
             <WebSocketBanner />
+            <AppUpdateGate />
         </div>
     );
 };
