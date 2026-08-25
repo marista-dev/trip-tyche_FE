@@ -111,19 +111,19 @@
 
 ## Phase 4. 푸시 — FE 단독 가능분 먼저
 
-- [ ] **4-1. Firebase 프로젝트 + Android 앱 등록**
+- [x] **4-1. Firebase 프로젝트 + Android 앱 등록**
   Firebase 프로젝트 생성, 패키지명 `cloud.triptyche.app` 등록, `google-services.json`을 `android/app/`에 배치(비밀 관리 방침 결정: 커밋 여부).
   ✓기준: 앱 빌드에 google-services 플러그인 적용되어 빌드 성공.
 
-- [ ] **4-2. FCM 플러그인 통합 + 권한** — `src/platform/native/push.ts` 신설
+- [x] **4-2. FCM 플러그인 통합 + 권한** — `src/platform/native/push.ts` 신설
   `@capacitor-firebase/messaging` 설치, 앱 시작 시 알림 권한 요청(거부 시 graceful degrade — 기능 차단 없음), FCM 토큰 획득·로그.
   ✓기준: 에뮬레이터/실기기에서 FCM 토큰이 로그에 찍힘.
 
-- [ ] **4-3. 토큰 등록 훅 골격** `[BE 의존]` — `src/domains/notification/hooks/usePushRegistration.ts` 신설
+- [x] **4-3. 토큰 등록 훅 골격** `[BE 의존]` — `src/domains/notification/hooks/usePushRegistration.ts` 신설
   로그인 후 `POST /v1/devices { token, platform: 'android', appVersion }` 호출 골격 작성(엔드포인트는 Phase 6-3에서 생김 — 그때까지 no-op/플래그 처리).
   ✓기준: 코드 리뷰 수준 완료 + 백엔드 미존재 시 에러 없이 스킵.
 
-- [ ] **4-4. 수신 핸들러: 포그라운드 배너 + 탭 딥링크 라우팅**
+- [x] **4-4. 수신 핸들러: 포그라운드 배너 + 탭 딥링크 라우팅**
   포그라운드 수신 → 기존 배너 UI(`src/domains/notification/banner`) 연결, 백그라운드/종료 상태에서 알림 탭 → payload `data.deeplink`(`triptyche://trip/{tripKey}`)로 라우팅.
   ✓기준: **Firebase 콘솔 테스트 메시지**(4-2의 토큰 대상)로 포그라운드 배너·백그라운드 알림 탭 진입까지 백엔드 없이 검증. 실서비스 이벤트 발송 검증은 Phase 6-3 후.
 
@@ -135,11 +135,11 @@
   저사양 포함 실기기에서 3D 지구본(`GlobeMapPage`)·드론뷰(`CinematicDroneMap`) 프레임 측정. 필요 시 DPR 상한 하향·antialias 조정·파티클 LOD, 저사양 폴백 모드 도입 여부 결정.
   ✓기준: 저사양 기준 기기에서 지구본 조작이 실사용 가능한 프레임 유지.
 
-- [ ] **5-2. 스토어 빌드에서 DEV 로그인 제거**
+- [x] **5-2. 스토어 빌드에서 DEV 로그인 제거**
   DEV 로그인 버튼(SigninPage Step 2)이 프로덕션/스토어 빌드에 포함되지 않도록 빌드 분기.
   ✓기준: release 빌드에서 DEV 로그인 미노출, 로컬 dev에선 유지.
 
-- [ ] **5-3. 앱 아이콘 · 스플래시 스토어 규격 생성**
+- [x] **5-3. 앱 아이콘 · 스플래시 스토어 규격 생성**
   기존 `public/icon-*.png` 기반으로 Android 다해상도(adaptive icon 포함)·스플래시 자산 생성, `android/` 리소스 반영.
   ✓기준: 런처 아이콘·스플래시가 실기기에서 정상 표시.
 
@@ -147,7 +147,8 @@
   매니페스트 권한 최소화 점검(`ACCESS_MEDIA_LOCATION`, 알림), Play Console 데이터 안전 섹션 답변 준비, 개인정보 처리방침 URL 준비.
   ✓기준: Play Console 앱 콘텐츠 섹션 제출 가능 상태.
 
-- [ ] **5-5. 서명 키 + Play 내부 테스트 트랙 업로드**
+- [x] **5-5. 서명 키 + 릴리스 APK 빌드** — 스토어 대신 링크 직배포로 변경됨
+  키스토어 생성·서명 설정·검증 내장 빌드 스크립트 완료. 배포 절차는 [`apk-release/`](apk-release/README.md) 참조.
   업로드 키스토어 생성·보관 방침, AAB 빌드, Play Console 내부 테스트 트랙 업로드.
   ✓기준: 내부 테스터 기기에서 스토어 경유 설치 성공. (최종 기능 E2E는 Phase 6 완료 후)
 
@@ -235,3 +236,30 @@
 - **게스트 로그인 세션이 WebView에서 유지되지 않음** — `POST /v1/auth/guest`는 200을 반환하지만 이후 온보딩으로 되돌아간다. 쿠키 기반 세션이 WebView에 남지 않기 때문으로, Phase 3-1/3-2(토큰 저장 + Bearer 주입)에서 해결된다. Phase 1 범위의 결함은 아니다.
 - **DEV 로그인이 앱에서 동작하지 않던 문제 (수정함)** — API 주소를 `http://localhost:8080`으로 하드코딩해 에뮬레이터에서는 기기 자신을 가리켰고, 세션도 `document.cookie`로 심어 WebView에서 유지되지 않았다. `API_BASE_URL` 사용 + 네이티브에서는 토큰 저장소를 쓰도록 고쳤다.
 - **`useUserStore.login(undefined)` 방어 부재** — 사용자 정보 조회가 실패하면 `userInfo.role`에서 `Cannot read properties of undefined`가 나고 앱이 로딩 화면에 멈춘다. 프로덕션 빌드에서는 API가 성공해 드러나지 않았으나, dev 서버 모드에서 재현된다. Phase 2-5 검증을 위해 dev 모드를 쓰려면 선행 수정이 필요하다.
+
+
+---
+
+## APK 직배포 전환 (2026-08-26)
+
+앱스토어 출시 → **링크에서 APK 직접 다운로드**로 배포 방식이 바뀌었다.
+빌드·서명·배포 절차는 [`apk-release/README.md`](apk-release/README.md)에 정리했다.
+
+### 릴리스 APK 실기기 검증 완료
+
+에뮬레이터(API 36)에 **릴리스 APK를 설치**해 확인한 것:
+
+- 서명 유효, 설치·실행 정상
+- 프로덕션 API(`api.triptyche.cloud`)와 통신 — 실제 여행 데이터 렌더링
+- OAuth 로그인 → 딥링크 복귀 동작
+- 앱 아이콘·이름(트립티케) 정상, 알림·사진 권한 등록
+
+### 남은 작업
+
+- [ ] **개인정보처리방침·이용약관 페이지** — `SigninPage`에 텍스트만 있고 링크가 없다.
+      `https://triptyche.cloud/privacy`는 SPA 폴백이라 실제 페이지가 아니다(루트와 동일한 응답).
+      법적 문서 내용은 서비스 운영자가 정해야 하므로 여기서 작성하지 않았다.
+      OAuth 동의화면 요건이기도 하니 실제 URL이 준비되면 연결할 것.
+- [ ] **푸시 실수신 검증** — 백엔드 M2가 머지됐으므로 가능하다. 다만 공유 요청을 만들면
+      프로덕션 데이터가 생기므로, 테스트 계정으로 하거나 Firebase 콘솔 테스트 메시지를 쓸 것.
+- [ ] **WebGL 저사양 기기 성능 측정** (5-1)
