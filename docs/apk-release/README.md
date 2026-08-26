@@ -96,16 +96,25 @@ export const APP_VERSION_NAME = '1.1.0';   // build.gradle의 versionName과 동
 두 곳에 있는 이유는 gradle(네이티브 빌드)과 JS 번들이 서로를 읽을 수 없기 때문이다.
 **①②는 `apk:publish`가 자동으로 맞추므로 직접 고칠 필요가 없다.**
 
-**③ 서버의 앱 버전 정책** — 환경변수로 덮어쓴다. **여기만 수동이다** (백엔드 배포 권한 필요).
+**③ 서버가 내려주는 최신 버전** — **자동이다.** 배포 워크플로가 APK와 함께
+`app/version.json`을 올리고, 백엔드가 그 파일을 읽어 `latestVersion`으로 내려준다.
 
-> 백엔드는 버전을 비교하지 않는다. 이 세 값을 그대로 내려줄 뿐이고, 비교는 앱이 한다
-> (`src/platform/native/appUpdate.ts`). 그래서 이 값을 올리지 않으면 새 APK를 올려도
-> 기존 사용자는 업데이트 안내를 받지 못한다.
+```json
+{ "latestVersion": "1.1.0", "latestVersionCode": 3, "publishedAt": "..." }
 ```
-APP_LATEST_VERSION=1.1.0
+
+> 예전에는 서버 환경변수 `APP_LATEST_VERSION`을 손으로 올려야 했고, 실제로 어긋난 채
+> 방치됐다(서버 1.0.0 / 배포된 APK 1.0.1). '무엇이 최신 빌드인가'는 배포만 아는 사실이라
+> 배포가 발행하도록 바꿨다. 조회에 실패하면 서버는 기존 `APP_LATEST_VERSION` 값으로 되돌아간다.
+
+**④ 정책 값** — 이쪽은 판단이 필요해 수동으로 남겨 뒀다 (백엔드 배포 권한 필요).
+```
 APP_MIN_SUPPORTED_VERSION=1.0.0    # 이 미만은 앱이 차단된다
-APP_UPDATE_URL=<APK 다운로드 페이지 주소>
+APP_UPDATE_URL=<APK 다운로드 주소>
 ```
+
+> 백엔드는 버전을 비교하지 않는다. 값을 그대로 내려줄 뿐이고, 비교는 앱이 한다
+> (`src/platform/native/appUpdate.ts`).
 
 앱은 부팅 시 `GET /v1/app/config`로 이 값을 읽어 안내한다.
 `minSupportedVersion` 미만이면 **닫을 수 없는 안내**가 뜨므로, API 호환이 실제로 깨졌을 때만 올린다.
@@ -146,6 +155,5 @@ Google Play가 아닌 곳에서 받는 앱이라 설치 중 경고가 표시됩�
 
 - [ ] `npm run apk:release`가 검증을 모두 통과했는가
 - [ ] `versionCode`·`versionName`·`APP_VERSION_NAME` 세 곳이 일치하는가
-- [ ] 서버의 `APP_LATEST_VERSION`을 이번 버전으로 올렸는가
 - [ ] `APP_UPDATE_URL`이 실제 다운로드 페이지를 가리키는가
 - [ ] 실기기에서 설치 → 로그인 → 사진 업로드가 동작하는가

@@ -107,8 +107,11 @@ jobs:
                       exit 1
                   fi
 
+                  VERSION_CODE="$(grep -oE 'versionCode [0-9]+' android/app/build.gradle | grep -oE '[0-9]+')"
+
                   echo "APK_PATH=$APK" >> "$GITHUB_ENV"
                   echo "VERSION=$TAG_VERSION" >> "$GITHUB_ENV"
+                  echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
 
             - name: Upload to OCI Object Storage
               run: |
@@ -127,6 +130,24 @@ jobs:
                       --cache-control "no-cache, max-age=0"
 
                   echo "업로드 완료: $PREFIX/triptyche-$VERSION.apk"
+
+                  # 서버(/v1/app/config)가 이 파일을 읽어 최신 버전을 판단한다.
+                  # '무엇이 최신 빌드인가'는 배포가 아는 사실이므로 여기서 발행하고,
+                  # 강제 업데이트 하한(min-supported-version)과 다운로드 주소는 서버 정책으로 남긴다.
+                  cat > version.json <<JSON
+                  {
+                    "latestVersion": "$VERSION",
+                    "latestVersionCode": $VERSION_CODE,
+                    "publishedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                  }
+                  JSON
+
+                  aws s3 cp version.json "s3://$BUCKET/$PREFIX/version.json" \
+                      --endpoint-url "$OCI_S3_ENDPOINT" \
+                      --content-type application/json \
+                      --cache-control "no-cache, max-age=0"
+
+                  echo "매니페스트 발행: $PREFIX/version.json ($VERSION / code $VERSION_CODE)"
 
             - name: Delete previous APKs
               run: |
@@ -155,6 +176,7 @@ jobs:
                       echo "| 버전 | \`$VERSION\` |"
                       echo "| 고정 링크 | \`$PREFIX/triptyche-latest.apk\` |"
                       echo "| 버전 링크 | \`$PREFIX/triptyche-$VERSION.apk\` |"
+                      echo "| 매니페스트 | \`$PREFIX/version.json\` |"
                       echo ""
-                      echo "⚠️ 서버의 \`APP_LATEST_VERSION\`을 \`$VERSION\`으로 올려야 앱이 업데이트를 안내한다."
+                      echo "서버의 최신 버전은 이 매니페스트를 읽어 자동 반영된다."
                   } >> "$GITHUB_STEP_SUMMARY"
