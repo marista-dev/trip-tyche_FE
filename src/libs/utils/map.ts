@@ -85,6 +85,10 @@ export const getPreciseLocationFromCoordinate = async (location: Location): Prom
             const placeName = await new Promise<string | null>((resolve) => {
                 service.nearbySearch({ location: center, radius: 30 }, (results, status) => {
                     if (status !== placesLib.PlacesServiceStatus.OK || !results || results.length === 0) {
+                        // ZERO_RESULTS는 정상이지만 REQUEST_DENIED/OVER_QUERY_LIMIT은 설정 문제다. 구분해서 남긴다.
+                        if (status !== placesLib.PlacesServiceStatus.ZERO_RESULTS) {
+                            console.warn(`Places nearbySearch failed: ${status}`);
+                        }
                         resolve(null);
                         return;
                     }
@@ -163,7 +167,8 @@ export const getPreciseLocationFromCoordinate = async (location: Location): Prom
 
         addressCache.set(cacheKey, cleaned);
         return cleaned;
-    } catch {
+    } catch (error) {
+        console.error('역지오코딩 실패: ', error);
         return '위치 정보 없음';
     }
 };
@@ -198,7 +203,8 @@ export const getNeighborhoodFromLocation = async (location: Location): Promise<s
         const fallback = results[0]?.formatted_address ?? '주소 특정 불가 지역';
         addressCache.set(cacheKey, fallback);
         return fallback;
-    } catch {
+    } catch (error) {
+        console.error('역지오코딩 실패: ', error);
         return '위치 정보 없음';
     }
 };
