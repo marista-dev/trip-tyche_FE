@@ -13,6 +13,19 @@ interface CustomRequestConfing extends InternalAxiosRequestConfig {
     isAlreadyRequest?: boolean;
 }
 
+/*
+ * 401·403이 "세션 종료"를 뜻하지 않는 경로.
+ *
+ * 배경에서 도는 부가 요청이라 실패해도 화면은 그대로 둬야 한다.
+ * 게스트는 ROLE_GUEST여서 POST /v1/devices 권한이 없어 401을 받는데,
+ * 이걸 세션 만료로 처리하는 바람에 게스트가 홈에 진입하자마자 로그인 화면으로 튕겼다.
+ * 인증이 꼭 필요한 요청과 있으면 좋은 요청을 구분하지 않으면 같은 사고가 반복된다.
+ */
+const SESSION_AGNOSTIC_PATHS = ['/v1/devices'];
+
+const isSessionAgnostic = (config?: CustomRequestConfing) =>
+    SESSION_AGNOSTIC_PATHS.some((path) => config?.url?.includes(path));
+
 export const setupRequestInterceptor = (instance: AxiosInstance) => {
     instance.interceptors.request.use(
         (config: InternalAxiosRequestConfig) => {
@@ -84,6 +97,8 @@ export const setupResponseInterceptor = (instance: AxiosInstance) => {
                 const { status } = error.response.data ?? {};
 
                 if (status === 401) {
+                    if (isSessionAgnostic(originalRequest)) return Promise.reject(error);
+
                     /*
                      * 앱에는 갱신할 쿠키가 없다. 현행 /v1/auth/refresh는 refresh 토큰을 쿠키에서만
                      * 읽으므로(백엔드 M1에서 body 기반 경로가 생긴다), 지금은 토큰을 버리고
@@ -110,6 +125,8 @@ export const setupResponseInterceptor = (instance: AxiosInstance) => {
                 }
 
                 if (status === 403) {
+                    if (isSessionAgnostic(originalRequest)) return Promise.reject(error);
+
                     useUserStore.getState().setUnauthenticated();
                     return Promise.reject(error);
                 }

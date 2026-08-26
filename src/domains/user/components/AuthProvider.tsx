@@ -32,8 +32,12 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
             if (result.success) {
                 login(result.data);
-                // 디바이스 등록은 인증이 필요하다. 여기가 앱에서 인증이 확정되는 유일한 지점이다.
-                void registerDeviceToken();
+                /*
+                 * 디바이스 등록은 인증이 필요하다. 여기가 앱에서 인증이 확정되는 유일한 지점이다.
+                 * 다만 게스트는 제외한다 — ROLE_GUEST에는 POST /v1/devices 권한이 없어 401이 나고,
+                 * 4시간 뒤 사라질 계정이라 토큰을 등록할 이유도 없다.
+                 */
+                if (result.data?.role !== 'GUEST') void registerDeviceToken();
             } else {
                 setUnauthenticated();
             }
