@@ -354,7 +354,7 @@ const TripTicketActionSheet = ({
                                             background: ${isDanger
                                                 ? 'rgba(239, 68, 68, 0.1)'
                                                 : 'rgba(15, 23, 42, 0.05)'};
-                                            color: ${isDanger ? '#ef4444' : COLORS.TICKET_BAND};
+                                            color: ${isDanger ? COLORS.TEXT.ERROR : COLORS.TICKET_BAND};
                                             display: flex;
                                             align-items: center;
                                             justify-content: center;
@@ -373,7 +373,7 @@ const TripTicketActionSheet = ({
                                             css={css`
                                                 font-size: 14px;
                                                 font-weight: 600;
-                                                color: ${isDanger ? '#ef4444' : COLORS.TICKET_BAND};
+                                                color: ${isDanger ? COLORS.TEXT.ERROR : COLORS.TICKET_BAND};
                                                 letter-spacing: -0.2px;
                                             `}
                                         >

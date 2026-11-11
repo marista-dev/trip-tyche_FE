@@ -16,10 +16,12 @@ export const COLORS = {
         WHITE: '#ffffff',
         PLACEHOLDER: 'rgba(15, 23, 42, 0.35)',
         SUCCESS: '#059669',
-        ERROR: '#ef4444',
-        DESCRIPTION: 'rgba(15, 23, 42, 0.6)',
-        DESCRIPTION_LIGHT: 'rgba(15, 23, 42, 0.4)',
-        SECONDARY: 'rgba(15, 23, 42, 0.5)',
+        // 흰 바탕 4.5:1 이상(WCAG AA). #ef4444는 3.76이라 작은 경고 문구가 읽히지 않았다.
+        ERROR: '#dc2626',
+        // 보조 글자도 흰 바탕 4.5:1 이상. 예전 0.4/0.5는 2.6/3.4라 낮 야외에서 읽기 어려웠다.
+        DESCRIPTION: 'rgba(15, 23, 42, 0.68)',
+        DESCRIPTION_LIGHT: 'rgba(15, 23, 42, 0.62)',
+        SECONDARY: 'rgba(15, 23, 42, 0.64)',
         LINK_LIGHT: '#0066cc',
         LINK_DARK: '#2997ff',
     },
@@ -45,8 +47,8 @@ export const COLORS = {
         NAV: 'rgba(255, 255, 255, 0.92)',
         DARK_CARD: '#0055d4',
     },
-    /** 입력칸 테두리 — Mantine Input 기본값과 같다. 직접 만든 입력칸도 이 값을 써야 모양이 맞는다. */
-    INPUT_BORDER: '#ced4da',
+    /** 입력칸 테두리 — 흰 바탕 3:1(WCAG 1.4.11). Mantine 기본 #ced4da는 1.5라 칸 경계가 흐렸다. */
+    INPUT_BORDER: '#8b95a5',
     /** 중립 회색 단계(tailwind slate). 칩·구분선·보조 텍스트에 쓴다. */
     SLATE: {
         100: '#f1f5f9',

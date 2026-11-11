@@ -135,7 +135,7 @@ const DestinationField = ({ value, onChange, suggestion }: DestinationFieldProps
                 <div css={sheetBody}>
                     <h2 css={sheetTitle}>어디로 다녀왔나요?</h2>
                     <label css={searchBox}>
-                        <Search size={16} color={COLORS.SLATE[400]} />
+                        <Search size={16} color={COLORS.SLATE[500]} />
                         <input
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
@@ -329,7 +329,7 @@ const trigger = css`
 
 const triggerIcon = css`
     justify-self: center;
-    color: ${COLORS.SLATE[400]};
+    color: ${COLORS.SLATE[500]};
 `;
 
 const triggerValue = css`
@@ -410,7 +410,7 @@ const searchInput = css`
     color: ${COLORS.TEXT.BLACK};
 
     &::placeholder {
-        color: ${COLORS.SLATE[400]};
+        color: ${COLORS.SLATE[500]};
         font-size: 14px;
     }
 `;
@@ -449,7 +449,7 @@ const sectionLabel = css`
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.6px;
-    color: ${COLORS.SLATE[400]};
+    color: ${COLORS.SLATE[500]};
 `;
 
 const tileGrid = (columns: number) => css`
@@ -577,7 +577,7 @@ const rowName = css`
 const rowSub = css`
     flex: 1;
     font-size: 11px;
-    color: ${COLORS.SLATE[400]};
+    color: ${COLORS.SLATE[500]};
     letter-spacing: 0.3px;
 `;
 
@@ -585,7 +585,7 @@ const emptyText = css`
     padding: 40px 0;
     text-align: center;
     font-size: 14px;
-    color: ${COLORS.SLATE[400]};
+    color: ${COLORS.SLATE[500]};
 `;
 
 const indexBar = css`

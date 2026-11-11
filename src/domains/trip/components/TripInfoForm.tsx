@@ -385,7 +385,7 @@ const toggleKnob = (on: boolean) => css`
 const toggleText = (on: boolean) => css`
     font-size: ${FIELD.HELP_SIZE};
     font-weight: 600;
-    color: ${on ? ACCENT : theme.COLORS.SLATE[400]};
+    color: ${on ? ACCENT : theme.COLORS.SLATE[500]};
     transition: color 0.2s;
 `;
 
@@ -405,7 +405,7 @@ const fitButton = css`
 const hashtagCount = (isFull: boolean) => css`
     font-size: ${FIELD.HELP_SIZE};
     font-weight: 600;
-    color: ${isFull ? ACCENT : theme.COLORS.SLATE[400]};
+    color: ${isFull ? ACCENT : theme.COLORS.SLATE[500]};
     letter-spacing: 0.4px;
     transition: color 0.2s;
 `;
