@@ -4,12 +4,39 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { PendingPhoto } from '@/domains/media/components/manage/DateGroupSection';
 import { useImageUpload } from '@/domains/media/hooks/useImageUpload';
+import { getDateBounds, getDatesOutside, toPhotoDays } from '@/domains/trip/tripDates';
 import { ANALYTICS_EVENTS, track } from '@/libs/analytics';
 import { isNative } from '@/platform';
 import { pickImagesFromGallery } from '@/platform/native/gallery';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
 type UploadPhase = 'idle' | 'extracting' | 'uploading';
+
+export interface TripRange {
+    start: string;
+    end: string;
+}
+
+/** 추가하려는 사진 중 여행 기간 밖에 찍힌 것이 있을 때 사용자에게 물을 내용 */
+export interface DateConflict {
+    /** 기간 밖 촬영일(정렬, 중복 없음) */
+    outsideDates: string[];
+    /** 기간 밖 사진 장수 */
+    outsideCount: number;
+    totalCount: number;
+    current: TripRange;
+    /** 기존 기간과 새 사진을 모두 담는 기간 */
+    extended: TripRange;
+}
+
+export type DateConflictChoice = 'extend' | 'keep' | 'cancel';
+
+interface UsePhotoUploadOptions {
+    /** 확정된 여행 기간. 없으면(작성 중인 여행) 날짜 확인을 건너뛴다. */
+    tripRange?: TripRange | null;
+    /** '기간 늘리기'를 고르면 호출. 실패하면 false를 돌려 업로드를 멈춘다. */
+    onExtendRange?: (range: TripRange) => Promise<boolean>;
+}
 
 /**
  * 사진 관리 페이지의 파일 추가 흐름을 캡슐화하는 훅.
@@ -26,10 +53,27 @@ type UploadPhase = 'idle' | 'extracting' | 'uploading';
  *  - input.value = '' reset은 finally(모든 await 종료 후)로 미뤄 FileList 무효화 차단
  *  - DataTransfer 의존 없음 (extractMetaData/useImageUpload 내부 다 File[]로 통일됨)
  */
-export const usePhotoUpload = (tripKey: string) => {
+export const usePhotoUpload = (tripKey: string, { tripRange, onExtendRange }: UsePhotoUploadOptions = {}) => {
     const queryClient = useQueryClient();
     const { showToast } = useToastStore();
-    const { prepareUploadFiles, uploadImagesToS3, waitForBackgroundUpload, progress } = useImageUpload();
+    const { prepareUploadFiles, extractMetadata, uploadImagesToS3, waitForBackgroundUpload, progress } =
+        useImageUpload();
+
+    // 날짜 확인 시트 — processFiles가 사용자의 선택을 기다린다.
+    const [dateConflict, setDateConflict] = useState<DateConflict | null>(null);
+    const conflictResolverRef = useRef<((choice: DateConflictChoice) => void) | null>(null);
+
+    const askDateConflict = (conflict: DateConflict) =>
+        new Promise<DateConflictChoice>((resolve) => {
+            conflictResolverRef.current = resolve;
+            setDateConflict(conflict);
+        });
+
+    const resolveDateConflict = (choice: DateConflictChoice) => {
+        conflictResolverRef.current?.(choice);
+        conflictResolverRef.current = null;
+        setDateConflict(null);
+    };
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploadPhase, setUploadPhase] = useState<UploadPhase>('idle');
@@ -89,10 +133,36 @@ export const usePhotoUpload = (tripKey: string) => {
 
         try {
             const uniqueFiles = await prepareUploadFiles(fileArray);
+            const metadata = await extractMetadata(uniqueFiles);
+
+            /*
+             * 여행 기간 밖에 찍힌 사진이면 올리기 전에 묻는다. 올린 뒤에 알려주면 잘못 고른 사진이
+             * 이미 서버에 있어 지우는 수고가 생긴다. 날짜만 비교한다(시각은 보지 않는다).
+             */
+            if (tripRange?.start && tripRange?.end) {
+                const days = toPhotoDays(metadata.map((m) => m.recordDate));
+                const outsideDates = getDatesOutside(days, tripRange.start, tripRange.end);
+                if (outsideDates.length > 0) {
+                    const bounds = getDateBounds([...days, tripRange.start, tripRange.end])!;
+                    const choice = await askDateConflict({
+                        outsideDates,
+                        outsideCount: days.filter((d) => outsideDates.includes(d)).length,
+                        totalCount: uniqueFiles.length,
+                        current: tripRange,
+                        extended: bounds,
+                    });
+                    if (choice === 'cancel') {
+                        showToast('사진 추가를 취소했어요');
+                        return;
+                    }
+                    if (choice === 'extend' && onExtendRange && !(await onExtendRange(bounds))) return;
+                }
+            }
+
             setUploadPhase('uploading');
             // uploadImagesToS3는 백그라운드 chain을 띄우고 즉시 return → waitForBackgroundUpload로
             // 실제 S3 PUT + metadata POST 완료까지 await.
-            await uploadImagesToS3(uniqueFiles);
+            await uploadImagesToS3(uniqueFiles, undefined, metadata);
             await waitForBackgroundUpload();
 
             await queryClient.invalidateQueries({ queryKey: ['trip-images', tripKey] });
@@ -130,5 +200,7 @@ export const usePhotoUpload = (tripKey: string) => {
         isUploading: uploadPhase !== 'idle',
         uploadingText,
         pendingByDate,
+        dateConflict,
+        resolveDateConflict,
     };
 };

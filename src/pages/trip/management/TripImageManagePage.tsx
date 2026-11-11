@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
 
 import { css } from '@emotion/react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ImageOff } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { SwappableImage } from '@/domains/media/components/common/SwappableImage';
+import DateConflictSheet from '@/domains/media/components/manage/DateConflictSheet';
 import DateGroupSection from '@/domains/media/components/manage/DateGroupSection';
 import IssueCard from '@/domains/media/components/manage/IssueCard';
 import ManageHeader from '@/domains/media/components/manage/ManageHeader';
@@ -26,6 +28,7 @@ import {
     filterWithoutLocationMediaFile,
     getImageGroupByDate,
 } from '@/domains/media/utils';
+import { useTripFormSubmit } from '@/domains/trip/hooks/mutations';
 import { useTripInfo } from '@/domains/trip/hooks/queries';
 import { toLocalDate } from '@/domains/trip/tripDates';
 import { useMemberOnly } from '@/domains/user/hooks/useMemberOnly';
@@ -61,6 +64,27 @@ const TripImageManagePage = () => {
     const { photos: allImages, isLoading: isImagesLoading } = useTripPhotos(tripKey);
     const { data: tripInfoResult } = useTripInfo(tripKey);
     const { mutate: deleteMutate, isPending: isDeleting } = useMediaDelete();
+    const { mutateAsync: submitTripForm } = useTripFormSubmit();
+    const queryClient = useQueryClient();
+    const tripInfo = tripInfoResult?.success ? tripInfoResult.data : undefined;
+    // 확정된 여행만 기간이 있다. 작성 중인 여행은 날짜 확인을 건너뛴다.
+    const tripRange =
+        tripInfo?.startDate && tripInfo?.endDate ? { start: tripInfo.startDate, end: tripInfo.endDate } : null;
+
+    const extendTripRange = async ({ start, end }: { start: string; end: string }) => {
+        if (!tripInfo) return false;
+        const { tripTitle, country, hashtags } = tripInfo;
+        const result = await submitTripForm({
+            tripKey,
+            tripForm: { tripTitle, country, hashtags, startDate: start, endDate: end },
+        });
+        if (!result.success) {
+            showToast(result.error || '여행 기간을 바꾸지 못했어요');
+            return false;
+        }
+        await queryClient.invalidateQueries({ queryKey: ['ticket-info', tripKey] });
+        return true;
+    };
 
     // 선택 상태 + 업로드 흐름 (각 책임을 hook으로 격리)
     const {
@@ -78,7 +102,9 @@ const TripImageManagePage = () => {
         isUploading,
         uploadingText,
         pendingByDate,
-    } = usePhotoUpload(tripKey);
+        dateConflict,
+        resolveDateConflict,
+    } = usePhotoUpload(tripKey, { tripRange, onExtendRange: extendTripRange });
     // 게스트는 사진을 고르기 전에 막는다 — 고른 뒤 업로드 단계에서 막히면 수고가 버려진다.
     const openFilePicker = () => requireMember('photo', openPicker);
 
@@ -93,8 +119,6 @@ const TripImageManagePage = () => {
             (item) => item.status === 'UPLOADED' || item.status === 'PROCESSING' || item.status === 'FAILED',
         );
     }, [sessionTripKey, tripKey, sessionImages]);
-
-    const tripInfo = tripInfoResult?.success ? tripInfoResult.data : undefined;
 
     // 파생 데이터 — 카테고리별 분류 + 날짜 그룹 + pending 머지
     const noLocImages = useMemo(() => filterWithoutLocationMediaFile(allImages) as MediaFile[], [allImages]);
@@ -266,6 +290,8 @@ const TripImageManagePage = () => {
                     onDelete={() => setShowDeleteConfirm(true)}
                 />
             )}
+
+            <DateConflictSheet conflict={dateConflict} onResolve={resolveDateConflict} />
 
             {showDeleteConfirm && (
                 <ConfirmModal

@@ -144,7 +144,12 @@ export const useImageUpload = () => {
     // postUploadTask는 S3 업로드 + 메타등록 이후에 같은 체인으로 묶어 실행할 작업(예: status 전환).
     // 실패 시 step3의 waitForBackgroundUpload에서 함께 surface되어 retry UI로 노출된다.
     const uploadImagesToS3 = useCallback(
-        async (uniqueFiles: readonly File[], postUploadTask?: () => Promise<unknown>) => {
+        async (
+            uniqueFiles: readonly File[],
+            postUploadTask?: () => Promise<unknown>,
+            /** 호출부가 이미 EXIF를 읽었다면 넘긴다 — 같은 파일을 두 번 읽지 않는다. 순서는 uniqueFiles와 같아야 한다. */
+            precomputedMetadata?: ClientImageFile[],
+        ) => {
             if (uploadInProgressRef.current) {
                 throw new Error('이미 진행 중인 업로드가 있습니다. 완료 후 다시 시도해주세요.');
             }
@@ -163,7 +168,7 @@ export const useImageUpload = () => {
                 const imageNames = fileArray.map((file) => ({ fileName: file.name }));
 
                 const [imagesWithMetadata, presignedResult] = await Promise.all([
-                    extractMetadataFromImage(fileArray, setProgress),
+                    precomputedMetadata ?? extractMetadataFromImage(fileArray, setProgress),
                     mediaAPI.requestPresignedUrls(tripKey!, imageNames),
                 ]);
 
@@ -273,8 +278,12 @@ export const useImageUpload = () => {
         };
     }, [retryFailedUploads]);
 
+    // 업로드 전에 날짜 등을 확인해야 하는 호출부용. 진행률(metadata)도 함께 갱신한다.
+    const extractMetadata = useCallback((files: readonly File[]) => extractMetadataFromImage(files, setProgress), []);
+
     return {
         images,
+        extractMetadata,
         imageCategories,
         progress,
         uploadStats,
