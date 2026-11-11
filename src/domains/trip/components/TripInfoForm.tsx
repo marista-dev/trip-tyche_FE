@@ -211,7 +211,9 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
                         value={toLocalDate(startDate)}
                         onChange={handleSingleDateChange}
                         {...sharedPickerProps}
-                        aria-labelledby={ids.date}
+                        // 라벨 + 자기 값(선택한 날짜)을 함께 읽게 자기 id도 넣는다
+                        id={`${ids.date}-value`}
+                        aria-labelledby={`${ids.date} ${ids.date}-value`}
                         valueFormatter={({ date }) => (date instanceof Date ? formatRange(date, null) : '')}
                     />
                 ) : (
@@ -224,7 +226,9 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
                         value={pickerValue}
                         onChange={handleDateChange}
                         {...sharedPickerProps}
-                        aria-labelledby={ids.date}
+                        // 라벨 + 자기 값(선택한 날짜)을 함께 읽게 자기 id도 넣는다
+                        id={`${ids.date}-value`}
+                        aria-labelledby={`${ids.date} ${ids.date}-value`}
                         valueFormatter={({ date }) =>
                             Array.isArray(date) ? formatRange(date[0] as Date | null, date[1] as Date | null) : ''
                         }
@@ -370,6 +374,7 @@ const titleRow = css`
     }
 `;
 
+// 보이는 크기는 그대로 두고 누를 수 있는 영역만 위아래로 넓혀 44px를 맞춘다.
 const togglePill = css`
     display: inline-flex;
     align-items: center;
@@ -378,7 +383,10 @@ const togglePill = css`
     user-select: none;
     background: none;
     border: none;
-    padding: 0;
+    min-height: 44px;
+    padding: 0 0 0 8px;
+    margin: -12px 0;
+    -webkit-tap-highlight-color: transparent;
 `;
 
 const toggleTrack = (on: boolean) => css`
@@ -394,13 +402,14 @@ const toggleTrack = (on: boolean) => css`
 const toggleKnob = (on: boolean) => css`
     position: absolute;
     top: 2px;
-    left: ${on ? '17px' : '2px'};
+    left: 2px;
     width: 16px;
     height: 16px;
     border-radius: 50%;
     background: ${theme.COLORS.BACKGROUND.WHITE};
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
-    transition: left 0.2s;
+    transform: translateX(${on ? '15px' : '0'});
+    transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
 `;
 
 const toggleText = (on: boolean) => css`
@@ -411,8 +420,8 @@ const toggleText = (on: boolean) => css`
 `;
 
 const fitButton = css`
-    margin-left: 6px;
-    padding: 0;
+    margin: -8px 0 -8px 4px;
+    padding: 8px 2px;
     border: none;
     background: none;
     color: ${ACCENT};

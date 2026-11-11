@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 
 import { css } from '@emotion/react';
-import { AnimatePresence, motion, PanInfo } from 'framer-motion';
+import { AnimatePresence, motion, PanInfo, useReducedMotion } from 'framer-motion';
 import { createPortal } from 'react-dom';
 
 interface BottomSheetProps {
@@ -15,6 +15,7 @@ interface BottomSheetProps {
 
 const BottomSheet = ({ isOpen, onClose, children, maxHeight = '80vh', labelledBy }: BottomSheetProps) => {
     const sheetRef = useRef<HTMLDivElement>(null);
+    const reduceMotion = useReducedMotion();
 
     /*
      * 열리면 포커스를 시트로 옮기고, 닫히면 연 버튼으로 돌려놓는다.
@@ -83,7 +84,8 @@ const BottomSheet = ({ isOpen, onClose, children, maxHeight = '80vh', labelledBy
                         initial={{ y: '100%' }}
                         animate={{ y: 0 }}
                         exit={{ y: '100%' }}
-                        transition={{ duration: 0.32, ease: [0.34, 1.4, 0.64, 1] }}
+                        // 튕기지 않고 부드럽게 멈추는 ease-out-quart. 동작 줄이기 설정이면 바로 나타난다.
+                        transition={reduceMotion ? { duration: 0 } : { duration: 0.32, ease: [0.25, 1, 0.5, 1] }}
                     >
                         <div css={handleBarStyle} />
                         {children}
@@ -104,21 +106,31 @@ const backdropStyle = css`
     z-index: 1100;
 `;
 
+/*
+ * - 앱 화면과 같은 폭(최대 428px)으로 가운데 둔다. PC 웹에서 화면 전체로 펼쳐지지 않게.
+ * - 높이는 dvh: 키보드가 올라오면 함께 줄어든다(vh는 그대로라 아래 내용이 키보드 뒤로 숨는다).
+ * - 아래 여백에 시스템 바(제스처 바) 높이를 더한다. 안드로이드는 targetSdk 36부터 화면을 끝까지 그린다.
+ */
 const sheetStyle = (maxHeight: string) => css`
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
+    margin: 0 auto;
+    max-width: 428px;
     max-height: ${maxHeight};
+    max-height: ${maxHeight.replace(/vh$/, 'dvh')};
     overflow-y: auto;
     background-color: #ffffff;
     border-radius: 20px 20px 0 0;
-    padding: 14px 20px 28px;
+    padding: 14px 20px calc(28px + env(safe-area-inset-bottom, 0px));
     z-index: 1101;
 
     /* 프로그램으로 옮긴 포커스(시트 전체)에는 테두리를 그리지 않는다 */
-    &:focus {
+    &:focus,
+    &:focus-visible {
         outline: none;
+        box-shadow: none;
     }
 `;
 

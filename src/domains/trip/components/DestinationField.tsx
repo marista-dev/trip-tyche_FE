@@ -166,7 +166,9 @@ const DestinationField = ({ value, onChange, suggestion, labelledBy }: Destinati
                                 onClick={() => setQuery('')}
                                 aria-label='검색어 지우기'
                             >
-                                <X size={14} />
+                                <span>
+                                    <X size={12} aria-hidden='true' />
+                                </span>
                             </button>
                         )}
                     </label>
@@ -373,8 +375,10 @@ const triggerPlaceholder = css`
 
 const hintButton = css`
     ${fieldHelp};
-    margin-top: 6px;
+    /* 글자 한 줄이지만 누르는 영역은 32px 높이로 */
+    margin-top: 0;
     margin-left: 2px;
+    min-height: 32px;
     padding: 0;
     display: inline-flex;
     align-items: center;
@@ -394,6 +398,7 @@ const sheetBody = css`
     display: flex;
     flex-direction: column;
     height: calc(88vh - 60px);
+    height: calc(88dvh - 60px - env(safe-area-inset-bottom, 0px));
 `;
 
 const sheetTitle = css`
@@ -431,16 +436,26 @@ const searchInput = css`
     }
 `;
 
+// 회색 원(20px)은 그대로 보이고, 누르는 영역은 32px.
 const clearButton = css`
     display: grid;
     place-items: center;
-    width: 22px;
-    height: 22px;
+    width: 32px;
+    height: 32px;
+    margin-right: -6px;
     border: none;
-    border-radius: 50%;
-    background: ${COLORS.SLATE[300]};
-    color: #fff;
+    background: none;
     cursor: pointer;
+
+    span {
+        display: grid;
+        place-items: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: ${COLORS.SLATE[300]};
+        color: ${COLORS.TEXT.WHITE};
+    }
 `;
 
 // 시트 자체는 드래그로 닫히므로 목록은 별도 스크롤 영역으로 둔다(터치 스크롤이 드래그에 먹히지 않게).
@@ -606,7 +621,7 @@ const emptyText = css`
 
 const indexBar = css`
     position: absolute;
-    right: -6px;
+    right: -10px;
     top: 120px;
     bottom: 8px;
     display: flex;
@@ -615,9 +630,11 @@ const indexBar = css`
     gap: 1px;
 `;
 
+// 글자는 작아도 한 칸에 28×24 이상(WCAG 2.5.8).
 const indexButton = css`
-    width: 22px;
-    padding: 1px 0;
+    width: 28px;
+    min-height: 24px;
+    padding: 0;
     border: none;
     background: none;
     font-size: 10px;

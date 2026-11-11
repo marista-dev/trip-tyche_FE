@@ -141,6 +141,8 @@ const previewHint = css`
 
 const buttonWrapper = css`
     margin-top: 4px;
+    /* 안드로이드 제스처 바에 버튼이 가리지 않게 */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
 `;
 
 export default TripInfoEditPage;
