@@ -1,6 +1,9 @@
 {
     "compilerOptions": {
+        "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
         "composite": true,
+        // 빌드 산출물(vite.config.js·.d.ts)을 루트에 두지 않는다. 루트에 생기면 Vite가 .ts보다 .js를 먼저 읽는다.
+        "outDir": "./node_modules/.tmp/tsconfig.node",
         "module": "ESNext",
         "moduleResolution": "bundler",
         "allowSyntheticDefaultImports": true,
