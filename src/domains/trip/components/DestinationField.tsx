@@ -10,6 +10,7 @@ import {
     getIndexLetter,
     KOREA_VALUE,
     overseasCountries,
+    parseDestination,
     regionOptions,
     searchDestinations,
 } from '@/domains/trip/destinations';
@@ -18,6 +19,9 @@ import BottomSheet from '@/shared/components/common/BottomSheet';
 import theme from '@/shared/styles/theme';
 
 const ACCENT = theme.COLORS.PRIMARY;
+
+// 처음엔 대표 지역만 2줄(7개 + 더보기)로 보여준다. 나머지는 '더보기'와 검색으로 찾는다.
+const FEATURED_REGIONS = ['제주', '부산', '서울', '강릉', '경주', '여수', '전주'];
 
 interface DestinationFieldProps {
     value: string;
@@ -36,6 +40,7 @@ interface DestinationFieldProps {
 const DestinationField = ({ value, onChange, suggestion }: DestinationFieldProps) => {
     const [isOpen, setIsOpen] = useState(false);
     const [query, setQuery] = useState('');
+    const [showAllRegions, setShowAllRegions] = useState(false);
     const listRef = useRef<HTMLDivElement>(null);
     const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -47,7 +52,14 @@ const DestinationField = ({ value, onChange, suggestion }: DestinationFieldProps
         const trips = summaryResult?.success ? summaryResult.data : [];
         const seen = new Set<string>();
         trips.forEach((t) => t.country && seen.add(t.country));
-        return [...seen].filter((v) => v !== suggestion?.value && formatDestination(v)).slice(0, 8);
+        // 작성 중인 여행의 임시값('미정' 등)처럼 목록에 없는 값은 뺀다.
+        return [...seen]
+            .filter((v) => v !== suggestion?.value)
+            .filter((v) => {
+                const { country, isDomestic } = parseDestination(v);
+                return isDomestic || Boolean(country);
+            })
+            .slice(0, 6);
     }, [summaryResult, suggestion?.value]);
 
     const grouped = useMemo(() => {
@@ -63,6 +75,7 @@ const DestinationField = ({ value, onChange, suggestion }: DestinationFieldProps
 
     const open = () => {
         setQuery('');
+        setShowAllRegions(false);
         setIsOpen(true);
     };
 
@@ -80,16 +93,16 @@ const DestinationField = ({ value, onChange, suggestion }: DestinationFieldProps
     const isSelected = (v: string) => v === value;
     const isKoreaWithoutRegion = value === KOREA_VALUE;
 
-    const renderChip = (v: string, key = v) => {
-        const d = formatDestination(v);
-        if (!d) return null;
-        return (
-            <button key={key} type='button' css={chip(isSelected(v))} onClick={() => select(v)}>
-                <span aria-hidden>{d.emoji}</span>
-                {d.name}
-            </button>
-        );
-    };
+    // 지금 고른 지역이 '더보기' 안쪽에 있으면 처음부터 펼쳐 보여준다.
+    const selectedRegionHidden = regionOptions
+        .filter((o) => !FEATURED_REGIONS.includes(o.name))
+        .some((o) => o.value === value);
+    const regionsShown =
+        showAllRegions || selectedRegionHidden
+            ? regionOptions
+            : regionOptions.filter((o) => FEATURED_REGIONS.includes(o.name));
+    const isExpanded = regionsShown.length === regionOptions.length;
+    const suggestionDisplay = suggestion ? formatDestination(suggestion.value) : null;
 
     return (
         <>
@@ -162,33 +175,80 @@ const DestinationField = ({ value, onChange, suggestion }: DestinationFieldProps
                             )
                         ) : (
                             <>
-                                {suggestion && (
-                                    <section css={section}>
-                                        <h3 css={sectionLabel}>
-                                            <MapPin size={11} /> 사진 위치
-                                        </h3>
-                                        <div css={chipRow}>{renderChip(suggestion.value, 'suggestion')}</div>
-                                    </section>
+                                {suggestion && suggestionDisplay && (
+                                    <button
+                                        type='button'
+                                        css={suggestionCard(isSelected(suggestion.value))}
+                                        onClick={() => select(suggestion.value)}
+                                    >
+                                        <MapPin size={16} color={ACCENT} />
+                                        <span css={suggestionText}>
+                                            <span css={suggestionLabel}>사진 위치</span>
+                                            <span css={rowName}>
+                                                {suggestionDisplay.emoji} {suggestionDisplay.name}
+                                            </span>
+                                        </span>
+                                        {isSelected(suggestion.value) ? (
+                                            <Check size={16} color={ACCENT} />
+                                        ) : (
+                                            <span css={suggestionAction}>선택</span>
+                                        )}
+                                    </button>
                                 )}
 
                                 <section css={section}>
-                                    <h3 css={sectionLabel}>🇰🇷 국내</h3>
-                                    <div css={chipRow}>
-                                        {regionOptions.map((o) => renderChip(o.value))}
-                                        <button
-                                            type='button'
-                                            css={chip(isKoreaWithoutRegion)}
-                                            onClick={() => select(KOREA_VALUE)}
-                                        >
-                                            그 외 지역
-                                        </button>
+                                    <h3 css={sectionLabel}>국내</h3>
+                                    <div css={tileGrid(4)}>
+                                        {regionsShown.map((o) => (
+                                            <button
+                                                key={o.value}
+                                                type='button'
+                                                css={tile(isSelected(o.value))}
+                                                onClick={() => select(o.value)}
+                                            >
+                                                {o.name}
+                                            </button>
+                                        ))}
+                                        {isExpanded ? (
+                                            <button
+                                                type='button'
+                                                css={tile(isKoreaWithoutRegion)}
+                                                onClick={() => select(KOREA_VALUE)}
+                                            >
+                                                그 외 지역
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type='button'
+                                                css={[tile(false), moreTile]}
+                                                onClick={() => setShowAllRegions(true)}
+                                            >
+                                                더보기
+                                            </button>
+                                        )}
                                     </div>
                                 </section>
 
                                 {visited.length > 0 && (
                                     <section css={section}>
                                         <h3 css={sectionLabel}>다녀온 곳</h3>
-                                        <div css={chipRow}>{visited.map((v) => renderChip(v, `visited-${v}`))}</div>
+                                        <div css={tileGrid(3)}>
+                                            {visited.map((v) => {
+                                                const d = formatDestination(v)!;
+                                                return (
+                                                    <button
+                                                        key={`visited-${v}`}
+                                                        type='button'
+                                                        css={tile(isSelected(v))}
+                                                        onClick={() => select(v)}
+                                                    >
+                                                        <span css={tileLabel}>
+                                                            {d.emoji} {d.name}
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                     </section>
                                 )}
 
@@ -396,31 +456,78 @@ const sectionLabel = css`
     color: #94a3b8;
 `;
 
-const chipRow = css`
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
+const tileGrid = (columns: number) => css`
+    display: grid;
+    grid-template-columns: repeat(${columns}, minmax(0, 1fr));
+    gap: 8px;
 `;
 
-const chip = (selected: boolean) => css`
-    display: inline-flex;
+const tile = (selected: boolean) => css`
+    height: 42px;
+    padding: 0 6px;
+    display: flex;
     align-items: center;
-    gap: 5px;
-    height: 34px;
-    padding: 0 12px;
-    border-radius: 100px;
+    justify-content: center;
+    border-radius: 12px;
     border: 1px solid ${selected ? ACCENT : '#e2e8f0'};
     background: ${selected ? 'rgba(0, 113, 227, 0.08)' : '#fff'};
     color: ${selected ? ACCENT : '#334155'};
     font-size: 13px;
     font-weight: 600;
     font-family: inherit;
+    white-space: nowrap;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
 
     &:active {
         transform: translateY(1px);
     }
+`;
+
+const moreTile = css`
+    background: #f8fafc;
+    color: #64748b;
+`;
+
+const tileLabel = css`
+    overflow: hidden;
+    text-overflow: ellipsis;
+`;
+
+const suggestionCard = (selected: boolean) => css`
+    width: 100%;
+    margin-top: 16px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-radius: 14px;
+    border: 1px solid ${selected ? ACCENT : 'rgba(0, 113, 227, 0.18)'};
+    background: rgba(0, 113, 227, 0.05);
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+`;
+
+const suggestionText = css`
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+`;
+
+const suggestionLabel = css`
+    font-size: 11px;
+    font-weight: 700;
+    color: ${ACCENT};
+`;
+
+const suggestionAction = css`
+    font-size: 13px;
+    font-weight: 700;
+    color: ${ACCENT};
 `;
 
 const letterHeader = css`
