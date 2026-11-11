@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from 'react';
 import { css } from '@emotion/react';
 import { Check, ChevronDown, Globe, MapPin, Search, X } from 'lucide-react';
 
+import { FIELD, fieldBox, fieldHelp } from '@/domains/trip/components/formField';
 import {
     DetectedDestination,
     formatDestination,
@@ -16,6 +17,7 @@ import {
 } from '@/domains/trip/destinations';
 import { useTripSummaryList } from '@/domains/trip/hooks/queries';
 import BottomSheet from '@/shared/components/common/BottomSheet';
+import { COLORS } from '@/shared/constants/style';
 import theme from '@/shared/styles/theme';
 
 const ACCENT = theme.COLORS.PRIMARY;
@@ -133,7 +135,7 @@ const DestinationField = ({ value, onChange, suggestion }: DestinationFieldProps
                 <div css={sheetBody}>
                     <h2 css={sheetTitle}>어디로 다녀왔나요?</h2>
                     <label css={searchBox}>
-                        <Search size={16} color='#94a3b8' />
+                        <Search size={16} color={COLORS.SLATE[400]} />
                         <input
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
@@ -306,20 +308,17 @@ const DestinationField = ({ value, onChange, suggestion }: DestinationFieldProps
     );
 };
 
-/* ── 입력칸 — Mantine Input(size md, radius md)과 같은 모양 ── */
+/* ── 입력칸 — 폼의 다른 입력칸과 같은 틀(fieldBox) ── */
 const trigger = css`
+    ${fieldBox};
     width: 100%;
-    height: 42px;
-    padding: 0 12px;
-    display: flex;
+    height: ${FIELD.HEIGHT};
+    padding: 0;
+    display: grid;
+    grid-template-columns: 40px 1fr 36px;
     align-items: center;
-    gap: 10px;
-    border: 1px solid #ced4da;
-    border-radius: 8px;
-    background: #fff;
     cursor: pointer;
     text-align: left;
-    font-family: inherit;
     -webkit-tap-highlight-color: transparent;
 
     &:focus-visible {
@@ -329,46 +328,43 @@ const trigger = css`
 `;
 
 const triggerIcon = css`
-    color: #adb5bd;
-    flex-shrink: 0;
+    justify-self: center;
+    color: ${COLORS.SLATE[400]};
 `;
 
 const triggerValue = css`
-    flex: 1;
     min-width: 0;
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 16px;
-    color: #0f172a;
+    color: ${COLORS.TEXT.BLACK};
+    white-space: nowrap;
+    overflow: hidden;
 `;
 
 const triggerSub = css`
     padding: 2px 7px;
     border-radius: 999px;
-    background: rgba(0, 113, 227, 0.08);
+    background: ${COLORS.BACKGROUND.PRIMARY_LIGHT};
     color: ${ACCENT};
     font-size: 11px;
     font-weight: 700;
 `;
 
 const triggerPlaceholder = css`
-    flex: 1;
-    font-size: 16px;
-    color: #adb5bd;
+    color: ${COLORS.TEXT.PLACEHOLDER};
 `;
 
 const hintButton = css`
-    margin-top: 8px;
-    margin-left: 4px;
+    ${fieldHelp};
+    margin-top: 6px;
+    margin-left: 2px;
     padding: 0;
     display: inline-flex;
     align-items: center;
     gap: 4px;
     border: none;
     background: none;
-    font-size: ${theme.FONT_SIZES.SM};
-    color: ${theme.COLORS.TEXT.DESCRIPTION};
     cursor: pointer;
 
     strong {
@@ -389,7 +385,7 @@ const sheetTitle = css`
     font-size: 17px;
     font-weight: 700;
     letter-spacing: -0.3px;
-    color: #0f172a;
+    color: ${COLORS.TEXT.BLACK};
 `;
 
 const searchBox = css`
@@ -399,7 +395,7 @@ const searchBox = css`
     height: 44px;
     padding: 0 12px;
     border-radius: 12px;
-    background: #f1f5f9;
+    background: ${COLORS.SLATE[100]};
     flex-shrink: 0;
 `;
 
@@ -411,10 +407,10 @@ const searchInput = css`
     background: transparent;
     font-size: 16px; /* iOS가 16px 미만 입력칸에 포커스하면 화면을 확대한다 */
     font-family: inherit;
-    color: #0f172a;
+    color: ${COLORS.TEXT.BLACK};
 
     &::placeholder {
-        color: #94a3b8;
+        color: ${COLORS.SLATE[400]};
         font-size: 14px;
     }
 `;
@@ -426,7 +422,7 @@ const clearButton = css`
     height: 22px;
     border: none;
     border-radius: 50%;
-    background: #cbd5e1;
+    background: ${COLORS.SLATE[300]};
     color: #fff;
     cursor: pointer;
 `;
@@ -453,7 +449,7 @@ const sectionLabel = css`
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.6px;
-    color: #94a3b8;
+    color: ${COLORS.SLATE[400]};
 `;
 
 const tileGrid = (columns: number) => css`
@@ -469,9 +465,9 @@ const tile = (selected: boolean) => css`
     align-items: center;
     justify-content: center;
     border-radius: 12px;
-    border: 1px solid ${selected ? ACCENT : '#e2e8f0'};
-    background: ${selected ? 'rgba(0, 113, 227, 0.08)' : '#fff'};
-    color: ${selected ? ACCENT : '#334155'};
+    border: 1px solid ${selected ? ACCENT : '${COLORS.SLATE[200]}'};
+    background: ${selected ? '${COLORS.BACKGROUND.PRIMARY_LIGHT}' : '#fff'};
+    color: ${selected ? ACCENT : '${COLORS.SLATE[700]}'};
     font-size: 13px;
     font-weight: 600;
     font-family: inherit;
@@ -485,8 +481,8 @@ const tile = (selected: boolean) => css`
 `;
 
 const moreTile = css`
-    background: #f8fafc;
-    color: #64748b;
+    background: ${COLORS.BACKGROUND.GRAY_LIGHT};
+    color: ${COLORS.SLATE[500]};
 `;
 
 const tileLabel = css`
@@ -554,7 +550,7 @@ const row = css`
     gap: 10px;
     padding: 0 4px;
     border: none;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid ${COLORS.SLATE[100]};
     background: none;
     text-align: left;
     font-family: inherit;
@@ -562,7 +558,7 @@ const row = css`
     -webkit-tap-highlight-color: transparent;
 
     &:active {
-        background: #f8fafc;
+        background: ${COLORS.BACKGROUND.GRAY_LIGHT};
     }
 `;
 
@@ -575,13 +571,13 @@ const rowEmoji = css`
 const rowName = css`
     font-size: 15px;
     font-weight: 600;
-    color: #0f172a;
+    color: ${COLORS.TEXT.BLACK};
 `;
 
 const rowSub = css`
     flex: 1;
     font-size: 11px;
-    color: #94a3b8;
+    color: ${COLORS.SLATE[400]};
     letter-spacing: 0.3px;
 `;
 
@@ -589,7 +585,7 @@ const emptyText = css`
     padding: 40px 0;
     text-align: center;
     font-size: 14px;
-    color: #94a3b8;
+    color: ${COLORS.SLATE[400]};
 `;
 
 const indexBar = css`

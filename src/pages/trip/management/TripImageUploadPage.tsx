@@ -72,14 +72,11 @@ const TripImageUploadPage = () => {
     // 추출된 이미지 → tripForm의 mediaFilesDates 동기화 (날짜 픽커 인디케이터에 사용).
     useEffect(() => {
         const imageDates = getImageDateFromImage(images || null);
-        setTripForm({
-            tripTitle: '',
-            country: '',
-            startDate: '',
-            endDate: '',
-            hashtags: [],
-            mediaFilesDates: imageDates ?? [],
-        });
+        /*
+         * 사진 날짜만 갱신하고 입력값은 건드리지 않는다. images는 업로드 진행 중에도 다시 설정되는데,
+         * 예전엔 그때마다 폼 전체를 초기화해 사진 위치로 자동 선택한 여행지나 사용자가 쓴 제목이 지워졌다.
+         */
+        setTripForm((prev) => ({ ...prev, mediaFilesDates: imageDates ?? [] }));
     }, [images]);
 
     // 첫 사진을 cover로 사용. images 변경 시 이전 URL 해제 + unmount 시 정리.

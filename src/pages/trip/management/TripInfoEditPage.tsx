@@ -31,9 +31,8 @@ const TripInfoEditPage = () => {
     const location = useLocation();
     const navigate = useNavigate();
 
-    const {
-        state: { isDraft },
-    } = location;
+    // 주소로 바로 들어오면 state가 없다 — 확정된 여행으로 본다.
+    const isDraft = Boolean((location.state as { isDraft?: boolean } | null)?.isDraft);
 
     const queryClient = useQueryClient();
     const { mutateAsync, isPending: isSubmitting } = useTripFormSubmit();
@@ -52,12 +51,8 @@ const TripInfoEditPage = () => {
             }
             setTripForm((prev) => {
                 if (isDraft) {
-                    const mediaFileDates = tripInfoResult.data.mediaFilesDates || [];
-                    const validMediaFileDates = mediaFileDates.filter((mediaFile) => mediaFile !== '1980-01-01');
-                    return {
-                        ...prev,
-                        mediaFilesDates: validMediaFileDates,
-                    };
+                    // 날짜 없는 사진(1980-01-01)은 폼이 걸러낸다(tripDates.toPhotoDays).
+                    return { ...prev, mediaFilesDates: tripInfoResult.data.mediaFilesDates || [] };
                 }
                 return tripInfoResult.data;
             });

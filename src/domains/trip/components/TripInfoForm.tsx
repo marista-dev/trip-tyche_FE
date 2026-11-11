@@ -6,6 +6,7 @@ import 'dayjs/locale/ko';
 import { Plane, Calendar, X } from 'lucide-react';
 
 import DestinationField from '@/domains/trip/components/DestinationField';
+import { FIELD, fieldBox, fieldHelp, fieldLabel, fieldOverrides } from '@/domains/trip/components/formField';
 import { FORM } from '@/domains/trip/constants';
 import { detectDestination, PhotoLocation } from '@/domains/trip/destinations';
 import {
@@ -45,10 +46,18 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
     const photoBounds = getDateBounds(photoDays);
     const outsideDates = getDatesOutside(photoDays, startDate, endDate);
 
-    // 당일치기 토글. 저장된 여행이 하루짜리이거나 사진이 하루치면 켜진 채로 시작한다.
-    const [isDayTrip, setIsDayTrip] = useState(
-        () => (Boolean(startDate) && startDate === endDate) || (!!photoBounds && photoBounds.start === photoBounds.end),
-    );
+    // 당일치기 토글. 날짜가 처음 채워질 때(사진으로 미리 채움 / 저장된 여행 불러옴) 하루짜리면 켠다.
+    const [isDayTrip, setIsDayTrip] = useState(Boolean(startDate) && startDate === endDate);
+    const hasDatesRef = useRef(Boolean(startDate && endDate));
+    useEffect(() => {
+        if (!startDate || !endDate) {
+            hasDatesRef.current = false;
+            return;
+        }
+        if (hasDatesRef.current) return;
+        hasDatesRef.current = true;
+        setIsDayTrip(startDate === endDate);
+    }, [startDate, endDate]);
 
     const setRange = (start: string, end: string) =>
         onChangeTripInfo((prev: Trip) => ({ ...prev, startDate: start, endDate: end }));
@@ -68,12 +77,13 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
      * 국내는 지역 경계로 판정해 믿을 만하므로 비어 있으면 바로 채운다(국내 여행은 보통 한 지역).
      * 해외는 국경 근처에서 틀릴 수 있어 입력칸 아래 추천으로만 보여준다.
      */
+    // country도 의존성에 둔다 — 등록 페이지가 사진을 받으며 폼을 초기화해 방금 채운 값이 지워질 수 있다.
     useEffect(() => {
         if (!country && detected?.isConfident) {
             onChangeTripInfo((prev: Trip) => (prev.country ? prev : { ...prev, country: detected.value }));
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [detected?.value]);
+    }, [detected?.value, country]);
 
     const handleDateChange = (value: DatesRangeValue) => {
         const [from, to] = value;
@@ -210,7 +220,8 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
                     />
                 )}
                 <div css={dateMetaRow}>
-                    {duration && (
+                    {/* 당일치기는 토글이 이미 말해 준다 — 배지는 N박 N일일 때만 */}
+                    {duration && !isDayTrip && (
                         <span css={durationBadge}>
                             <span css={durationDot} aria-hidden />
                             {duration}
@@ -247,7 +258,7 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
                 <h2 css={fieldLabel}>{FORM.TITLE.TITLE}</h2>
                 <Input
                     value={tripTitle}
-                    onChange={(value) => onChangeTripInfo({ ...tripForm, tripTitle: value })}
+                    onChange={(value) => onChangeTripInfo((prev: Trip) => ({ ...prev, tripTitle: value }))}
                     placeholder='최대 12자까지 입력할 수 있습니다'
                     maxLength={12}
                     leftSection={<Plane size={16} />}
@@ -305,13 +316,14 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
 };
 
 const card = css`
-    background: #fff;
+    ${fieldOverrides};
+    background: ${theme.COLORS.BACKGROUND.WHITE};
     border-radius: 20px;
-    padding: 18px;
+    padding: 18px 16px;
     display: flex;
     flex-direction: column;
-    gap: 24px;
-    border: 1px solid #f1f5f9;
+    gap: ${FIELD.SECTION_GAP};
+    border: 1px solid ${theme.COLORS.SLATE[100]};
     box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
 `;
 
@@ -322,7 +334,6 @@ const datePickerInputNowrap = css`
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        font-size: 13px;
         letter-spacing: -0.25px;
     }
 `;
@@ -331,7 +342,11 @@ const titleRow = css`
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: ${FIELD.LABEL_GAP};
+
+    h2 {
+        margin: 0;
+    }
 `;
 
 const togglePill = css`
@@ -349,7 +364,7 @@ const toggleTrack = (on: boolean) => css`
     width: 36px;
     height: 20px;
     border-radius: 100px;
-    background: ${on ? ACCENT : '#e2e8f0'};
+    background: ${on ? ACCENT : theme.COLORS.SLATE[200]};
     position: relative;
     transition: background 0.2s;
     flex-shrink: 0;
@@ -362,15 +377,15 @@ const toggleKnob = (on: boolean) => css`
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: #fff;
+    background: ${theme.COLORS.BACKGROUND.WHITE};
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
     transition: left 0.2s;
 `;
 
 const toggleText = (on: boolean) => css`
-    font-size: 11px;
-    font-weight: 700;
-    color: ${on ? ACCENT : '#94a3b8'};
+    font-size: ${FIELD.HELP_SIZE};
+    font-weight: 600;
+    color: ${on ? ACCENT : theme.COLORS.SLATE[400]};
     transition: color 0.2s;
 `;
 
@@ -387,34 +402,26 @@ const fitButton = css`
     cursor: pointer;
 `;
 
-const fieldLabel = css`
-    font-size: ${theme.FONT_SIZES.MD};
-    font-weight: bold;
-    color: ${theme.COLORS.TEXT.BLACK};
-`;
-
 const hashtagCount = (isFull: boolean) => css`
-    font-size: 11px;
-    font-weight: 700;
-    color: ${isFull ? ACCENT : '#94a3b8'};
+    font-size: ${FIELD.HELP_SIZE};
+    font-weight: 600;
+    color: ${isFull ? ACCENT : theme.COLORS.SLATE[400]};
     letter-spacing: 0.4px;
     transition: color 0.2s;
 `;
 
+// 다른 입력칸과 같은 틀(fieldBox) 안에 태그 칩과 입력을 함께 둔다.
 const hashtagInputWrap = (isFull: boolean) => css`
+    ${fieldBox};
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
     align-items: center;
-    padding: 10px 12px;
-    background: #f8fafc;
-    border-radius: 12px;
-    border: 1.5px solid ${isFull ? 'transparent' : '#e2e8f0'};
-    transition: border-color 0.2s;
+    padding: 6px 12px;
+    ${isFull && `border-color: ${theme.COLORS.SLATE[200]};`}
 
     &:focus-within {
         border-color: ${ACCENT};
-        background: #fff;
     }
 `;
 
@@ -423,7 +430,7 @@ const selectedChip = css`
     align-items: center;
     gap: 3px;
     padding: 5px 9px 5px 10px;
-    background: rgba(0, 113, 227, 0.08);
+    background: ${theme.COLORS.BACKGROUND.PRIMARY_LIGHT};
     color: ${ACCENT};
     font-size: 12px;
     font-weight: 600;
@@ -455,14 +462,12 @@ const tagInputStyle = css`
     background: transparent;
     border: none;
     outline: none;
-    font-size: 13px;
-    font-weight: 500;
-    color: #0f172a;
+    font-size: ${FIELD.FONT_SIZE};
+    color: ${theme.COLORS.TEXT.BLACK};
     font-family: inherit;
 
     &::placeholder {
-        color: #94a3b8;
-        font-weight: 500;
+        color: ${theme.COLORS.TEXT.PLACEHOLDER};
     }
 `;
 
@@ -471,23 +476,19 @@ const suggestionRow = css`
     flex-wrap: wrap;
     gap: 6px;
     align-items: center;
-    margin-top: 10px;
+    margin-top: 8px;
 `;
 
 const suggestionLabel = css`
-    font-size: 10px;
-    font-weight: 700;
-    color: #cbd5e1;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
+    ${fieldHelp};
     margin-right: 2px;
 `;
 
 const suggestionChip = css`
     padding: 5px 10px;
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    color: #475569;
+    background: ${theme.COLORS.BACKGROUND.WHITE};
+    border: 1px solid ${theme.COLORS.SLATE[200]};
+    color: ${theme.COLORS.SLATE[600]};
     font-size: 12px;
     font-weight: 600;
     border-radius: 100px;
@@ -508,18 +509,10 @@ const suggestionChip = css`
     }
 `;
 
-const baseDescriptionStyle = css`
-    font-size: ${theme.FONT_SIZES.SM};
-    font-weight: normal;
-    color: ${theme.COLORS.TEXT.DESCRIPTION};
-`;
-
-const dateDescriptionStyle = css`
-    ${baseDescriptionStyle}
-`;
+const dateDescriptionStyle = fieldHelp;
 
 const errorStyle = css`
-    font-size: ${theme.FONT_SIZES.SM};
+    ${fieldHelp};
     color: ${theme.COLORS.TEXT.ERROR};
 `;
 
@@ -527,9 +520,9 @@ const dateMetaRow = css`
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
-    margin-top: 8px;
-    margin-left: 4px;
+    gap: 6px;
+    margin-top: 6px;
+    margin-left: 2px;
 `;
 
 // 여행 기간 강조 칩 — 무성의해 보이지 않도록 시각적 무게 부여
@@ -537,12 +530,12 @@ const durationBadge = css`
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 4px 9px;
-    background: rgba(0, 113, 227, 0.08);
+    padding: 3px 8px;
+    background: ${theme.COLORS.BACKGROUND.PRIMARY_LIGHT};
     color: ${ACCENT};
     border-radius: 999px;
-    font-size: 12px;
-    font-weight: 700;
+    font-size: ${FIELD.HELP_SIZE};
+    font-weight: 600;
     letter-spacing: -0.1px;
 `;
 
@@ -566,7 +559,7 @@ const dayIndicatorStyle = css`
     width: 5px;
     height: 5px;
     background-color: ${theme.COLORS.PRIMARY};
-    box-shadow: 0 0 0 1px #fff;
+    box-shadow: 0 0 0 1px ${theme.COLORS.BACKGROUND.WHITE};
     border-radius: 50%;
     z-index: 2;
 `;
