@@ -7,6 +7,7 @@ import backgroundImage from '@/assets/images/background-mobile.webp';
 import GuestButton from '@/domains/user/components/GuestButton';
 import LoginButton from '@/domains/user/components/LoginButton';
 import useUserStore from '@/domains/user/stores/useUserStore';
+import { ANALYTICS_EVENTS, queuePendingEvent, rememberLoginProvider } from '@/libs/analytics';
 import { API_BASE_URL, OAUTH_CONFIG } from '@/libs/apis/shared/constants';
 import { isNative } from '@/platform';
 import { AUTH_CALLBACK_SCHEME } from '@/platform/native/appShell';
@@ -23,6 +24,9 @@ const SigninPage = () => {
     const showToast = useToastStore((s) => s.showToast);
 
     const handleLoginButtonClick = async (provider: keyof typeof OAUTH_CONFIG.PATH) => {
+        // 웹 리다이렉트에는 어느 provider로 로그인했는지가 실려 오지 않는다. 페이지를 떠나기 전에 적어 두었다가 signed_up 속성으로 쓴다.
+        rememberLoginProvider(provider.toLowerCase());
+
         /*
          * 앱에서는 인앱 브라우저로 OAuth를 진행한다.
          * WebView에서 location.href로 열면 앱 화면이 제공자 페이지로 대체돼 돌아올 수 없고,
@@ -42,6 +46,8 @@ const SigninPage = () => {
     const handleGuestClick = async () => {
         try {
             await loginAsGuest();
+            // 곧바로 전체 새로고침이 일어난다. 지금 capture하면 전송 큐가 유실될 수 있어 보류해 두고 부팅 후 identify 뒤에 보낸다.
+            queuePendingEvent(ANALYTICS_EVENTS.GUEST_STARTED);
             window.location.replace(ROUTES.PATH.HOME);
         } catch {
             showToast('게스트 로그인에 실패했습니다. 잠시 후 다시 시도해주세요.');

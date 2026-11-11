@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { UserInfo } from '@/domains/user/types';
+import { resetAnalytics } from '@/libs/analytics';
 import { userAPI } from '@/libs/apis';
 import { unregisterDeviceToken } from '@/platform/native/push';
 import { queryClient } from '@/shared/providers/TanStackProvider';
@@ -79,6 +80,12 @@ const useUserStore = create<UserState>()((set, get) => ({
                 status: 'unauthenticated',
                 isGuest: false,
             }));
+            /*
+             * 분석 id 초기화는 명시적 로그아웃에서만 한다. setUnauthenticated에서 하면 안 된다 —
+             * 비로그인 방문자는 부팅마다 setUnauthenticated를 타므로 익명 id가 매번 바뀌어 랜딩 퍼널이 끊긴다.
+             * 상태 초기화 뒤에 둬서, 분석 쪽 문제가 로그아웃 자체를 막지 못하게 한다.
+             */
+            resetAnalytics();
         }
     },
     /**

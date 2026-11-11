@@ -1,6 +1,7 @@
 import { Preferences } from '@capacitor/preferences';
 import axios from 'axios';
 
+import { ANALYTICS_EVENTS, consumeLoginProvider, queuePendingEvent } from '@/libs/analytics';
 import { API_BASE_URL } from '@/libs/apis/shared/constants';
 
 /*
@@ -95,6 +96,14 @@ export const exchangeCodeForTokens = async (code: string): Promise<boolean> => {
         }
 
         await saveTokens({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
+
+        /*
+         * 앱의 신규 가입 신호. 호출부(appShell)가 바로 전체 새로고침을 하므로 여기서 capture하지 않고
+         * 보류해 두었다가 다음 부팅의 identify 뒤에 보낸다. refresh 응답은 항상 newUser=false라 건드리지 않는다.
+         */
+        if (tokens.newUser === true) {
+            queuePendingEvent(ANALYTICS_EVENTS.SIGNED_UP, { provider: consumeLoginProvider() ?? undefined });
+        }
         return true;
     } catch (error) {
         console.error('토큰 교환 실패: ', error);

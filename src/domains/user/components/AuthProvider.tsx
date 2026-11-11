@@ -1,6 +1,14 @@
 import { useEffect, useRef } from 'react';
 
 import useUserStore from '@/domains/user/stores/useUserStore';
+import {
+    ANALYTICS_EVENTS,
+    consumeLoginProvider,
+    consumeSignupQuery,
+    flushPendingEvents,
+    identifyUser,
+    queuePendingEvent,
+} from '@/libs/analytics';
 import { userAPI } from '@/libs/apis';
 import { toResult } from '@/libs/apis/shared/utils';
 import { registerDeviceToken } from '@/platform/native/push';
@@ -38,6 +46,26 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                  * 4시간 뒤 사라질 계정이라 토큰을 등록할 이유도 없다.
                  */
                 if (result.data?.role !== 'GUEST') void registerDeviceToken();
+
+                /*
+                 * 분석 identify도 여기서만 한다. 로그인·게스트 진입은 모두 전체 새로고침으로 끝나므로
+                 * 인증이 확정되는 시점은 이 부팅 한 곳뿐이다.
+                 * 실패 분기에서는 아무것도 하지 않는다 — 비로그인 방문자는 부팅마다 거기로 오는데,
+                 * 여기서 reset하면 익명 id가 매번 바뀌어 랜딩 퍼널이 끊긴다.
+                 */
+                if (result.data) {
+                    // 재로그인에서도 꺼내 지운다. 남겨 두면 나중의 가입에 이전 provider가 붙는다.
+                    const provider = consumeLoginProvider() ?? undefined;
+                    // 웹 신규 가입: 백엔드가 리다이렉트 URL에 붙인 ?signup=true. 읽는 즉시 URL에서 지워 새로고침 중복을 막는다.
+                    if (consumeSignupQuery()) {
+                        queuePendingEvent(ANALYTICS_EVENTS.SIGNED_UP, { provider });
+                    }
+                    // 객체를 통째로 넘기지 않고 세 필드만 꺼낸다. 닉네임 등이 실수로 PostHog에 실리는 것을 막는다.
+                    const { userId, role, createdAt } = result.data;
+                    identifyUser({ userId, role, createdAt });
+                    // 보류 이벤트(signed_up, guest_started)는 identify가 끝난 뒤에 보내야 해당 사용자에게 귀속된다.
+                    flushPendingEvents();
+                }
             } else {
                 setUnauthenticated();
             }
