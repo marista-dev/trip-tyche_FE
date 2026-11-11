@@ -32,5 +32,8 @@
         "types": ["node", "vite/client", "google.maps", "vitest/globals"]
     },
     "include": ["src", "**/*.ts", "**/*.tsx", "**/*d.ts"],
+    // vite.config.ts는 tsconfig.node.json이 맡는다. 여기 포함되면 참조 프로젝트의 빌드 산출물(.d.ts)을 요구해
+    // 빌드 전 단독 타입 체크(CI)가 TS6305로 실패한다. exclude를 지정하면 기본 제외가 사라지므로 node_modules도 적는다.
+    "exclude": ["node_modules", "dist", "vite.config.ts"],
     "references": [{ "path": "./tsconfig.node.json" }]
 }
