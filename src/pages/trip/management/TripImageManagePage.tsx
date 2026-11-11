@@ -30,7 +30,7 @@ import {
 } from '@/domains/media/utils';
 import { useTripFormSubmit } from '@/domains/trip/hooks/mutations';
 import { useTripInfo } from '@/domains/trip/hooks/queries';
-import { toLocalDate } from '@/domains/trip/tripDates';
+import { formatPeriod, getTripDays } from '@/domains/trip/tripDates';
 import { useMemberOnly } from '@/domains/user/hooks/useMemberOnly';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import InlineDatePickSheet from '@/pages/trip/management/InlineDatePickSheet';
@@ -40,15 +40,10 @@ import Indicator from '@/shared/components/common/Spinner/Indicator';
 import { ROUTES } from '@/shared/constants/route';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
+// "3월 5일–9일 · 5일". 달이 바뀌는 기간도 끝 날짜에 월을 붙인다(예전엔 "3월 30일–2일"로 나왔다).
 const formatDateRange = (start?: string, end?: string): string => {
-    if (!start || !end) return '';
-    const s = toLocalDate(start);
-    const e = toLocalDate(end);
-    if (!s || !e) return '';
-    const days = Math.max(1, Math.round((e.getTime() - s.getTime()) / 86_400_000) + 1);
-    const fmt = (d: Date) => `${d.getMonth() + 1}월 ${d.getDate()}일`;
-    if (s.toDateString() === e.toDateString()) return `${fmt(s)} · 1일`;
-    return `${fmt(s)}–${fmt(e).replace(/^\d+월\s/, '')} · ${days}일`;
+    const days = getTripDays(start, end);
+    return start && end && days ? `${formatPeriod(start, end)} · ${days}일` : '';
 };
 
 const TripImageManagePage = () => {

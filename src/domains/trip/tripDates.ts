@@ -49,9 +49,8 @@ export const getDatesOutside = (dates: string[], start?: string, end?: string): 
 
 /** "당일치기" / "N박 N일". 기간이 비었거나 뒤집혔으면 null. */
 export const formatDuration = (start?: string, end?: string): string | null => {
-    if (!start || !end) return null;
-    const days = dayjs(end.slice(0, 10)).diff(dayjs(start.slice(0, 10)), 'day') + 1;
-    if (days <= 0) return null;
+    const days = getTripDays(start, end);
+    if (days === 0) return null;
     if (days === 1) return '당일치기';
     return `${days - 1}박 ${days}일`;
 };
@@ -72,4 +71,25 @@ export const formatRange = (start: Date | null, end: Date | null): string => {
 export const formatMonthDay = (date: string): string => {
     const d = dayjs(date.slice(0, 10));
     return `${d.month() + 1}월 ${d.date()}일`;
+};
+
+/** "2025.03.05" — 티켓·공유 화면의 날짜 표기. 잘못된 값이면 빈 문자열. */
+export const formatDot = (value?: string): string => {
+    const d = toLocalDate(value);
+    return d ? dayjs(d).format('YYYY.MM.DD') : '';
+};
+
+/** 기간 일수(양 끝 포함). 비었거나 뒤집혔으면 0. */
+export const getTripDays = (start?: string, end?: string): number => {
+    if (!start || !end) return 0;
+    const days = dayjs(end.slice(0, 10)).diff(dayjs(start.slice(0, 10)), 'day') + 1;
+    return days > 0 ? days : 0;
+};
+
+/** "3월 5일–9일", 달이 바뀌면 "3월 30일–4월 2일", 하루면 "3월 5일" */
+export const formatPeriod = (start: string, end: string): string => {
+    const s = formatMonthDay(start);
+    if (start.slice(0, 10) === end.slice(0, 10)) return s;
+    const e = formatMonthDay(end);
+    return start.slice(0, 7) === end.slice(0, 7) ? `${s}–${e.replace(/^\d+월\s/, '')}` : `${s}–${e}`;
 };

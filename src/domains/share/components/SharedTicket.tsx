@@ -4,9 +4,7 @@ import { css } from '@emotion/react';
 
 import characterImg from '@/assets/images/character-icon.png';
 import { SharedTripDetail } from '@/domains/share/types';
-import { getIataFromCountryString } from '@/domains/trip/airport';
-import { getDepartureCode } from '@/domains/trip/destinations';
-import { formatToDot } from '@/libs/utils/date';
+import { getTicketView } from '@/domains/trip/ticketView';
 import { COLORS, FONT_SIZES } from '@/shared/constants/style';
 
 interface IntroTicketProps {
@@ -15,11 +13,11 @@ interface IntroTicketProps {
 }
 
 const SharedTicket = ({ trip, userNickname }: IntroTicketProps) => {
-    const { tripTitle, country, startDate, endDate, hashtags } = trip;
+    const { tripTitle, country, hashtags } = trip;
     const [isAnimating, setIsAnimating] = useState(false);
 
     const countryEmoji = country.split('/')[0] || '';
-    const destinationIata = getIataFromCountryString(country);
+    const { departure, arrival: destinationIata, startText, endText } = getTicketView(trip);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -41,11 +39,11 @@ const SharedTicket = ({ trip, userNickname }: IntroTicketProps) => {
                     </div>
                     <div css={headerItem}>
                         <h3 css={labelStyle}>DATE</h3>
-                        <p css={valueStyle}>{formatToDot(startDate)}</p>
+                        <p css={valueStyle}>{startText}</p>
                     </div>
                     <div css={headerItem}>
                         <h3 css={labelStyle}>DATE</h3>
-                        <p css={valueStyle}>{formatToDot(endDate)}</p>
+                        <p css={valueStyle}>{endText}</p>
                     </div>
                     <div css={headerItem}>
                         <h3 css={labelStyle}>FLIGHT</h3>
@@ -55,7 +53,7 @@ const SharedTicket = ({ trip, userNickname }: IntroTicketProps) => {
 
                 <div css={contentStyle}>
                     <div css={citiesStyle}>
-                        <p css={countryNameStyle}>{getDepartureCode(country)}</p>
+                        <p css={countryNameStyle}>{departure}</p>
                         <div css={dotsAndCharacterContainer}>
                             <div css={pointDots}>
                                 <div css={startPointDot} />

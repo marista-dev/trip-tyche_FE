@@ -1,9 +1,7 @@
 import { css } from '@emotion/react';
 import { Plane } from 'lucide-react';
 
-import { getIataFromCountryString } from '@/domains/trip/airport';
-import { getDepartureCode } from '@/domains/trip/destinations';
-import { formatDuration, toLocalDate } from '@/domains/trip/tripDates';
+import { getTicketView } from '@/domains/trip/ticketView';
 import { TripInfo } from '@/domains/trip/types';
 import { COLORS } from '@/shared/constants/style';
 
@@ -13,27 +11,9 @@ interface MiniTicketPreviewProps {
     coverPhotoUrl?: string;
     photoCount?: number;
     sample?: boolean;
-    isDayTrip?: boolean;
 }
 
 const ACCENT = COLORS.PRIMARY;
-
-const formatShort = (iso: string) => {
-    if (!iso) return '';
-    const dt = toLocalDate(iso);
-    if (!dt) return iso;
-    const yy = String(dt.getFullYear()).slice(2);
-    const mm = String(dt.getMonth() + 1).padStart(2, '0');
-    const dd = String(dt.getDate()).padStart(2, '0');
-    return `${yy}.${mm}.${dd}`;
-};
-
-const seededHue = (seed: string) => (seed.charCodeAt(0) || 65) % 360;
-
-const calcDuration = (start: string, end: string, isDayTrip: boolean) => {
-    if (isDayTrip) return '당일치기';
-    return formatDuration(start, end) ?? '—';
-};
 
 const MiniTicketPreview = ({
     trip,
@@ -41,18 +21,8 @@ const MiniTicketPreview = ({
     coverPhotoUrl,
     photoCount,
     sample = false,
-    isDayTrip = false,
 }: MiniTicketPreviewProps) => {
-    const destinationIata = getIataFromCountryString(trip.country);
-    const hue = seededHue(trip.tripTitle || trip.country || 'A');
-    const fallbackBg = `linear-gradient(135deg, oklch(0.7 0.08 ${hue}) 0%, oklch(0.35 0.08 ${(hue + 40) % 360}) 100%)`;
-
-    const dateLine =
-        trip.endDate && trip.endDate !== trip.startDate && !isDayTrip
-            ? `${formatShort(trip.startDate)} — ${formatShort(trip.endDate)}`
-            : formatShort(trip.startDate);
-
-    const duration = calcDuration(trip.startDate, trip.endDate, isDayTrip);
+    const { departure, arrival: destinationIata, dateLine, duration, fallbackBg } = getTicketView(trip);
     const photosLabel = typeof photoCount === 'number' ? `${photoCount}장` : '—';
 
     return (
@@ -74,7 +44,7 @@ const MiniTicketPreview = ({
                 <span css={notchLeft} />
                 <span css={notchRight} />
                 <div css={routeRow}>
-                    <div css={iata}>{getDepartureCode(trip.country)}</div>
+                    <div css={iata}>{departure}</div>
                     <div css={dashLine} />
                     <Plane size={13} color='#fff' />
                     <div css={dashLine} />

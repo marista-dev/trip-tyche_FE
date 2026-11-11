@@ -4,8 +4,7 @@ import { css } from '@emotion/react';
 import { ChevronRight, Edit, Image, Lock, Share2, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
-import { getIataFromCountryString } from '@/domains/trip/airport';
-import { getDepartureCode } from '@/domains/trip/destinations';
+import { getTicketView } from '@/domains/trip/ticketView';
 import { COLORS } from '@/shared/constants/style';
 
 interface ActionSheetTrip {
@@ -83,7 +82,7 @@ const TripTicketActionSheet = ({
 
     if (!mounted) return null;
 
-    const destinationIata = getIataFromCountryString(trip.country);
+    const { departure, arrival: destinationIata } = getTicketView(trip);
 
     /*
      * 게스트의 체험용 여행은 소유자가 게스트 본인이다. 예전엔 '공유받은 티켓' 메뉴를 보여줘
@@ -287,7 +286,7 @@ const TripTicketActionSheet = ({
                                 margin-bottom: 3px;
                             `}
                         >
-                            {getDepartureCode(trip.country)} → {destinationIata}
+                            {departure} → {destinationIata}
                         </div>
                         <div
                             css={css`

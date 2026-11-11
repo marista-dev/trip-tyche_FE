@@ -5,14 +5,11 @@ import { Plus, Trash } from 'lucide-react';
 
 import { useTripImages } from '@/domains/media/hooks/queries';
 import ShareModal from '@/domains/share/components/ShareModal';
-import { getIataFromCountryString } from '@/domains/trip/airport';
 import TripTicketActionSheet from '@/domains/trip/components/TripTicketActionSheet';
-import { getDepartureCode } from '@/domains/trip/destinations';
-import { formatDuration } from '@/domains/trip/tripDates';
+import { getTicketView } from '@/domains/trip/ticketView';
 import { Trip } from '@/domains/trip/types';
 import { useMemberOnly } from '@/domains/user/hooks/useMemberOnly';
 import useUserStore from '@/domains/user/stores/useUserStore';
-import { formatHyphenToDot, formatToDot } from '@/libs/utils/date';
 import ConfirmModal from '@/shared/components/common/Modal/ConfirmModal';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import { COLORS } from '@/shared/constants/style';
@@ -58,16 +55,15 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
     if (isCompletedTrip === undefined) return null;
 
     const isOwner = userInfo?.nickname === ownerNickname;
-    const destinationIata = isCompletedTrip ? getIataFromCountryString(country) : 'TYC';
-    const departureIata = getDepartureCode(country);
-    const formattedStartDate = isCompletedTrip ? formatToDot(startDate) : '—';
-    const formattedEndDate = isCompletedTrip ? formatToDot(endDate) : '—';
+    const {
+        departure: departureIata,
+        arrival: destinationIata,
+        startText: formattedStartDate,
+        endText: formattedEndDate,
+        duration: durationLabel,
+        fallbackBg,
+    } = getTicketView({ tripTitle, country, startDate, endDate }, { completed: !!isCompletedTrip });
     const sharedPeople = [ownerNickname || '', ...(sharedUsersNicknames || [])];
-
-    const durationLabel = isCompletedTrip ? (formatDuration(startDate, endDate) ?? '—') : '—';
-
-    const seedHue = (tripTitle.charCodeAt(0) + tripTitle.charCodeAt(tripTitle.length - 1)) % 360;
-    const fallbackBg = `linear-gradient(135deg, oklch(0.7 0.08 ${seedHue}) 0%, oklch(0.35 0.08 ${seedHue + 40}) 100%)`;
 
     return (
         <div css={containerStyle}>
@@ -261,8 +257,8 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
                     tripTitle={tripTitle}
                     isOwner={isOwner}
                     sharedPeople={sharedPeople}
-                    startDate={formatHyphenToDot(startDate)}
-                    endDate={formatHyphenToDot(endDate)}
+                    startDate={formattedStartDate}
+                    endDate={formattedEndDate}
                     onClose={() => setIsShareModalOpen(false)}
                 />
             )}
