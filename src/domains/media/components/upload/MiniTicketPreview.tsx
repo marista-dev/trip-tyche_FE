@@ -2,7 +2,7 @@ import { css } from '@emotion/react';
 import { Plane } from 'lucide-react';
 
 import { getIataFromCountryString } from '@/domains/trip/airport';
-import { TICKET } from '@/domains/trip/constants';
+import { getDepartureCode } from '@/domains/trip/destinations';
 import { formatDuration, toLocalDate } from '@/domains/trip/tripDates';
 import { TripInfo } from '@/domains/trip/types';
 import { COLORS } from '@/shared/constants/style';
@@ -74,7 +74,7 @@ const MiniTicketPreview = ({
                 <span css={notchLeft} />
                 <span css={notchRight} />
                 <div css={routeRow}>
-                    <div css={iata}>{TICKET.DEPARTURE_IATA}</div>
+                    <div css={iata}>{getDepartureCode(trip.country)}</div>
                     <div css={dashLine} />
                     <Plane size={13} color='#fff' />
                     <div css={dashLine} />

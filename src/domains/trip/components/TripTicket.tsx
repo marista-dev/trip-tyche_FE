@@ -7,7 +7,7 @@ import { useTripImages } from '@/domains/media/hooks/queries';
 import ShareModal from '@/domains/share/components/ShareModal';
 import { getIataFromCountryString } from '@/domains/trip/airport';
 import TripTicketActionSheet from '@/domains/trip/components/TripTicketActionSheet';
-import { TICKET } from '@/domains/trip/constants';
+import { getDepartureCode } from '@/domains/trip/destinations';
 import { formatDuration } from '@/domains/trip/tripDates';
 import { Trip } from '@/domains/trip/types';
 import { useMemberOnly } from '@/domains/user/hooks/useMemberOnly';
@@ -59,6 +59,7 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
 
     const isOwner = userInfo?.nickname === ownerNickname;
     const destinationIata = isCompletedTrip ? getIataFromCountryString(country) : 'TYC';
+    const departureIata = getDepartureCode(country);
     const formattedStartDate = isCompletedTrip ? formatToDot(startDate) : '—';
     const formattedEndDate = isCompletedTrip ? formatToDot(endDate) : '—';
     const sharedPeople = [ownerNickname || '', ...(sharedUsersNicknames || [])];
@@ -127,7 +128,7 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
 
                     {/* Route row */}
                     <div css={routeRowStyle}>
-                        <div css={routeCodeStyle}>{TICKET.DEPARTURE_IATA}</div>
+                        <div css={routeCodeStyle}>{departureIata}</div>
                         <div css={routeLineStyle}>
                             <div css={dashedLineStyle} />
                             <div css={dashedLineStyle} />

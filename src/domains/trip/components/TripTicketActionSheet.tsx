@@ -5,7 +5,7 @@ import { ChevronRight, Edit, Image, Lock, Share2, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 import { getIataFromCountryString } from '@/domains/trip/airport';
-import { TICKET } from '@/domains/trip/constants';
+import { getDepartureCode } from '@/domains/trip/destinations';
 import { COLORS } from '@/shared/constants/style';
 
 interface ActionSheetTrip {
@@ -287,7 +287,7 @@ const TripTicketActionSheet = ({
                                 margin-bottom: 3px;
                             `}
                         >
-                            {TICKET.DEPARTURE_IATA} → {destinationIata}
+                            {getDepartureCode(trip.country)} → {destinationIata}
                         </div>
                         <div
                             css={css`

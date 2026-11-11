@@ -180,7 +180,11 @@ const TripImageUploadPage = () => {
                             />
                             <p css={previewHint}>↓ 아래를 편집하면 티켓이 실시간으로 바뀌어요</p>
                         </div>
-                        <TripInfoForm tripForm={tripForm} onChangeTripInfo={setTripForm} />
+                        <TripInfoForm
+                            tripForm={tripForm}
+                            onChangeTripInfo={setTripForm}
+                            photoLocations={images ?? undefined}
+                        />
                         <div css={buttonWrapper}>
                             <Button text='여행 등록하기' onClick={handleTripFormSubmit} disabled={!isFormComplete} />
                         </div>

@@ -5,7 +5,7 @@ import { css } from '@emotion/react';
 import characterImg from '@/assets/images/character-icon.png';
 import { SharedTripDetail } from '@/domains/share/types';
 import { getIataFromCountryString } from '@/domains/trip/airport';
-import { TICKET } from '@/domains/trip/constants';
+import { getDepartureCode } from '@/domains/trip/destinations';
 import { formatToDot } from '@/libs/utils/date';
 import { COLORS, FONT_SIZES } from '@/shared/constants/style';
 
@@ -55,7 +55,7 @@ const SharedTicket = ({ trip, userNickname }: IntroTicketProps) => {
 
                 <div css={contentStyle}>
                     <div css={citiesStyle}>
-                        <p css={countryNameStyle}>{TICKET.DEPARTURE_IATA}</p>
+                        <p css={countryNameStyle}>{getDepartureCode(country)}</p>
                         <div css={dotsAndCharacterContainer}>
                             <div css={pointDots}>
                                 <div css={startPointDot} />

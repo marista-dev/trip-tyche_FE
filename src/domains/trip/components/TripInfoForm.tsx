@@ -1,12 +1,13 @@
-import { Dispatch, SetStateAction, useEffect, useState } from 'react';
+import { Dispatch, SetStateAction, useEffect, useMemo, useState } from 'react';
 
 import { css } from '@emotion/react';
-import { Select } from '@mantine/core';
 import { DatePickerInput, DatesRangeValue } from '@mantine/dates';
 import 'dayjs/locale/ko';
-import { Plane, Calendar, Globe, X } from 'lucide-react';
+import { Plane, Calendar, X } from 'lucide-react';
 
-import { COUNTRIES, FORM } from '@/domains/trip/constants';
+import DestinationField from '@/domains/trip/components/DestinationField';
+import { FORM } from '@/domains/trip/constants';
+import { detectDestination, PhotoLocation } from '@/domains/trip/destinations';
 import {
     formatDuration,
     formatMonthDay,
@@ -24,6 +25,8 @@ import theme from '@/shared/styles/theme';
 interface TripInfoFormProps {
     tripForm: Trip;
     onChangeTripInfo: Dispatch<SetStateAction<Trip>>;
+    /** 사진 GPS. 여행지를 추정하는 데 쓴다. */
+    photoLocations?: PhotoLocation[];
 }
 
 const ACCENT = theme.COLORS.PRIMARY;
@@ -32,7 +35,7 @@ const HASHTAG_MAX_LEN = 12;
 // 추천 태그 — 풀 메뉴는 너무 길어 가독성을 해치므로 대표 3개만 노출.
 const HASHTAG_SUGGESTIONS = FORM.HASHTAG_MENU.slice(0, 3);
 
-const TripInfoForm = ({ tripForm, onChangeTripInfo }: TripInfoFormProps) => {
+const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripInfoFormProps) => {
     const { tripTitle, country, startDate, endDate, hashtags, mediaFilesDates = [] } = tripForm;
     const [tagInput, setTagInput] = useState('');
     // 시작일만 고른 '진행 중' 상태. 끝날까지 고르면 tripForm에 반영하고 비운다.
@@ -53,6 +56,19 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo }: TripInfoFormProps) => {
         if (!startDate && !endDate && photoBounds) setRange(photoBounds.start, photoBounds.end);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [photoBounds?.start, photoBounds?.end]);
+
+    const detected = useMemo(() => detectDestination(photoLocations), [photoLocations]);
+
+    /*
+     * 국내는 지역 경계로 판정해 믿을 만하므로 비어 있으면 바로 채운다(국내 여행은 보통 한 지역).
+     * 해외는 국경 근처에서 틀릴 수 있어 입력칸 아래 추천으로만 보여준다.
+     */
+    useEffect(() => {
+        if (!country && detected?.isConfident) {
+            onChangeTripInfo((prev: Trip) => (prev.country ? prev : { ...prev, country: detected.value }));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [detected?.value]);
 
     const handleDateChange = (value: DatesRangeValue) => {
         const [from, to] = value;
@@ -97,11 +113,6 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo }: TripInfoFormProps) => {
 
     const remainingSuggestions = HASHTAG_SUGGESTIONS.filter((t) => !hashtags.includes(t));
     const isFull = hashtags.length >= HASHTAG_MAX;
-
-    const countryData = COUNTRIES.map((country) => ({
-        value: `${country.value}`,
-        label: `${country.emoji} ${country.nameKo}`,
-    }));
 
     return (
         <div css={card}>
@@ -163,17 +174,10 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo }: TripInfoFormProps) => {
 
             <section>
                 <h2 css={fieldLabel}>{FORM.TITLE.COUNTRY}</h2>
-                <Select
-                    placeholder={FORM.TITLE.COUNTRY_DEFAULT}
-                    data={countryData}
+                <DestinationField
                     value={country}
-                    onChange={(value) => onChangeTripInfo({ ...tripForm, country: value || '' })}
-                    checkIconPosition='right'
-                    leftSection={<Globe size={16} />}
-                    size='md'
-                    radius='md'
-                    allowDeselect={false}
-                    comboboxProps={{ transitionProps: { transition: 'pop', duration: 200 }, dropdownPadding: 6 }}
+                    onChange={(value) => onChangeTripInfo((prev: Trip) => ({ ...prev, country: value }))}
+                    suggestion={detected}
                 />
             </section>
 

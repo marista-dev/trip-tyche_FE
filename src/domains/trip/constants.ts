@@ -1,9 +1,5 @@
 import { Country } from '@/domains/trip/types';
 
-export const TICKET = {
-    DEPARTURE_IATA: 'ICN',
-};
-
 export const FORM = {
     INITIAL: {
         tripTitle: '',
@@ -14,7 +10,7 @@ export const FORM = {
     },
     TITLE: {
         DATE: '여행 기간 *',
-        COUNTRY: '여행 국가 *',
+        COUNTRY: '여행지 *',
         COUNTRY_DEFAULT: '여행 국가를 선택해주세요',
         TITLE: '여행 제목 *',
         TITLE_PLACEHOLDER: '여행 제목을 입력해주세요',
@@ -647,4 +643,11 @@ export const COUNTRIES: Country[] = [
         value: '🇭🇰/홍콩/HONG KONG',
         iata: 'HKG',
     },
+    // 한국인 여행 수요가 많은데 목록에 없던 나라. 정렬은 선택 시트가 이름순으로 다시 한다.
+    { emoji: '🇨🇳', nameKo: '중국', nameEn: 'CHINA', value: '🇨🇳/중국/CHINA', iata: 'PEK' },
+    { emoji: '🇲🇳', nameKo: '몽골', nameEn: 'MONGOLIA', value: '🇲🇳/몽골/MONGOLIA', iata: 'UBN' },
+    { emoji: '🇷🇺', nameKo: '러시아', nameEn: 'RUSSIA', value: '🇷🇺/러시아/RUSSIA', iata: 'SVO' },
+    { emoji: '🇳🇵', nameKo: '네팔', nameEn: 'NEPAL', value: '🇳🇵/네팔/NEPAL', iata: 'KTM' },
+    { emoji: '🇲🇲', nameKo: '미얀마', nameEn: 'MYANMAR', value: '🇲🇲/미얀마/MYANMAR', iata: 'RGN' },
+    { emoji: '🇺🇿', nameKo: '우즈베키스탄', nameEn: 'UZBEKISTAN', value: '🇺🇿/우즈베키스탄/UZBEKISTAN', iata: 'TAS' },
 ];

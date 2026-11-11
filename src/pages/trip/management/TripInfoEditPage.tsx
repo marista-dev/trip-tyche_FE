@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import MiniTicketPreview from '@/domains/media/components/upload/MiniTicketPreview';
+import { useTripPhotos } from '@/domains/media/hooks/queries';
 import TripInfoForm from '@/domains/trip/components/TripInfoForm';
 import { FORM } from '@/domains/trip/constants';
 import { useTripFormSubmit } from '@/domains/trip/hooks/mutations';
@@ -38,6 +39,8 @@ const TripInfoEditPage = () => {
     const { mutateAsync, isPending: isSubmitting } = useTripFormSubmit();
 
     const { data: tripInfoResult, isLoading } = useTripInfo(tripKey!);
+    // 여행지 추정용 사진 위치
+    const { photos } = useTripPhotos(tripKey!);
     const { isFormComplete } = useTripFormValidation(tripForm);
 
     useEffect(() => {
@@ -100,7 +103,7 @@ const TripInfoEditPage = () => {
                     <MiniTicketPreview trip={tripForm} ownerNickname={userInfo?.nickname} />
                     <p css={previewHint}>↓ 아래를 편집하면 티켓이 실시간으로 바뀌어요</p>
                 </div>
-                <TripInfoForm tripForm={tripForm} onChangeTripInfo={setTripForm} />
+                <TripInfoForm tripForm={tripForm} onChangeTripInfo={setTripForm} photoLocations={photos} />
                 <div css={buttonWrapper}>
                     <Button
                         text={`여행 ${isDraft ? '등록' : '수정'}하기`}

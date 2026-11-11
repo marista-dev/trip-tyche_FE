@@ -1,5 +1,6 @@
 import { DEFAULT_METADATA } from '@/domains/media/constants';
 import { MediaFile } from '@/domains/media/types';
+import { getCountryKey } from '@/domains/trip/destinations';
 import { Trip } from '@/domains/trip/types';
 import { hasValidLocation } from '@/libs/utils/validate';
 
@@ -94,13 +95,15 @@ export const aggregateUserStats = (trips: Trip[], mediaLists: MediaFile[][]): Us
         }
 
         if (!isPlaceholderCountry(trip.country)) {
-            const existing = countryMap.get(trip.country);
+            // 국내 여행은 지역이 붙는다('…/SOUTH KOREA/제주'). 방문 국가는 나라 단위로 센다.
+            const countryKey = getCountryKey(trip.country);
+            const existing = countryMap.get(countryKey);
             if (existing) {
                 existing.visits += 1;
                 existing.photoCount += photoCount;
             } else {
                 const { emoji, name } = splitCountry(trip.country);
-                countryMap.set(trip.country, { country: trip.country, emoji, name, visits: 1, photoCount });
+                countryMap.set(countryKey, { country: countryKey, emoji, name, visits: 1, photoCount });
             }
         }
 

@@ -1,14 +1,7 @@
-import { COUNTRIES } from '@/domains/trip/constants';
+import { getArrivalCode } from '@/domains/trip/destinations';
 
-export const FALLBACK_IATA = 'TRP';
-
-const iataCache = new Map<string, string>();
-
-export const getIataFromCountryString = (country?: string): string => {
-    if (!country) return FALLBACK_IATA;
-    const cached = iataCache.get(country);
-    if (cached) return cached;
-    const iata = COUNTRIES.find((c) => c.value === country)?.iata ?? FALLBACK_IATA;
-    iataCache.set(country, iata);
-    return iata;
-};
+/**
+ * 티켓 도착 코드. 국내 여행은 지역 코드(CJU 등), 해외는 나라 대표 공항.
+ * 실제 규칙은 destinations.ts에 있다 — 기존 호출부 호환용 이름.
+ */
+export const getIataFromCountryString = (country?: string): string => getArrivalCode(country);
