@@ -1,7 +1,7 @@
-import { Dispatch, SetStateAction, useEffect, useMemo, useState } from 'react';
+import { Dispatch, SetStateAction, useEffect, useMemo, useRef, useState } from 'react';
 
 import { css } from '@emotion/react';
-import { DatePickerInput, DatesRangeValue } from '@mantine/dates';
+import { DatePickerInput, DatesRangeValue, DateValue } from '@mantine/dates';
 import 'dayjs/locale/ko';
 import { Plane, Calendar, X } from 'lucide-react';
 
@@ -45,6 +45,11 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
     const photoBounds = getDateBounds(photoDays);
     const outsideDates = getDatesOutside(photoDays, startDate, endDate);
 
+    // 당일치기 토글. 저장된 여행이 하루짜리이거나 사진이 하루치면 켜진 채로 시작한다.
+    const [isDayTrip, setIsDayTrip] = useState(
+        () => (Boolean(startDate) && startDate === endDate) || (!!photoBounds && photoBounds.start === photoBounds.end),
+    );
+
     const setRange = (start: string, end: string) =>
         onChangeTripInfo((prev: Trip) => ({ ...prev, startDate: start, endDate: end }));
 
@@ -75,14 +80,67 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
         if (from && to) {
             setDraftRange(null);
             setRange(toDateString(from), toDateString(to));
+            // 기간 모드에서 같은 날을 두 번 눌러도 당일치기로 본다.
+            if (toDateString(from) === toDateString(to)) setIsDayTrip(true);
             return;
         }
         setDraftRange(value);
     };
 
+    const handleSingleDateChange = (value: DateValue) => {
+        if (!value) return;
+        const day = toDateString(value);
+        setRange(day, day);
+    };
+
+    /*
+     * 토글을 바꿔도 고른 날짜를 지우지 않는다(예전엔 바꿀 때마다 초기화돼 다시 골라야 했다).
+     * 켜면 시작일 하루로 줄이고, 끄면 그 하루를 그대로 둔 채 기간을 넓힐 수 있게 한다.
+     */
+    // 당일치기를 켜기 직전의 기간. 그대로 다시 끄면 되돌린다(실수로 켰다 꺼도 끝 날짜를 잃지 않게).
+    const rangeBeforeDayTripRef = useRef<{ start: string; end: string } | null>(null);
+
+    const toggleDayTrip = () => {
+        const next = !isDayTrip;
+        setIsDayTrip(next);
+        setDraftRange(null);
+        if (next) {
+            rangeBeforeDayTripRef.current = startDate && endDate ? { start: startDate, end: endDate } : null;
+            if (startDate) setRange(startDate, startDate);
+            return;
+        }
+        const before = rangeBeforeDayTripRef.current;
+        rangeBeforeDayTripRef.current = null;
+        // 당일치기 동안 날짜를 바꾸지 않았을 때만 되돌린다.
+        if (before && startDate === before.start && endDate === before.start) setRange(before.start, before.end);
+    };
+
+    const fitToPhotos = () => {
+        if (!photoBounds) return;
+        setRange(photoBounds.start, photoBounds.end);
+        setIsDayTrip(photoBounds.start === photoBounds.end);
+    };
+
     const pickerValue: DatesRangeValue = draftRange ?? [toLocalDate(startDate), toLocalDate(endDate)];
     const duration = formatDuration(startDate, endDate);
     const photoDaySet = new Set(photoDays);
+
+    const sharedPickerProps = {
+        leftSection: <Calendar size={16} />,
+        locale: 'ko',
+        size: 'md' as const,
+        radius: 'md' as const,
+        defaultDate: toLocalDate(startDate) ?? toLocalDate(photoBounds?.start) ?? undefined,
+        popoverProps: { position: 'bottom' as const },
+        classNames: { input: 'trip-date-input' },
+        css: datePickerInputNowrap,
+        renderDay: (date: Date) => (
+            <div css={dayContainerStyle}>
+                {photoDaySet.has(toDateString(date)) && <div css={dayIndicatorStyle} />}
+                {date.getDate()}
+            </div>
+        ),
+    };
 
     const removeTag = (tag: string) => {
         onChangeTripInfo((prev: Trip) => ({
@@ -117,32 +175,40 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
     return (
         <div css={card}>
             <section>
-                <h2 css={[fieldLabel, labelGap]}>{FORM.TITLE.DATE}</h2>
-                <DatePickerInput
-                    type='range'
-                    // 같은 날을 두 번 누르면 당일치기. 기본값(false)이면 선택이 풀려 하루짜리 여행을 못 고른다.
-                    allowSingleDateInRange
-                    placeholder='여행 기간을 선택해주세요'
-                    value={pickerValue}
-                    onChange={handleDateChange}
-                    leftSection={<Calendar size={16} />}
-                    locale='ko'
-                    size='md'
-                    radius='md'
-                    valueFormatter={({ date }) =>
-                        Array.isArray(date) ? formatRange(date[0] as Date | null, date[1] as Date | null) : ''
-                    }
-                    defaultDate={toLocalDate(startDate) ?? toLocalDate(photoBounds?.start) ?? undefined}
-                    popoverProps={{ position: 'bottom', onClose: () => setDraftRange(null) }}
-                    classNames={{ input: 'trip-date-input' }}
-                    css={datePickerInputNowrap}
-                    renderDay={(date) => (
-                        <div css={dayContainerStyle}>
-                            {photoDaySet.has(toDateString(date)) && <div css={dayIndicatorStyle} />}
-                            {date.getDate()}
-                        </div>
-                    )}
-                />
+                <div css={titleRow}>
+                    <h2 css={fieldLabel}>{FORM.TITLE.DATE}</h2>
+                    <button type='button' css={togglePill} onClick={toggleDayTrip} aria-pressed={isDayTrip}>
+                        <span css={toggleTrack(isDayTrip)}>
+                            <span css={toggleKnob(isDayTrip)} />
+                        </span>
+                        <span css={toggleText(isDayTrip)}>당일치기</span>
+                    </button>
+                </div>
+                {isDayTrip ? (
+                    <DatePickerInput
+                        key='single'
+                        placeholder='여행한 날을 선택해주세요'
+                        value={toLocalDate(startDate)}
+                        onChange={handleSingleDateChange}
+                        {...sharedPickerProps}
+                        valueFormatter={({ date }) => (date instanceof Date ? formatRange(date, null) : '')}
+                    />
+                ) : (
+                    <DatePickerInput
+                        key='range'
+                        type='range'
+                        // 같은 날을 두 번 누르면 당일치기. 기본값(false)이면 선택이 풀려 하루짜리 여행을 못 고른다.
+                        allowSingleDateInRange
+                        placeholder='여행 기간을 선택해주세요'
+                        value={pickerValue}
+                        onChange={handleDateChange}
+                        {...sharedPickerProps}
+                        valueFormatter={({ date }) =>
+                            Array.isArray(date) ? formatRange(date[0] as Date | null, date[1] as Date | null) : ''
+                        }
+                        popoverProps={{ position: 'bottom', onClose: () => setDraftRange(null) }}
+                    />
+                )}
                 <div css={dateMetaRow}>
                     {duration && (
                         <span css={durationBadge}>
@@ -154,17 +220,13 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
                         <span css={errorStyle}>
                             {formatMonthDay(outsideDates[0])}
                             {outsideDates.length > 1 && ` 외 ${outsideDates.length - 1}일`} 사진이 기간 밖에 있어요.
-                            <button
-                                type='button'
-                                css={fitButton}
-                                onClick={() => setRange(photoBounds.start, photoBounds.end)}
-                            >
+                            <button type='button' css={fitButton} onClick={fitToPhotos}>
                                 사진 날짜에 맞추기
                             </button>
                         </span>
                     ) : (
                         <span css={dateDescriptionStyle}>
-                            {draftRange?.[0]
+                            {!isDayTrip && draftRange?.[0]
                                 ? '끝나는 날을 골라주세요 · 같은 날을 한 번 더 누르면 당일치기'
                                 : '사진이 있는 날짜는 파란 점으로 표시됩니다'}
                         </span>
@@ -272,8 +334,44 @@ const titleRow = css`
     margin-bottom: 12px;
 `;
 
-const labelGap = css`
-    margin-bottom: 12px;
+const togglePill = css`
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    background: none;
+    border: none;
+    padding: 0;
+`;
+
+const toggleTrack = (on: boolean) => css`
+    width: 36px;
+    height: 20px;
+    border-radius: 100px;
+    background: ${on ? ACCENT : '#e2e8f0'};
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+`;
+
+const toggleKnob = (on: boolean) => css`
+    position: absolute;
+    top: 2px;
+    left: ${on ? '17px' : '2px'};
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+    transition: left 0.2s;
+`;
+
+const toggleText = (on: boolean) => css`
+    font-size: 11px;
+    font-weight: 700;
+    color: ${on ? ACCENT : '#94a3b8'};
+    transition: color 0.2s;
 `;
 
 const fitButton = css`
