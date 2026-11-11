@@ -1,5 +1,6 @@
 import { AxiosError } from 'axios';
 
+import { isGuestRestrictedError } from '@/domains/user/guestPolicy';
 import { ApiResponse, Result } from '@/libs/apis/shared/types';
 import { MESSAGE } from '@/shared/constants/ui';
 
@@ -22,6 +23,11 @@ export const toResult = async <T, R = T>(
         const value = (transform ? transform(data) : data) as R;
         return { success: true, data: value };
     } catch (error) {
+        // 게스트 차단은 로그인 유도 시트가 이미 떴다. 빈 메시지로 돌려 호출부 토스트가 겹치지 않게 한다.
+        if (isGuestRestrictedError(error)) {
+            onError?.();
+            return { success: false, error: '' };
+        }
         if (error instanceof AxiosError) {
             const errorResponse = error?.response?.data;
             onError?.();

@@ -1,5 +1,7 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
+import { createGuestRestrictedError, isGuestRestricted, isGuestRestrictedError } from '@/domains/user/guestPolicy';
+import { useLoginPromptStore } from '@/domains/user/stores/useLoginPromptStore';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import { apiClient } from '@/libs/apis/shared/client';
 import { API_BASE_URL } from '@/libs/apis/shared/constants';
@@ -29,7 +31,7 @@ const isSessionAgnostic = (config?: CustomRequestConfing) =>
 export const setupRequestInterceptor = (instance: AxiosInstance) => {
     instance.interceptors.request.use(
         (config: InternalAxiosRequestConfig) => {
-            const { isLoggingOut } = useUserStore.getState();
+            const { isLoggingOut, isGuest } = useUserStore.getState();
 
             if (isLoggingOut && !config.url?.includes('/auth/logout')) {
                 const controller = new AbortController();
@@ -38,6 +40,16 @@ export const setupRequestInterceptor = (instance: AxiosInstance) => {
                     ...config,
                     signal: controller.signal,
                 };
+            }
+
+            /*
+             * 게스트의 쓰기 요청은 서버에 보내지 않는다. 보내면 401이 돌아오고, 응답 인터셉터가
+             * 세션 만료로 오해해 게스트를 로그인 화면으로 쫓아낸다(guestPolicy.ts 참고).
+             * 대신 로그인 유도 시트를 띄운다.
+             */
+            if (isGuest && isGuestRestricted(config)) {
+                useLoginPromptStore.getState().open();
+                return Promise.reject(createGuestRestrictedError(config));
             }
 
             // 앱에서는 쿠키가 살아남지 않으므로 저장된 토큰을 헤더로 싣는다.
@@ -79,6 +91,9 @@ export const setupResponseInterceptor = (instance: AxiosInstance) => {
         async (error: AxiosError<ApiResponse<null>>) => {
             const { showToast } = useToastStore.getState();
 
+            // 요청 인터셉터가 막은 게스트 요청. 네트워크 오류로 오인해 토스트를 띄우면 안 된다.
+            if (isGuestRestrictedError(error)) return Promise.reject(error);
+
             const originalRequest = error.config as CustomRequestConfing;
 
             if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK') {
@@ -98,6 +113,21 @@ export const setupResponseInterceptor = (instance: AxiosInstance) => {
 
                 if (status === 401) {
                     if (isSessionAgnostic(originalRequest)) return Promise.reject(error);
+
+                    /*
+                     * 401은 code로 나누지 않는다. 웹은 access 쿠키의 Max-Age가 토큰 만료와 같아서,
+                     * 만료되면 브라우저가 쿠키를 버리고 서버는 2003(만료)이 아니라 1001(토큰 없음)을 준다.
+                     * 2003에만 refresh하면 웹 회원은 갱신 기회 없이 로그아웃된다.
+                     *
+                     * 게스트는 refresh 토큰이 없다. 권한 부족은 이제 403으로 오므로 게스트의 401은
+                     * 4시간 체험 만료다 — 갱신 시도 없이 끝낸다.
+                     */
+                    if (useUserStore.getState().isGuest) {
+                        if (isNative()) await clearTokens();
+                        showToast('게스트 체험 시간이 끝났어요. 로그인하고 이어서 기록해보세요.');
+                        useUserStore.getState().setUnauthenticated();
+                        return Promise.reject(error);
+                    }
 
                     /*
                      * 앱에는 갱신할 쿠키가 없다. 현행 /v1/auth/refresh는 refresh 토큰을 쿠키에서만
@@ -124,10 +154,18 @@ export const setupResponseInterceptor = (instance: AxiosInstance) => {
                     }
                 }
 
+                /*
+                 * 403은 권한 부족(code 2009 ACCESS_DENIED)이지 세션 만료가 아니다 — 세션을 끊지 않는다.
+                 * 예전엔 여기서 로그아웃시켰지만, 그땐 서버가 403을 401로 덮어 실제로 도달하지 않았다.
+                 * 게스트 쓰기는 요청 인터셉터가 먼저 막는다. 여기는 허용 목록이 놓친 경우의 안전망이다.
+                 */
                 if (status === 403) {
                     if (isSessionAgnostic(originalRequest)) return Promise.reject(error);
 
-                    useUserStore.getState().setUnauthenticated();
+                    if (useUserStore.getState().isGuest) {
+                        useLoginPromptStore.getState().open();
+                        return Promise.reject(createGuestRestrictedError(originalRequest));
+                    }
                     return Promise.reject(error);
                 }
 
