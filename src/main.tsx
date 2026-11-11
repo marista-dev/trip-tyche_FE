@@ -2,6 +2,7 @@
 import { createRoot } from 'react-dom/client';
 
 import App from './App';
+import { initAnalytics } from '@/libs/analytics';
 import { initAppShell } from '@/platform/native/appShell';
 
 const render = () => {
@@ -11,6 +12,12 @@ const render = () => {
         // </StrictMode>
     );
 };
+
+/*
+ * 분석 초기화는 initAppShell보다 먼저 한다. 앱의 OAuth 딥링크 리스너(initAppShell이 등록)가
+ * 신규 가입 보류 이벤트를 적는데, init 전이면 그 호출이 no-op이라 signed_up이 유실된다.
+ */
+initAnalytics();
 
 /*
  * 네이티브 셸 초기화(저장된 토큰 복원, 상태바, 백버튼, 스플래시). 웹에서는 즉시 반환된다.
