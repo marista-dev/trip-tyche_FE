@@ -8,6 +8,7 @@ import TripTicket from '@/domains/trip/components/TripTicket';
 import { useTripTicketList } from '@/domains/trip/hooks/queries';
 import { Trip } from '@/domains/trip/types';
 import { useSummary } from '@/domains/user/hooks/queries';
+import { useMemberOnly } from '@/domains/user/hooks/useMemberOnly';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import { ANALYTICS_EVENTS, track } from '@/libs/analytics';
 import { tripAPI } from '@/libs/apis';
@@ -22,7 +23,7 @@ import { useToastStore } from '@/shared/stores/useToastStore';
 
 const MainPage = () => {
     const userInfo = useUserStore((state) => state.userInfo);
-    const isGuest = useUserStore((state) => state.isGuest);
+    const requireMember = useMemberOnly();
     const login = useUserStore((state) => state.login);
     const showToast = useToastStore((state) => state.showToast);
     useMapScript(); // TripRoutePage 진입 전 Google Maps 스크립트 백그라운드 로드
@@ -125,7 +126,13 @@ const MainPage = () => {
                             </p>
                         )}
                     </div>
-                    {!isGuest && <Button css={addButton} onClick={createNewTrip} icon={<Plus size={22} />} />}
+                    {/* 게스트에게도 보여준다 — 누르면 로그인 유도. 숨기면 '티켓을 만들 수 있다'는 사실 자체를 모른다. */}
+                    <Button
+                        css={addButton}
+                        onClick={() => requireMember('trip', createNewTrip)}
+                        icon={<Plus size={22} />}
+                        aria-label='새 여행 티켓 만들기'
+                    />
                 </div>
 
                 <div css={tripList}>

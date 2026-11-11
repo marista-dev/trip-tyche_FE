@@ -27,6 +27,7 @@ import {
     getImageGroupByDate,
 } from '@/domains/media/utils';
 import { useTripInfo } from '@/domains/trip/hooks/queries';
+import { useMemberOnly } from '@/domains/user/hooks/useMemberOnly';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import InlineDatePickSheet from '@/pages/trip/management/InlineDatePickSheet';
 import EmptyItem from '@/shared/components/common/EmptyItem';
@@ -68,8 +69,17 @@ const TripImageManagePage = () => {
         toggle: togglePhoto,
         clear: clearSelection,
     } = usePhotoSelection();
-    const { fileInputRef, openFilePicker, handleFileSelected, isUploading, uploadingText, pendingByDate } =
-        usePhotoUpload(tripKey);
+    const requireMember = useMemberOnly();
+    const {
+        fileInputRef,
+        openFilePicker: openPicker,
+        handleFileSelected,
+        isUploading,
+        uploadingText,
+        pendingByDate,
+    } = usePhotoUpload(tripKey);
+    // 게스트는 사진을 고르기 전에 막는다 — 고른 뒤 업로드 단계에서 막히면 수고가 버려진다.
+    const openFilePicker = () => requireMember('photo', openPicker);
 
     const userId = useUserStore((s) => s.userInfo?.userId ?? null);
     useUploadSessionSync(tripKey, userId);

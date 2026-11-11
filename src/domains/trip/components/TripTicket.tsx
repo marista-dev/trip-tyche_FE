@@ -9,6 +9,7 @@ import { getIataFromCountryString } from '@/domains/trip/airport';
 import TripTicketActionSheet from '@/domains/trip/components/TripTicketActionSheet';
 import { TICKET } from '@/domains/trip/constants';
 import { Trip } from '@/domains/trip/types';
+import { useMemberOnly } from '@/domains/user/hooks/useMemberOnly';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import { formatHyphenToDot, formatToDot } from '@/libs/utils/date';
 import ConfirmModal from '@/shared/components/common/Modal/ConfirmModal';
@@ -37,6 +38,7 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
     const showToast = useToastStore((state) => state.showToast);
     const userInfo = useUserStore((state) => state.userInfo);
     const isGuest = useUserStore((state) => state.isGuest);
+    const requireMember = useMemberOnly();
 
     const { isModalOpen, isDeleting, isUnLinking, handler, deleteTrip, unlinkShared, closeModal } = useTicketHandler(
         tripKey!,
@@ -86,7 +88,11 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
                             <Plus size={14} aria-hidden='true' /> 여행 정보 이어서 작성하기
                         </button>
                         <div css={separatorStyle} aria-hidden='true' />
-                        <button css={uncompletedDeleteStyle} onClick={() => handler.delete()} aria-label='삭제하기'>
+                        <button
+                            css={uncompletedDeleteStyle}
+                            onClick={() => requireMember('delete', handler.delete)}
+                            aria-label='삭제하기'
+                        >
                             <Trash size={14} aria-hidden='true' /> 삭제하기
                         </button>
                     </div>
@@ -234,6 +240,7 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
                 isCompletedTrip={!!isCompletedTrip}
                 handler={handler}
                 onShare={() => setIsShareModalOpen(true)}
+                onLocked={(id) => requireMember(id, () => undefined)}
             />
 
             {isModalOpen && (

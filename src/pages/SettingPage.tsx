@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 
 import { css, keyframes } from '@emotion/react';
-import { ChevronRight, FileText, Info, Lock, MessageCircle, Pencil } from 'lucide-react';
+import { ChevronRight, Clock, FileText, Info, Lock, MessageCircle, Pencil } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import character from '@/assets/images/character-icon.png';
 import NicknameDialog from '@/domains/user/components/NicknameDialog';
 import StatBottomSheet, { StatView } from '@/domains/user/components/setting/StatBottomSheet';
+import { useMemberOnly } from '@/domains/user/hooks/useMemberOnly';
 import { useUserStats } from '@/domains/user/hooks/useUserStats';
+import { useLoginPromptStore } from '@/domains/user/stores/useLoginPromptStore';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import Header from '@/shared/components/common/Header';
 import ConfirmModal from '@/shared/components/common/Modal/ConfirmModal';
@@ -26,6 +28,8 @@ const SettingPage = () => {
     const nickname = useUserStore((state) => state.userInfo?.nickname);
     const isGuest = useUserStore((state) => state.isGuest);
     const logout = useUserStore((state) => state.logout);
+    const requireMember = useMemberOnly();
+    const openLoginPrompt = useLoginPromptStore((state) => state.open);
     const showToast = useToastStore((state) => state.showToast);
 
     const navigate = useNavigate();
@@ -72,11 +76,13 @@ const SettingPage = () => {
                             <p css={travelerLabel}>TRAVELER</p>
                             <p css={nicknameText}>{nickname ?? '여행자'}</p>
                         </div>
-                        {!isGuest && (
-                            <button css={editButton} onClick={() => setEditing(true)} aria-label='닉네임 수정'>
-                                <Pencil size={16} />
-                            </button>
-                        )}
+                        <button
+                            css={editButton}
+                            onClick={() => requireMember('profile', () => setEditing(true))}
+                            aria-label='닉네임 수정'
+                        >
+                            <Pencil size={16} />
+                        </button>
                     </div>
 
                     <div css={statDivider} />
@@ -93,6 +99,21 @@ const SettingPage = () => {
                         ))}
                     </div>
                 </section>
+
+                {isGuest && (
+                    <section css={guestBanner}>
+                        <div css={guestBannerText}>
+                            <p css={guestBannerTitle}>게스트로 둘러보는 중이에요</p>
+                            <p css={guestBannerSub}>
+                                <Clock size={12} strokeWidth={2.2} aria-hidden='true' />
+                                체험 기록은 4시간 뒤 사라져요
+                            </p>
+                        </div>
+                        <button css={guestBannerButton} onClick={() => openLoginPrompt('trip')}>
+                            로그인
+                        </button>
+                    </section>
+                )}
 
                 {/* ── 계정 ── */}
                 <h3 css={sectionTitle}>계정</h3>
@@ -304,6 +325,57 @@ const statSeparator = css`
 `;
 
 /* ── section / card group ── */
+const guestBanner = css`
+    margin-top: 12px;
+    padding: 14px 14px 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-radius: 16px;
+    background: rgba(0, 113, 227, 0.06);
+    border: 1px solid rgba(0, 113, 227, 0.12);
+`;
+
+const guestBannerText = css`
+    flex: 1;
+    min-width: 0;
+`;
+
+const guestBannerTitle = css`
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    color: #0f172a;
+`;
+
+const guestBannerSub = css`
+    margin: 3px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: rgba(15, 23, 42, 0.5);
+`;
+
+const guestBannerButton = css`
+    flex-shrink: 0;
+    height: 36px;
+    padding: 0 16px;
+    border: none;
+    border-radius: 999px;
+    background: #0071e3;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+
+    &:active {
+        opacity: 0.85;
+    }
+`;
+
 const sectionTitle = css`
     margin: 20px 0 8px;
     font-size: 11px;

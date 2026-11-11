@@ -18,6 +18,7 @@ import { useTripSummaryList } from '@/domains/trip/hooks/queries';
 import { TripSummary } from '@/domains/trip/types';
 import { NICKNAME_FORM } from '@/domains/user/constants';
 import { useSummary } from '@/domains/user/hooks/queries';
+import { useMemberOnly } from '@/domains/user/hooks/useMemberOnly';
 import { useNickname } from '@/domains/user/hooks/useNickname';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import { ANALYTICS_EVENTS, track } from '@/libs/analytics';
@@ -233,6 +234,7 @@ const TicketCard = ({ trip, country, onPress }: { trip: TripSummary; country: Se
 const GlobeMapPage = () => {
     const navigate = useNavigate();
     const showToast = useToastStore((s) => s.showToast);
+    const requireMember = useMemberOnly();
     const mountRef = useRef<HTMLDivElement>(null);
     const pinsRef = useRef<THREE.Mesh[]>([]);
     const hitMeshesRef = useRef<THREE.Mesh[]>([]);
@@ -645,7 +647,7 @@ const GlobeMapPage = () => {
                             <p css={emptyCardSub}>티켓 하나만 있으면 지구본이 채워져요</p>
                         </div>
                     </div>
-                    <button css={emptyCtaBtn} onClick={handleCreateFirst}>
+                    <button css={emptyCtaBtn} onClick={() => requireMember('trip', handleCreateFirst)}>
                         <svg
                             width='14'
                             height='14'

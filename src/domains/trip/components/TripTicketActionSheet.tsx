@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { css } from '@emotion/react';
-import { ChevronRight, Edit, Image, Share2, Trash2 } from 'lucide-react';
+import { ChevronRight, Edit, Image, Lock, Share2, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 import { getIataFromCountryString } from '@/domains/trip/airport';
@@ -27,6 +27,8 @@ interface TripTicketActionSheetProps {
         delete: () => void;
     };
     onShare: () => void;
+    /** 게스트가 잠긴 동작(공유·삭제)을 눌렀을 때. 로그인 유도 시트를 연다. */
+    onLocked: (id: 'share' | 'delete') => void;
 }
 
 const TripTicketActionSheet = ({
@@ -38,6 +40,7 @@ const TripTicketActionSheet = ({
     isCompletedTrip,
     handler,
     onShare,
+    onLocked,
 }: TripTicketActionSheetProps) => {
     const [mounted, setMounted] = useState(false);
     const [show, setShow] = useState(false);
@@ -82,59 +85,97 @@ const TripTicketActionSheet = ({
 
     const destinationIata = getIataFromCountryString(trip.country);
 
-    const actions =
-        isOwner && !isGuest
-            ? [
-                  {
-                      id: 'edit',
-                      label: '여행 정보 수정',
-                      sub: '제목, 날짜, 해시태그',
-                      Icon: Edit,
-                      tone: 'default' as const,
-                  },
-                  {
-                      id: 'photo',
-                      label: '사진 관리',
-                      sub: '추가 · 삭제 · 위치 수정',
-                      Icon: Image,
-                      tone: 'default' as const,
-                  },
-                  {
-                      id: 'share',
-                      label: '친구에게 공유',
-                      sub: '링크 복사 또는 앱으로 보내기',
-                      Icon: Share2,
-                      tone: 'default' as const,
-                  },
-                  { id: 'delete', label: '여행 삭제', sub: '복구할 수 없어요', Icon: Trash2, tone: 'danger' as const },
-              ]
-            : [
-                  { id: 'edit', label: '정보 보기', sub: '제목, 날짜, 해시태그', Icon: Edit, tone: 'default' as const },
-                  {
-                      id: 'photo',
-                      label: '사진 보기',
-                      sub: '추가 · 삭제 · 위치 수정',
-                      Icon: Image,
-                      tone: 'default' as const,
-                  },
-                  {
-                      id: 'share',
-                      label: '공유 정보',
-                      sub: '링크 복사 또는 앱으로 보내기',
-                      Icon: Share2,
-                      tone: 'default' as const,
-                  },
-                  {
-                      id: 'delete',
-                      label: '공유 해제',
-                      sub: '이 티켓에 더 이상 접근할 수 없어요',
-                      Icon: Trash2,
-                      tone: 'danger' as const,
-                  },
-              ];
+    /*
+     * 게스트의 체험용 여행은 소유자가 게스트 본인이다. 예전엔 '공유받은 티켓' 메뉴를 보여줘
+     * '공유 해제'를 누르면 실제로는 여행 삭제(DELETE)가 나가 401 → 로그인 화면으로 튕겼다.
+     * 보기는 열어두고, 쓰기는 자물쇠로 표시해 누르면 로그인을 안내한다.
+     */
+    const guestActions = [
+        { id: 'edit', label: '정보 보기', sub: '제목, 날짜, 해시태그', Icon: Edit, tone: 'default' as const },
+        { id: 'photo', label: '사진 보기', sub: '지도 위 사진과 날짜별 기록', Icon: Image, tone: 'default' as const },
+        {
+            id: 'share',
+            label: '친구에게 공유',
+            sub: '로그인하면 사용할 수 있어요',
+            Icon: Share2,
+            tone: 'default' as const,
+            locked: true,
+        },
+        {
+            id: 'delete',
+            label: '여행 삭제',
+            sub: '로그인하면 사용할 수 있어요',
+            Icon: Trash2,
+            tone: 'default' as const,
+            locked: true,
+        },
+    ];
+
+    const actions: {
+        id: string;
+        label: string;
+        sub: string;
+        Icon: typeof Edit;
+        tone: 'default' | 'danger';
+        locked?: boolean;
+    }[] = isGuest
+        ? guestActions
+        : isOwner
+          ? [
+                {
+                    id: 'edit',
+                    label: '여행 정보 수정',
+                    sub: '제목, 날짜, 해시태그',
+                    Icon: Edit,
+                    tone: 'default' as const,
+                },
+                {
+                    id: 'photo',
+                    label: '사진 관리',
+                    sub: '추가 · 삭제 · 위치 수정',
+                    Icon: Image,
+                    tone: 'default' as const,
+                },
+                {
+                    id: 'share',
+                    label: '친구에게 공유',
+                    sub: '링크 복사 또는 앱으로 보내기',
+                    Icon: Share2,
+                    tone: 'default' as const,
+                },
+                { id: 'delete', label: '여행 삭제', sub: '복구할 수 없어요', Icon: Trash2, tone: 'danger' as const },
+            ]
+          : [
+                { id: 'edit', label: '정보 보기', sub: '제목, 날짜, 해시태그', Icon: Edit, tone: 'default' as const },
+                {
+                    id: 'photo',
+                    label: '사진 보기',
+                    sub: '추가 · 삭제 · 위치 수정',
+                    Icon: Image,
+                    tone: 'default' as const,
+                },
+                {
+                    id: 'share',
+                    label: '공유 정보',
+                    sub: '링크 복사 또는 앱으로 보내기',
+                    Icon: Share2,
+                    tone: 'default' as const,
+                },
+                {
+                    id: 'delete',
+                    label: '공유 해제',
+                    sub: '이 티켓에 더 이상 접근할 수 없어요',
+                    Icon: Trash2,
+                    tone: 'danger' as const,
+                },
+            ];
 
     const handleAction = (id: string) => {
         onClose();
+        if (isGuest && (id === 'share' || id === 'delete')) {
+            onLocked(id);
+            return;
+        }
         if (id === 'edit') handler.edit(isCompletedTrip);
         if (id === 'photo') handler.images();
         if (id === 'share') onShare();
@@ -349,8 +390,29 @@ const TripTicketActionSheet = ({
                                             {action.sub}
                                         </div>
                                     </div>
-                                    {!isDanger && (
-                                        <ChevronRight size={16} strokeWidth={2} color='rgba(15, 23, 42, 0.25)' />
+                                    {action.locked ? (
+                                        <span
+                                            aria-label='로그인 필요'
+                                            css={css`
+                                                display: inline-flex;
+                                                align-items: center;
+                                                gap: 3px;
+                                                padding: 4px 8px;
+                                                border-radius: 999px;
+                                                background: ${COLORS.BACKGROUND.PRIMARY_LIGHT};
+                                                color: ${COLORS.PRIMARY};
+                                                font-size: 11px;
+                                                font-weight: 700;
+                                                flex-shrink: 0;
+                                            `}
+                                        >
+                                            <Lock size={11} strokeWidth={2.5} aria-hidden='true' />
+                                            로그인
+                                        </span>
+                                    ) : (
+                                        !isDanger && (
+                                            <ChevronRight size={16} strokeWidth={2} color='rgba(15, 23, 42, 0.25)' />
+                                        )
                                     )}
                                 </button>
                             </li>
