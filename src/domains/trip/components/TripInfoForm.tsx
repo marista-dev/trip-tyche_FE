@@ -11,13 +11,14 @@ import { FORM } from '@/domains/trip/constants';
 import { detectDestination, PhotoLocation } from '@/domains/trip/destinations';
 import {
     formatDuration,
-    formatMonthDay,
+    formatDateSummary,
     formatRange,
     getDateBounds,
     getDatesOutside,
     toDateString,
     toLocalDate,
     toPhotoDays,
+    TripRange,
 } from '@/domains/trip/tripDates';
 import { Trip } from '@/domains/trip/types';
 import Input from '@/shared/components/common/Input';
@@ -26,20 +27,20 @@ import theme from '@/shared/styles/theme';
 interface TripInfoFormProps {
     tripForm: Trip;
     onChangeTripInfo: Dispatch<SetStateAction<Trip>>;
-    /** 사진 GPS. 여행지를 추정하는 데 쓴다. */
+    /** 여행지 추정용 사진 GPS */
     photoLocations?: PhotoLocation[];
 }
 
-const ACCENT = theme.COLORS.PRIMARY;
+const { PRIMARY } = theme.COLORS;
 const HASHTAG_MAX = 3;
 const HASHTAG_MAX_LEN = 12;
-// 추천 태그 — 풀 메뉴는 너무 길어 가독성을 해치므로 대표 3개만 노출.
 const HASHTAG_SUGGESTIONS = FORM.HASHTAG_MENU.slice(0, 3);
+const NO_DATES: string[] = [];
+const NO_LOCATIONS: PhotoLocation[] = [];
 
-const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripInfoFormProps) => {
-    const { tripTitle, country, startDate, endDate, hashtags, mediaFilesDates = [] } = tripForm;
+const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = NO_LOCATIONS }: TripInfoFormProps) => {
+    const { tripTitle, country, startDate, endDate, hashtags, mediaFilesDates = NO_DATES } = tripForm;
     const [tagInput, setTagInput] = useState('');
-    // 보이는 라벨(h2)과 입력칸을 aria-labelledby로 잇는다 — 화면낭독기가 '여행 기간' 등을 읽게.
     const labelId = useId();
     const ids = {
         date: `${labelId}-date`,
@@ -47,14 +48,17 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
         title: `${labelId}-title`,
         tag: `${labelId}-tag`,
     };
-    // 시작일만 고른 '진행 중' 상태. 끝날까지 고르면 tripForm에 반영하고 비운다.
+    // 시작일만 고른 상태. 끝날까지 고르면 비운다.
     const [draftRange, setDraftRange] = useState<DatesRangeValue | null>(null);
 
-    const photoDays = toPhotoDays(mediaFilesDates);
-    const photoBounds = getDateBounds(photoDays);
-    const outsideDates = getDatesOutside(photoDays, startDate, endDate);
+    // 제목·태그를 칠 때마다 다시 계산하지 않게 사진 날짜가 바뀔 때만 계산한다.
+    const { photoDays, photoDaySet, photoBounds } = useMemo(() => {
+        const days = [...new Set(toPhotoDays(mediaFilesDates))];
+        return { photoDays: days, photoDaySet: new Set(days), photoBounds: getDateBounds(days) };
+    }, [mediaFilesDates]);
+    const outsideDates = useMemo(() => getDatesOutside(photoDays, startDate, endDate), [photoDays, startDate, endDate]);
 
-    // 당일치기 토글. 날짜가 처음 채워질 때(사진으로 미리 채움 / 저장된 여행 불러옴) 하루짜리면 켠다.
+    // 날짜가 처음 채워질 때(사진 미리 채움·저장된 여행) 하루짜리면 당일치기를 켠다.
     const [isDayTrip, setIsDayTrip] = useState(Boolean(startDate) && startDate === endDate);
     const hasDatesRef = useRef(Boolean(startDate && endDate));
     useEffect(() => {
@@ -70,10 +74,7 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
     const setRange = (start: string, end: string) =>
         onChangeTripInfo((prev: Trip) => ({ ...prev, startDate: start, endDate: end }));
 
-    /*
-     * 사진 날짜로 기간을 미리 채운다. 예전엔 사진 기간을 회색 placeholder로만 보여줘
-     * 채워진 것처럼 보이는데 값은 비어 있어 '등록하기'가 막혔다.
-     */
+    // 사진 날짜로 기간을 미리 채운다(placeholder만 두면 값이 비어 등록이 막힌다).
     useEffect(() => {
         if (!startDate && !endDate && photoBounds) setRange(photoBounds.start, photoBounds.end);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -81,24 +82,19 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
 
     const detected = useMemo(() => detectDestination(photoLocations), [photoLocations]);
 
-    /*
-     * 국내는 지역 경계로 판정해 믿을 만하므로 비어 있으면 바로 채운다(국내 여행은 보통 한 지역).
-     * 해외는 국경 근처에서 틀릴 수 있어 입력칸 아래 추천으로만 보여준다.
-     */
-    // country도 의존성에 둔다 — 등록 페이지가 사진을 받으며 폼을 초기화해 방금 채운 값이 지워질 수 있다.
+    // 국내 추정은 경계 판정이라 비어 있으면 바로 채우고, 해외는 추천만 한다.
     useEffect(() => {
-        if (!country && detected?.isConfident) {
+        if (detected?.isConfident) {
             onChangeTripInfo((prev: Trip) => (prev.country ? prev : { ...prev, country: detected.value }));
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [detected?.value, country]);
+    }, [detected?.value]);
 
     const handleDateChange = (value: DatesRangeValue) => {
         const [from, to] = value;
         if (from && to) {
             setDraftRange(null);
             setRange(toDateString(from), toDateString(to));
-            // 기간 모드에서 같은 날을 두 번 눌러도 당일치기로 본다.
             if (toDateString(from) === toDateString(to)) setIsDayTrip(true);
             return;
         }
@@ -111,12 +107,8 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
         setRange(day, day);
     };
 
-    /*
-     * 토글을 바꿔도 고른 날짜를 지우지 않는다(예전엔 바꿀 때마다 초기화돼 다시 골라야 했다).
-     * 켜면 시작일 하루로 줄이고, 끄면 그 하루를 그대로 둔 채 기간을 넓힐 수 있게 한다.
-     */
-    // 당일치기를 켜기 직전의 기간. 그대로 다시 끄면 되돌린다(실수로 켰다 꺼도 끝 날짜를 잃지 않게).
-    const rangeBeforeDayTripRef = useRef<{ start: string; end: string } | null>(null);
+    // 켜기 직전 기간. 날짜를 바꾸지 않고 다시 끄면 되돌린다.
+    const rangeBeforeDayTripRef = useRef<TripRange | null>(null);
 
     const toggleDayTrip = () => {
         const next = !isDayTrip;
@@ -129,7 +121,6 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
         }
         const before = rangeBeforeDayTripRef.current;
         rangeBeforeDayTripRef.current = null;
-        // 당일치기 동안 날짜를 바꾸지 않았을 때만 되돌린다.
         if (before && startDate === before.start && endDate === before.start) setRange(before.start, before.end);
     };
 
@@ -141,9 +132,10 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
 
     const pickerValue: DatesRangeValue = draftRange ?? [toLocalDate(startDate), toLocalDate(endDate)];
     const duration = formatDuration(startDate, endDate);
-    const photoDaySet = new Set(photoDays);
-
     const sharedPickerProps = {
+        // 라벨과 선택된 값을 함께 읽게 한다
+        id: `${ids.date}-value`,
+        'aria-labelledby': `${ids.date} ${ids.date}-value`,
         leftSection: <Calendar size={16} />,
         locale: 'ko',
         size: 'md' as const,
@@ -211,24 +203,18 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
                         value={toLocalDate(startDate)}
                         onChange={handleSingleDateChange}
                         {...sharedPickerProps}
-                        // 라벨 + 자기 값(선택한 날짜)을 함께 읽게 자기 id도 넣는다
-                        id={`${ids.date}-value`}
-                        aria-labelledby={`${ids.date} ${ids.date}-value`}
                         valueFormatter={({ date }) => (date instanceof Date ? formatRange(date, null) : '')}
                     />
                 ) : (
                     <DatePickerInput
                         key='range'
                         type='range'
-                        // 같은 날을 두 번 누르면 당일치기. 기본값(false)이면 선택이 풀려 하루짜리 여행을 못 고른다.
+                        // 없으면 같은 날을 두 번 누를 때 선택이 풀린다
                         allowSingleDateInRange
                         placeholder='여행 기간을 선택해주세요'
                         value={pickerValue}
                         onChange={handleDateChange}
                         {...sharedPickerProps}
-                        // 라벨 + 자기 값(선택한 날짜)을 함께 읽게 자기 id도 넣는다
-                        id={`${ids.date}-value`}
-                        aria-labelledby={`${ids.date} ${ids.date}-value`}
                         valueFormatter={({ date }) =>
                             Array.isArray(date) ? formatRange(date[0] as Date | null, date[1] as Date | null) : ''
                         }
@@ -236,7 +222,7 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
                     />
                 )}
                 <div css={dateMetaRow}>
-                    {/* 당일치기는 토글이 이미 말해 준다 — 배지는 N박 N일일 때만 */}
+                    {/* 당일치기면 토글이 이미 보여준다 */}
                     {duration && !isDayTrip && (
                         <span css={durationBadge}>
                             <span css={durationDot} aria-hidden />
@@ -245,14 +231,13 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
                     )}
                     {outsideDates.length > 0 && photoBounds ? (
                         <span css={errorStyle}>
-                            {formatMonthDay(outsideDates[0])}
-                            {outsideDates.length > 1 && ` 외 ${outsideDates.length - 1}일`} 사진이 기간 밖에 있어요.
+                            {formatDateSummary(outsideDates)} 사진이 기간 밖에 있어요.
                             <button type='button' css={fitButton} onClick={fitToPhotos}>
                                 사진 날짜에 맞추기
                             </button>
                         </span>
                     ) : (
-                        <span css={dateDescriptionStyle}>
+                        <span css={fieldHelp}>
                             {!isDayTrip && draftRange?.[0]
                                 ? '끝나는 날을 골라주세요 · 같은 날을 한 번 더 누르면 당일치기'
                                 : '사진이 있는 날짜는 파란 점으로 표시됩니다'}
@@ -352,8 +337,7 @@ const card = css`
     box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
 `;
 
-// 가장 긴 케이스(예: "2024.12.31 (화) ~ 2025.01.05 (일)")도 모바일에서 무조건
-// 한 줄에 들어가도록 폰트 크기와 자간을 살짝 좁힘. nowrap + ellipsis는 최후 안전망.
+// 해가 바뀌는 기간("2024.12.31 (화) ~ 2025.01.05 (일)")도 한 줄에. ellipsis는 안전망.
 const datePickerInputNowrap = css`
     .trip-date-input {
         white-space: nowrap;
@@ -374,7 +358,7 @@ const titleRow = css`
     }
 `;
 
-// 보이는 크기는 그대로 두고 누를 수 있는 영역만 위아래로 넓혀 44px를 맞춘다.
+// 터치 영역만 44px로 넓힌다.
 const togglePill = css`
     display: inline-flex;
     align-items: center;
@@ -393,7 +377,7 @@ const toggleTrack = (on: boolean) => css`
     width: 36px;
     height: 20px;
     border-radius: 100px;
-    background: ${on ? ACCENT : theme.COLORS.SLATE[200]};
+    background: ${on ? PRIMARY : theme.COLORS.SLATE[200]};
     position: relative;
     transition: background 0.2s;
     flex-shrink: 0;
@@ -415,7 +399,7 @@ const toggleKnob = (on: boolean) => css`
 const toggleText = (on: boolean) => css`
     font-size: ${FIELD.HELP_SIZE};
     font-weight: 600;
-    color: ${on ? ACCENT : theme.COLORS.SLATE[500]};
+    color: ${on ? PRIMARY : theme.COLORS.SLATE[500]};
     transition: color 0.2s;
 `;
 
@@ -424,7 +408,7 @@ const fitButton = css`
     padding: 8px 2px;
     border: none;
     background: none;
-    color: ${ACCENT};
+    color: ${PRIMARY};
     font-size: inherit;
     font-weight: 700;
     text-decoration: underline;
@@ -435,12 +419,11 @@ const fitButton = css`
 const hashtagCount = (isFull: boolean) => css`
     font-size: ${FIELD.HELP_SIZE};
     font-weight: 600;
-    color: ${isFull ? ACCENT : theme.COLORS.SLATE[500]};
+    color: ${isFull ? PRIMARY : theme.COLORS.SLATE[500]};
     letter-spacing: 0.4px;
     transition: color 0.2s;
 `;
 
-// 다른 입력칸과 같은 틀(fieldBox) 안에 태그 칩과 입력을 함께 둔다.
 const hashtagInputWrap = (isFull: boolean) => css`
     ${fieldBox};
     display: flex;
@@ -451,7 +434,7 @@ const hashtagInputWrap = (isFull: boolean) => css`
     ${isFull && `border-color: ${theme.COLORS.SLATE[200]};`}
 
     &:focus-within {
-        border-color: ${ACCENT};
+        border-color: ${PRIMARY};
     }
 `;
 
@@ -463,7 +446,7 @@ const selectedChip = css`
     gap: 3px;
     padding: 5px 9px 5px 10px;
     background: ${theme.COLORS.BACKGROUND.PRIMARY_LIGHT};
-    color: ${ACCENT};
+    color: ${PRIMARY};
     font-size: 12px;
     font-weight: 600;
     border-radius: 100px;
@@ -477,7 +460,7 @@ const selectedChip = css`
 `;
 
 const chipHash = css`
-    color: ${ACCENT};
+    color: ${PRIMARY};
     font-weight: 700;
     margin-right: 1px;
 `;
@@ -531,8 +514,8 @@ const suggestionChip = css`
         color 0.15s;
 
     &:hover {
-        border-color: ${ACCENT};
-        color: ${ACCENT};
+        border-color: ${PRIMARY};
+        color: ${PRIMARY};
         background: rgba(0, 113, 227, 0.04);
     }
 
@@ -540,8 +523,6 @@ const suggestionChip = css`
         transform: translateY(1px);
     }
 `;
-
-const dateDescriptionStyle = fieldHelp;
 
 const errorStyle = css`
     ${fieldHelp};
@@ -557,14 +538,13 @@ const dateMetaRow = css`
     margin-left: 2px;
 `;
 
-// 여행 기간 강조 칩 — 무성의해 보이지 않도록 시각적 무게 부여
 const durationBadge = css`
     display: inline-flex;
     align-items: center;
     gap: 5px;
     padding: 3px 8px;
     background: ${theme.COLORS.BACKGROUND.PRIMARY_LIGHT};
-    color: ${ACCENT};
+    color: ${PRIMARY};
     border-radius: 999px;
     font-size: ${FIELD.HELP_SIZE};
     font-weight: 600;
@@ -575,14 +555,14 @@ const durationDot = css`
     width: 5px;
     height: 5px;
     border-radius: 50%;
-    background: ${ACCENT};
+    background: ${PRIMARY};
 `;
 
 const dayContainerStyle = css`
     position: relative;
 `;
 
-// 선택된 날(파란 배경) 위에서도 보이도록 흰 테두리를 두른다.
+// 선택된 날(파란 배경) 위에서도 보이게
 const dayIndicatorStyle = css`
     position: absolute;
     top: -2px;

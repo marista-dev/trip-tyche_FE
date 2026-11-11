@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 
 import { css } from '@emotion/react';
-import { useQueryClient } from '@tanstack/react-query';
 import { ImageOff } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -30,7 +29,7 @@ import {
 } from '@/domains/media/utils';
 import { useTripFormSubmit } from '@/domains/trip/hooks/mutations';
 import { useTripInfo } from '@/domains/trip/hooks/queries';
-import { formatPeriod, getTripDays } from '@/domains/trip/tripDates';
+import { formatPeriod, getTripDays, TripRange } from '@/domains/trip/tripDates';
 import { useMemberOnly } from '@/domains/user/hooks/useMemberOnly';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import InlineDatePickSheet from '@/pages/trip/management/InlineDatePickSheet';
@@ -40,7 +39,7 @@ import Indicator from '@/shared/components/common/Spinner/Indicator';
 import { ROUTES } from '@/shared/constants/route';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
-// "3월 5일–9일 · 5일". 달이 바뀌는 기간도 끝 날짜에 월을 붙인다(예전엔 "3월 30일–2일"로 나왔다).
+// "3월 5일–9일 · 5일"
 const formatDateRange = (start?: string, end?: string): string => {
     const days = getTripDays(start, end);
     return start && end && days ? `${formatPeriod(start, end)} · ${days}일` : '';
@@ -60,13 +59,12 @@ const TripImageManagePage = () => {
     const { data: tripInfoResult } = useTripInfo(tripKey);
     const { mutate: deleteMutate, isPending: isDeleting } = useMediaDelete();
     const { mutateAsync: submitTripForm } = useTripFormSubmit();
-    const queryClient = useQueryClient();
     const tripInfo = tripInfoResult?.success ? tripInfoResult.data : undefined;
-    // 확정된 여행만 기간이 있다. 작성 중인 여행은 날짜 확인을 건너뛴다.
+    // 작성 중인 여행은 기간이 없어 날짜 확인을 건너뛴다.
     const tripRange =
         tripInfo?.startDate && tripInfo?.endDate ? { start: tripInfo.startDate, end: tripInfo.endDate } : null;
 
-    const extendTripRange = async ({ start, end }: { start: string; end: string }) => {
+    const extendTripRange = async ({ start, end }: TripRange) => {
         if (!tripInfo) return false;
         const { tripTitle, country, hashtags } = tripInfo;
         const result = await submitTripForm({
@@ -77,7 +75,6 @@ const TripImageManagePage = () => {
             showToast(result.error || '여행 기간을 바꾸지 못했어요');
             return false;
         }
-        await queryClient.invalidateQueries({ queryKey: ['ticket-info', tripKey] });
         return true;
     };
 
@@ -100,7 +97,7 @@ const TripImageManagePage = () => {
         dateConflict,
         resolveDateConflict,
     } = usePhotoUpload(tripKey, { tripRange, onExtendRange: extendTripRange });
-    // 게스트는 사진을 고르기 전에 막는다 — 고른 뒤 업로드 단계에서 막히면 수고가 버려진다.
+    // 게스트는 사진을 고르기 전에 막는다.
     const openFilePicker = () => requireMember('photo', openPicker);
 
     const userId = useUserStore((s) => s.userInfo?.userId ?? null);

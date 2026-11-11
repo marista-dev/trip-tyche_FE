@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { PendingPhoto } from '@/domains/media/components/manage/DateGroupSection';
 import { useImageUpload } from '@/domains/media/hooks/useImageUpload';
-import { getDateBounds, getDatesOutside, toDateString, toPhotoDays } from '@/domains/trip/tripDates';
+import { getDateBounds, getDatesOutside, toDateString, toPhotoDays, TripRange } from '@/domains/trip/tripDates';
 import { ANALYTICS_EVENTS, track } from '@/libs/analytics';
 import { isNative } from '@/platform';
 import { pickImagesFromGallery } from '@/platform/native/gallery';
@@ -12,16 +12,10 @@ import { useToastStore } from '@/shared/stores/useToastStore';
 
 type UploadPhase = 'idle' | 'extracting' | 'uploading';
 
-export interface TripRange {
-    start: string;
-    end: string;
-}
-
-/** 추가하려는 사진 중 여행 기간 밖에 찍힌 것이 있을 때 사용자에게 물을 내용 */
+/** 기간 밖에 찍힌 사진이 있을 때 물을 내용 */
 export interface DateConflict {
-    /** 기간 밖 촬영일(정렬, 중복 없음) */
+    /** 정렬·중복 제거됨 */
     outsideDates: string[];
-    /** 기간 밖 사진 장수 */
     outsideCount: number;
     totalCount: number;
     current: TripRange;
@@ -32,9 +26,9 @@ export interface DateConflict {
 export type DateConflictChoice = 'extend' | 'keep' | 'cancel';
 
 interface UsePhotoUploadOptions {
-    /** 확정된 여행 기간. 없으면(작성 중인 여행) 날짜 확인을 건너뛴다. */
+    /** 없으면(작성 중인 여행) 날짜 확인을 건너뛴다. */
     tripRange?: TripRange | null;
-    /** '기간 늘리기'를 고르면 호출. 실패하면 false를 돌려 업로드를 멈춘다. */
+    /** false를 돌려주면 업로드를 멈춘다. */
     onExtendRange?: (range: TripRange) => Promise<boolean>;
 }
 
@@ -59,9 +53,14 @@ export const usePhotoUpload = (tripKey: string, { tripRange, onExtendRange }: Us
     const { prepareUploadFiles, extractMetadata, uploadImagesToS3, waitForBackgroundUpload, progress } =
         useImageUpload();
 
-    // 날짜 확인 시트 — processFiles가 사용자의 선택을 기다린다.
+    // processFiles가 이 Promise로 사용자의 선택을 기다린다.
     const [dateConflict, setDateConflict] = useState<DateConflict | null>(null);
     const conflictResolverRef = useRef<((choice: DateConflictChoice) => void) | null>(null);
+
+    const settleConflict = (choice: DateConflictChoice) => {
+        conflictResolverRef.current?.(choice);
+        conflictResolverRef.current = null;
+    };
 
     const askDateConflict = (conflict: DateConflict) =>
         new Promise<DateConflictChoice>((resolve) => {
@@ -70,20 +69,13 @@ export const usePhotoUpload = (tripKey: string, { tripRange, onExtendRange }: Us
         });
 
     const resolveDateConflict = (choice: DateConflictChoice) => {
-        conflictResolverRef.current?.(choice);
-        conflictResolverRef.current = null;
+        settleConflict(choice);
         setDateConflict(null);
     };
 
-    // 시트가 떠 있는 채로 화면을 떠나면 취소로 마무리한다. 안 그러면 processFiles가 영원히 기다려
-    // finally(미리보기 URL 해제)가 돌지 않는다.
-    useEffect(
-        () => () => {
-            conflictResolverRef.current?.('cancel');
-            conflictResolverRef.current = null;
-        },
-        [],
-    );
+    // 시트가 뜬 채 언마운트되면 취소로 끝내 finally(미리보기 URL 해제)가 돌게 한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => () => settleConflict('cancel'), []);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploadPhase, setUploadPhase] = useState<UploadPhase>('idle');
@@ -142,13 +134,11 @@ export const usePhotoUpload = (tripKey: string, { tripRange, onExtendRange }: Us
 
         try {
             const uniqueFiles = await prepareUploadFiles(fileArray);
-            const metadata = await extractMetadata(uniqueFiles);
+            // 기간이 있으면 올리기 전에 날짜를 확인해야 해서 EXIF를 먼저 읽는다. 없으면 업로드가 presign과 함께 읽는다.
+            const metadata = tripRange ? await extractMetadata(uniqueFiles) : undefined;
 
-            /*
-             * 여행 기간 밖에 찍힌 사진이면 올리기 전에 묻는다. 올린 뒤에 알려주면 잘못 고른 사진이
-             * 이미 서버에 있어 지우는 수고가 생긴다. 날짜만 비교한다(시각은 보지 않는다).
-             */
-            if (tripRange?.start && tripRange?.end) {
+            // 올린 뒤가 아니라 올리기 전에 묻는다 — 잘못 고른 사진을 서버에서 지우는 수고를 덜려고.
+            if (tripRange && metadata) {
                 const days = toPhotoDays(metadata.map((m) => m.recordDate));
                 const outsideDates = getDatesOutside(days, tripRange.start, tripRange.end);
                 if (outsideDates.length > 0) {
@@ -194,7 +184,7 @@ export const usePhotoUpload = (tripKey: string, { tripRange, onExtendRange }: Us
         }
     };
 
-    // 날짜 확인 시트가 떠 있는 동안은 진행률을 숨긴다(시트 뒤로 '분석 중 100%'가 남지 않게).
+    // 시트 뒤에 '분석 중 100%'가 남지 않게 숨긴다.
     const uploadingText = dateConflict
         ? undefined
         : uploadPhase === 'extracting'

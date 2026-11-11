@@ -1,16 +1,21 @@
 import dayjs from 'dayjs';
 
+import { DEFAULT_METADATA } from '@/domains/media/constants';
+
 /*
- * 여행 날짜는 '하루' 단위로만 다룬다. 시각은 쓰지 않는다.
- *
- * 'YYYY-MM-DD'를 new Date()에 넘기면 UTC 자정으로 해석돼, 시간대에 따라 하루가 밀린다.
- * 날짜 문자열 ↔ Date 변환은 이 파일의 함수만 쓴다(로컬 자정 기준).
+ * 여행 날짜는 하루 단위로만 다룬다(시각 없음).
+ * 'YYYY-MM-DD'를 new Date()로 읽으면 UTC 자정이라 시간대에 따라 하루가 밀리므로, 변환은 이 파일 함수로만 한다.
  */
+
+export interface TripRange {
+    start: string;
+    end: string;
+}
 
 const DATE_FORMAT = 'YYYY-MM-DD';
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-/** 날짜 정보가 없는 사진에 서버가 채우는 값(DEFAULT_METADATA.DATE). 실제 날짜로 취급하지 않는다. */
-const NO_DATE = '1980-01-01';
+/** 날짜 없는 사진에 서버가 채우는 값 */
+const NO_DATE = DEFAULT_METADATA.DATE.slice(0, 10);
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 /** 'YYYY-MM-DD'(또는 'YYYY-MM-DDTHH:mm:ss') → 로컬 자정 Date. 비었거나 잘못된 값이면 null. */
@@ -18,20 +23,18 @@ export const toLocalDate = (value?: string | null): Date | null => {
     if (!value) return null;
     const day = value.slice(0, 10);
     if (!DATE_PATTERN.test(day)) return null;
-    // dayjs는 날짜만 있는 ISO 문자열을 로컬 자정으로 해석한다(new Date는 UTC 자정).
     const d = dayjs(day);
     return d.isValid() ? d.toDate() : null;
 };
 
-/** Date → 'YYYY-MM-DD' (로컬 기준) */
 export const toDateString = (date: Date): string => dayjs(date).format(DATE_FORMAT);
 
 /** 실제 촬영 날짜만 'YYYY-MM-DD'로 추린다(날짜 없는 사진 제외). */
 export const toPhotoDays = (dates: string[]): string[] =>
     dates.map((d) => (d ?? '').slice(0, 10)).filter((d) => DATE_PATTERN.test(d) && d !== NO_DATE);
 
-/** 사진 날짜 목록에서 가장 이른 날과 늦은 날. 'YYYY-MM-DD' 문자열은 사전순 = 날짜순이다. */
-export const getDateBounds = (dates: string[]): { start: string; end: string } | null => {
+/** 가장 이른 날과 늦은 날('YYYY-MM-DD'는 사전순 = 날짜순) */
+export const getDateBounds = (dates: string[]): TripRange | null => {
     const valid = toPhotoDays(dates);
     if (valid.length === 0) return null;
     const sorted = [...valid].sort();
@@ -73,7 +76,7 @@ export const formatMonthDay = (date: string): string => {
     return `${d.month() + 1}월 ${d.date()}일`;
 };
 
-/** "2025.03.05" — 티켓·공유 화면의 날짜 표기. 잘못된 값이면 빈 문자열. */
+/** "2025.03.05". 잘못된 값이면 빈 문자열. */
 export const formatDot = (value?: string): string => {
     const d = toLocalDate(value);
     return d ? dayjs(d).format('YYYY.MM.DD') : '';
@@ -93,3 +96,7 @@ export const formatPeriod = (start: string, end: string): string => {
     const e = formatMonthDay(end);
     return start.slice(0, 7) === end.slice(0, 7) ? `${s}–${e.replace(/^\d+월\s/, '')}` : `${s}–${e}`;
 };
+
+/** "3월 4일" / "3월 4일 외 2일" */
+export const formatDateSummary = (dates: string[]): string =>
+    dates.length > 1 ? `${formatMonthDay(dates[0])} 외 ${dates.length - 1}일` : formatMonthDay(dates[0]);

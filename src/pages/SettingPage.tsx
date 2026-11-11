@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import character from '@/assets/images/character-icon.png';
 import NicknameDialog from '@/domains/user/components/NicknameDialog';
 import StatBottomSheet, { StatView } from '@/domains/user/components/setting/StatBottomSheet';
+import { GUEST_TTL_HOURS } from '@/domains/user/guestPolicy';
 import { useMemberOnly } from '@/domains/user/hooks/useMemberOnly';
 import { useUserStats } from '@/domains/user/hooks/useUserStats';
 import { useLoginPromptStore } from '@/domains/user/stores/useLoginPromptStore';
@@ -15,6 +16,7 @@ import Header from '@/shared/components/common/Header';
 import ConfirmModal from '@/shared/components/common/Modal/ConfirmModal';
 import { APP_VERSION } from '@/shared/constants/app';
 import { ROUTES } from '@/shared/constants/route';
+import { COLORS } from '@/shared/constants/style';
 import { MESSAGE } from '@/shared/constants/ui';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
@@ -106,7 +108,7 @@ const SettingPage = () => {
                             <p css={guestBannerTitle}>게스트로 둘러보는 중이에요</p>
                             <p css={guestBannerSub}>
                                 <Clock size={12} strokeWidth={2.2} aria-hidden='true' />
-                                체험 기록은 4시간 뒤 사라져요
+                                체험 기록은 {GUEST_TTL_HOURS}시간 뒤 사라져요
                             </p>
                         </div>
                         <button css={guestBannerButton} onClick={() => openLoginPrompt('trip')}>
@@ -332,8 +334,7 @@ const guestBanner = css`
     align-items: center;
     gap: 12px;
     border-radius: 16px;
-    background: rgba(0, 113, 227, 0.06);
-    border: 1px solid rgba(0, 113, 227, 0.12);
+    background: ${COLORS.BACKGROUND.PRIMARY_LIGHT};
 `;
 
 const guestBannerText = css`
@@ -346,7 +347,7 @@ const guestBannerTitle = css`
     font-size: 14px;
     font-weight: 700;
     letter-spacing: -0.2px;
-    color: #0f172a;
+    color: ${COLORS.TEXT.BLACK};
 `;
 
 const guestBannerSub = css`
@@ -355,7 +356,7 @@ const guestBannerSub = css`
     align-items: center;
     gap: 4px;
     font-size: 12px;
-    color: rgba(15, 23, 42, 0.5);
+    color: ${COLORS.TEXT.DESCRIPTION};
 `;
 
 const guestBannerButton = css`
@@ -364,8 +365,8 @@ const guestBannerButton = css`
     padding: 0 16px;
     border: none;
     border-radius: 999px;
-    background: #0071e3;
-    color: #fff;
+    background: ${COLORS.PRIMARY};
+    color: ${COLORS.TEXT.WHITE};
     font-size: 13px;
     font-weight: 700;
     cursor: pointer;

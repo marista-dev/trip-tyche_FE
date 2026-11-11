@@ -147,7 +147,7 @@ export const useImageUpload = () => {
         async (
             uniqueFiles: readonly File[],
             postUploadTask?: () => Promise<unknown>,
-            /** 호출부가 이미 EXIF를 읽었다면 넘긴다 — 같은 파일을 두 번 읽지 않는다. 순서는 uniqueFiles와 같아야 한다. */
+            /** 이미 읽은 EXIF(두 번 읽지 않게). uniqueFiles와 순서가 같아야 한다. */
             precomputedMetadata?: ClientImageFile[],
         ) => {
             if (uploadInProgressRef.current) {
@@ -278,7 +278,7 @@ export const useImageUpload = () => {
         };
     }, [retryFailedUploads]);
 
-    // 업로드 전에 날짜 등을 확인해야 하는 호출부용. 진행률(metadata)도 함께 갱신한다.
+    // 업로드 전에 날짜를 확인하는 호출부용. 진행률(metadata)도 갱신한다.
     const extractMetadata = useCallback((files: readonly File[]) => extractMetadataFromImage(files, setProgress), []);
 
     return {

@@ -13,7 +13,7 @@ interface SheetAction {
 interface SheetDialogProps {
     isOpen: boolean;
     onClose: () => void;
-    /** 제목 위 작은 머리말(예: GUEST PASS). 아이콘 배지는 쓰지 않는다 — 글자 크기·굵기로만 위계를 준다. */
+    /** 제목 위 머리말(예: GUEST PASS) */
     eyebrow?: ReactNode;
     title: string;
     description?: ReactNode;
@@ -25,11 +25,7 @@ interface SheetDialogProps {
     tertiary?: SheetAction;
 }
 
-/**
- * 바텀시트 형태의 확인 대화상자 — (머리말) · 제목 · 설명 · (내용) · 버튼.
- * 왼쪽 정렬, 아이콘 없이 글로만 위계를 준다(애플 기본 앱·토스의 시트처럼).
- * 로그인 유도, 날짜 확인처럼 사용자의 선택을 받는 시트가 같은 모양을 쓰도록 한 곳에 둔다.
- */
+/** 선택을 받는 시트(로그인 유도·날짜 확인)의 공통 틀 */
 const SheetDialog = ({
     isOpen,
     onClose,

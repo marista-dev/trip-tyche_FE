@@ -1,13 +1,10 @@
 import { COUNTRIES } from '@/domains/trip/constants';
 import { Country } from '@/domains/trip/types';
+import { Location } from '@/shared/types/map';
 
 /*
- * 여행지 = 나라 + (국내면) 지역.
- *
- * 저장 형식은 기존 country 문자열에 지역을 덧붙인다: "🇰🇷/대한민국/SOUTH KOREA/제주"
- * - 백엔드는 그냥 문자열(varchar 255)로 저장하므로 서버 변경이 필요 없다
- * - 기존 파서(지구본·공유 티켓·통계)는 '/'로 나눈 앞 3칸만 읽으므로 깨지지 않는다
- * - 나라 단위로 묶어야 하는 곳(방문 국가 수 등)은 getCountryKey로 앞 3칸만 쓴다
+ * 저장 형식: 나라 값 + '/지역' ("🇰🇷/대한민국/SOUTH KOREA/제주").
+ * 서버는 문자열 그대로 저장하고 기존 파서는 앞 3칸만 읽어 호환된다. 나라 단위로 묶을 땐 getCountryKey.
  */
 
 export const KOREA_VALUE = '🇰🇷/대한민국/SOUTH KOREA';
@@ -18,15 +15,12 @@ export interface Region {
     /** 티켓 도착 코드. 공항이 있으면 실제 공항 코드, 없으면 3글자 약어 */
     code: string;
     aliases: string[];
-    /** [남, 북, 서, 동] — 사진 GPS로 지역을 고를 때 쓰는 대략적인 범위 */
+    /** [남, 북, 서, 동] — 사진 GPS 판정용 대략 범위 */
     bounds: [number, number, number, number];
 }
 
-/*
- * 국내 여행지. 한 여행은 한 지역만 고른다(국내 여행은 보통 한 지역만 간다).
- * 범위가 겹치면 먼저 나온 지역이 이긴다 — 좁은 도시를 넓은 권역보다 앞에 둔다.
- */
-export const REGIONS: Region[] = [
+// 범위가 겹치면 먼저 나온 지역이 이긴다 — 좁은 도시를 앞에 둔다.
+const REGIONS: Region[] = [
     {
         name: '제주',
         nameEn: 'JEJU',
@@ -71,16 +65,15 @@ export const REGIONS: Region[] = [
     },
 ];
 
-/** 국내 여행에서 지역을 고르지 않았을 때(또는 지역 기능 이전에 저장된 여행)의 도착 코드 */
+/** 지역 없는 국내 여행의 도착 코드 */
 const KOREA_FALLBACK_CODE = 'KOR';
-/** 국내선 출발 코드. 국내 여행 티켓이 'ICN → ICN'으로 찍히던 문제를 막는다. */
 const DOMESTIC_DEPARTURE = 'GMP';
 const INTERNATIONAL_DEPARTURE = 'ICN';
 const FALLBACK_IATA = 'TRP';
 
 const KOREA_BOUNDS: [number, number, number, number] = [33.0, 38.7, 124.5, 132.0];
-
-/* ── 값 해석 ───────────────────────────────────────── */
+/** 한국 범위 사각형에 걸치는 대한해협 동쪽(후쿠오카·쓰시마) — 한국으로 보지 않는다 */
+const KOREA_STRAIT_EAST: [number, number, number, number] = [33.0, 35.5, 129.4, 132.0];
 
 export interface Destination {
     /** 나라 값(앞 3칸) — COUNTRIES의 value와 같다 */
@@ -103,7 +96,7 @@ export const parseDestination = (value?: string): Destination => {
     };
 };
 
-export const toRegionValue = (region: Region) => `${KOREA_VALUE}/${region.name}`;
+const toRegionValue = (region: Region) => `${KOREA_VALUE}/${region.name}`;
 
 /** 입력칸·티켓에 보여줄 이름. "🇯🇵 일본", "🇰🇷 제주" */
 export const formatDestination = (value?: string): { emoji: string; name: string; sub?: string } | null => {
@@ -114,7 +107,6 @@ export const formatDestination = (value?: string): { emoji: string; name: string
     return { emoji: country?.emoji ?? emoji, name: country?.nameKo ?? nameKo };
 };
 
-/** 티켓 도착 코드 */
 export const getArrivalCode = (value?: string): string => {
     if (!value) return FALLBACK_IATA;
     const { country, region, isDomestic } = parseDestination(value);
@@ -122,11 +114,8 @@ export const getArrivalCode = (value?: string): string => {
     return country?.iata ?? FALLBACK_IATA;
 };
 
-/** 티켓 출발 코드 — 국내 여행은 국내선(GMP), 해외는 ICN */
 export const getDepartureCode = (value?: string): string =>
     parseDestination(value).isDomestic ? DOMESTIC_DEPARTURE : INTERNATIONAL_DEPARTURE;
-
-/* ── 검색 ─────────────────────────────────────────── */
 
 const CHOSUNG = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
 
@@ -161,7 +150,7 @@ const COUNTRY_ALIASES: Record<string, string[]> = {
     'SOUTH AFRICA': ['남아공'],
 };
 
-export interface DestinationOption {
+interface DestinationOption {
     value: string;
     emoji: string;
     name: string;
@@ -175,25 +164,22 @@ const matches = (query: string, names: string[]): boolean => {
     return names.some((n) => n.toLowerCase().includes(q));
 };
 
-export const regionOptions: DestinationOption[] = REGIONS.map((r) => ({
+const toRegionOption = (r: Region): DestinationOption => ({
     value: toRegionValue(r),
     emoji: '🇰🇷',
     name: r.name,
     sub: '국내',
-}));
+});
 
-/** 해외 나라 — 대한민국은 국내 지역으로 고르므로 뺀다. 이름순. */
+export const regionOptions: DestinationOption[] = REGIONS.map(toRegionOption);
+
+/** 대한민국은 국내 지역으로 고르므로 뺀다. */
 export const overseasCountries: Country[] = COUNTRIES.filter((c) => c.value !== KOREA_VALUE).sort((a, b) =>
     a.nameKo.localeCompare(b.nameKo, 'ko'),
 );
 
 export const searchDestinations = (query: string): DestinationOption[] => {
-    const regions = REGIONS.filter((r) => matches(query, [r.name, r.nameEn, ...r.aliases])).map((r) => ({
-        value: toRegionValue(r),
-        emoji: '🇰🇷',
-        name: r.name,
-        sub: '국내',
-    }));
+    const regions = REGIONS.filter((r) => matches(query, [r.name, r.nameEn, ...r.aliases])).map(toRegionOption);
     const korea = matches(query, ['대한민국', '한국', 'korea', '국내'])
         ? [{ value: KOREA_VALUE, emoji: '🇰🇷', name: '대한민국', sub: '국내 · 지역 없이' }]
         : [];
@@ -203,26 +189,18 @@ export const searchDestinations = (query: string): DestinationOption[] => {
     return [...regions, ...korea, ...countries];
 };
 
-/** 이름 첫 글자의 초성 — 전체 목록의 ㄱㄴㄷ 묶음·인덱스에 쓴다. 쌍자음은 기본 자음으로 묶는다. */
+/** ㄱㄴㄷ 인덱스용 첫 글자 초성(쌍자음은 기본 자음으로) */
 export const getIndexLetter = (name: string): string => {
     const first = toChosung(name.charAt(0));
     return { ㄲ: 'ㄱ', ㄸ: 'ㄷ', ㅃ: 'ㅂ', ㅆ: 'ㅅ', ㅉ: 'ㅈ' }[first] ?? first;
 };
 
-/* ── 사진 위치로 추정 ─────────────────────────────── */
-
-export interface PhotoLocation {
-    latitude: number;
-    longitude: number;
-}
+export type PhotoLocation = Location;
 
 const inBounds = ({ latitude, longitude }: PhotoLocation, [s, n, w, e]: [number, number, number, number]) =>
     latitude >= s && latitude <= n && longitude >= w && longitude <= e;
 
-/*
- * 해외는 나라 경계 대신 대표 지점(수도·주요 여행 도시)과의 거리로 추정한다.
- * 국경 근처에서는 틀릴 수 있으므로 해외 추정은 '추천'으로만 보여주고 자동 선택하지 않는다.
- */
+// 해외는 대표 지점(수도·여행 도시)과의 거리로 추정한다 — 국경 근처에선 틀릴 수 있어 추천만 한다.
 const COUNTRY_ANCHORS: Record<string, [number, number][]> = {
     JAPAN: [
         [35.68, 139.69],
@@ -487,22 +465,22 @@ const COUNTRY_ANCHORS: Record<string, [number, number][]> = {
 const MAX_ANCHOR_DISTANCE = 9;
 
 const nearestCountry = ({ latitude, longitude }: PhotoLocation): string | null => {
-    let best: { nameEn: string; dist: number } | null = null;
-    Object.entries(COUNTRY_ANCHORS).forEach(([nameEn, points]) => {
-        points.forEach(([lat, lng]) => {
-            const dLng = (longitude - lng) * Math.cos((latitude * Math.PI) / 180);
-            const dist = Math.hypot(latitude - lat, dLng);
-            if (!best || dist < best.dist) best = { nameEn, dist };
-        });
-    });
-    const found = best as { nameEn: string; dist: number } | null;
-    return found && found.dist <= MAX_ANCHOR_DISTANCE ? found.nameEn : null;
+    let bestName: string | null = null;
+    let bestDist = MAX_ANCHOR_DISTANCE;
+    for (const [nameEn, points] of Object.entries(COUNTRY_ANCHORS)) {
+        for (const [lat, lng] of points) {
+            const dist = Math.hypot(latitude - lat, (longitude - lng) * Math.cos((latitude * Math.PI) / 180));
+            if (dist <= bestDist) {
+                bestName = nameEn;
+                bestDist = dist;
+            }
+        }
+    }
+    return bestName;
 };
 
-/** 사진 한 장의 여행지 추정값 */
 const detectOne = (loc: PhotoLocation): string | null => {
-    if (inBounds(loc, KOREA_BOUNDS) && !inBounds(loc, [33.0, 35.5, 129.4, 132.0])) {
-        // 대한해협 너머(후쿠오카·쓰시마)는 한국 범위에 걸치므로 위 조건으로 걸러 낸다.
+    if (inBounds(loc, KOREA_BOUNDS) && !inBounds(loc, KOREA_STRAIT_EAST)) {
         const region = REGIONS.find((r) => inBounds(loc, r.bounds));
         return region ? toRegionValue(region) : KOREA_VALUE;
     }
@@ -512,7 +490,7 @@ const detectOne = (loc: PhotoLocation): string | null => {
 
 export interface DetectedDestination {
     value: string;
-    /** 국내는 경계로 판정해 믿을 만하다 → 자동 선택. 해외는 추천만. */
+    /** true: 자동 선택(국내 경계 판정), false: 추천만 */
     isConfident: boolean;
 }
 
@@ -520,12 +498,12 @@ export interface DetectedDestination {
 export const detectDestination = (locations: PhotoLocation[]): DetectedDestination | null => {
     const counts = new Map<string, number>();
     locations
-        .filter((l) => l && (l.latitude !== 0 || l.longitude !== 0))
+        .filter((l) => l && (l.latitude !== 0 || l.longitude !== 0)) // 0,0 = 위치 없는 사진
         .forEach((l) => {
             const value = detectOne(l);
             if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
         });
     if (counts.size === 0) return null;
     const [value] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
-    return { value, isConfident: getCountryKey(value) === KOREA_VALUE };
+    return { value, isConfident: parseDestination(value).isDomestic };
 };

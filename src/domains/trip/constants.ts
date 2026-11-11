@@ -643,7 +643,7 @@ export const COUNTRIES: Country[] = [
         value: '🇭🇰/홍콩/HONG KONG',
         iata: 'HKG',
     },
-    // 한국인 여행 수요가 많은데 목록에 없던 나라. 정렬은 선택 시트가 이름순으로 다시 한다.
+    // 정렬은 선택 시트가 이름순으로 다시 한다.
     { emoji: '🇨🇳', nameKo: '중국', nameEn: 'CHINA', value: '🇨🇳/중국/CHINA', iata: 'PEK' },
     { emoji: '🇲🇳', nameKo: '몽골', nameEn: 'MONGOLIA', value: '🇲🇳/몽골/MONGOLIA', iata: 'UBN' },
     { emoji: '🇷🇺', nameKo: '러시아', nameEn: 'RUSSIA', value: '🇷🇺/러시아/RUSSIA', iata: 'SVO' },

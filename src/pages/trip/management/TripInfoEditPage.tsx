@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 
 import { css } from '@emotion/react';
-import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import MiniTicketPreview from '@/domains/media/components/upload/MiniTicketPreview';
@@ -10,11 +9,11 @@ import TripInfoForm from '@/domains/trip/components/TripInfoForm';
 import { FORM } from '@/domains/trip/constants';
 import { useTripFormSubmit } from '@/domains/trip/hooks/mutations';
 import { useTripInfo } from '@/domains/trip/hooks/queries';
-import { useTripFormValidation } from '@/domains/trip/hooks/useTripFormValidation';
 import { TripInfo } from '@/domains/trip/types';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import { tripAPI } from '@/libs/apis';
 import { toResult } from '@/libs/apis/shared/utils';
+import { validateFormComplete } from '@/libs/utils/validate';
 import Button from '@/shared/components/common/Button';
 import Header from '@/shared/components/common/Header';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
@@ -33,14 +32,12 @@ const TripInfoEditPage = () => {
 
     // 주소로 바로 들어오면 state가 없다 — 확정된 여행으로 본다.
     const isDraft = Boolean((location.state as { isDraft?: boolean } | null)?.isDraft);
-
-    const queryClient = useQueryClient();
     const { mutateAsync, isPending: isSubmitting } = useTripFormSubmit();
 
     const { data: tripInfoResult, isLoading } = useTripInfo(tripKey!);
-    // 여행지 추정용 사진 위치
-    const { photos } = useTripPhotos(tripKey!);
-    const { isFormComplete } = useTripFormValidation(tripForm);
+    // 여행지 추정용 사진 위치. 확정된 여행은 여행지가 이미 있어 불러오지 않는다.
+    const { photos } = useTripPhotos(tripKey!, { enabled: isDraft });
+    const isFormComplete = validateFormComplete(tripForm);
 
     useEffect(() => {
         if (tripInfoResult) {
@@ -73,7 +70,6 @@ const TripInfoEditPage = () => {
 
         const result = await mutateAsync({ tripKey, tripForm });
         if (result.success) {
-            queryClient.invalidateQueries({ queryKey: ['ticket-info', tripKey] });
             if (isDraft) {
                 setIsTripFinalizing(true);
                 await finalizeTrip();

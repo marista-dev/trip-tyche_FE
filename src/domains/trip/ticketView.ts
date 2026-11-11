@@ -17,7 +17,7 @@ export interface TicketView {
     dateLine: string;
     /** "당일치기" / "N박 N일" / "—" */
     duration: string;
-    /** 커버 사진이 없을 때 쓰는 그라데이션. 같은 여행이면 미리보기와 발급 티켓이 같은 색이다. */
+    /** 커버 사진이 없을 때의 그라데이션(같은 여행이면 같은 색) */
     fallbackBg: string;
 }
 
@@ -25,10 +25,7 @@ const PLACEHOLDER = '—';
 
 const seedHue = (seed: string) => (seed ? (seed.charCodeAt(0) + seed.charCodeAt(seed.length - 1)) % 360 : 210);
 
-/**
- * 티켓 한 장을 그리는 데 필요한 표시값. 발급 티켓·미리보기·공유 화면·액션시트가 같은 규칙을 쓴다.
- * 작성 중(미확정) 여행은 completed:false로 넘기면 날짜·기간을 비우고 도착 코드를 'TYC'로 둔다.
- */
+/** completed:false(작성 중)면 날짜·기간을 비우고 도착 코드를 'TYC'로 둔다. */
 export const getTicketView = (trip: TicketSource, { completed = true } = {}): TicketView => {
     const { tripTitle = '', country = '', startDate = '', endDate = '' } = trip;
     const startText = completed ? formatDot(startDate) : '';

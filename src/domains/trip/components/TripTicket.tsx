@@ -9,6 +9,7 @@ import TripTicketActionSheet from '@/domains/trip/components/TripTicketActionShe
 import { getTicketView } from '@/domains/trip/ticketView';
 import { Trip } from '@/domains/trip/types';
 import { useMemberOnly } from '@/domains/user/hooks/useMemberOnly';
+import { useLoginPromptStore } from '@/domains/user/stores/useLoginPromptStore';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import ConfirmModal from '@/shared/components/common/Modal/ConfirmModal';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
@@ -37,6 +38,7 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
     const userInfo = useUserStore((state) => state.userInfo);
     const isGuest = useUserStore((state) => state.isGuest);
     const requireMember = useMemberOnly();
+    const openLoginPrompt = useLoginPromptStore((state) => state.open);
 
     const { isModalOpen, isDeleting, isUnLinking, handler, deleteTrip, unlinkShared, closeModal } = useTicketHandler(
         tripKey!,
@@ -233,7 +235,7 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
                 isCompletedTrip={!!isCompletedTrip}
                 handler={handler}
                 onShare={() => setIsShareModalOpen(true)}
-                onLocked={(id) => requireMember(id, () => undefined)}
+                onLocked={openLoginPrompt}
             />
 
             {isModalOpen && (

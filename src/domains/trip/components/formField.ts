@@ -2,10 +2,7 @@ import { css } from '@emotion/react';
 
 import { COLORS } from '@/shared/constants/style';
 
-/*
- * 여행 정보 폼의 글자·간격 규격. 등록·수정 폼과 여행지 입력칸이 같은 값을 쓴다.
- * 위계: 라벨 14 / 입력값 15 / 안내 12. 입력칸 높이 44.
- */
+/* 등록·수정 폼과 여행지 입력칸이 함께 쓰는 입력칸 규격 */
 export const FIELD = {
     HEIGHT: '44px',
     FONT_SIZE: '15px',
@@ -24,7 +21,7 @@ export const fieldLabel = css`
     color: ${COLORS.TEXT.BLACK};
 `;
 
-/** 입력칸 틀 — 테두리·모서리·높이·글자. Mantine 입력칸도 같은 값으로 덮어쓴다(fieldOverrides). */
+/** 입력칸 틀. Mantine 입력칸은 fieldOverrides로 같은 값을 쓴다. */
 export const fieldBox = css`
     min-height: ${FIELD.HEIGHT};
     border: 1px solid ${COLORS.INPUT_BORDER};
@@ -36,7 +33,7 @@ export const fieldBox = css`
     transition: border-color 0.2s;
 `;
 
-/** 폼 안의 Mantine 입력칸(날짜·제목)을 fieldBox와 같은 규격으로 맞춘다. */
+/** 폼 안의 Mantine 입력칸을 fieldBox 규격에 맞춘다. */
 export const fieldOverrides = css`
     .mantine-Input-input {
         height: ${FIELD.HEIGHT};

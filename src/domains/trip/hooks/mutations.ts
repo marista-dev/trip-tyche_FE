@@ -22,6 +22,7 @@ export const useTripFormSubmit = () => {
             toResult(() => tripAPI.updateTripForm(tripKey, tripForm), {
                 onSuccess: () => {
                     queryClient.invalidateQueries({ queryKey: ['ticket-list'] });
+                    queryClient.invalidateQueries({ queryKey: ['ticket-info', tripKey] });
                 },
             }),
     });

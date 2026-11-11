@@ -14,9 +14,10 @@ import { toResult } from '@/libs/apis/shared/utils';
 // 모듈-레벨 빈 배열 상수 — 매 렌더마다 새 [] 반환 시 downstream useMemo 의존성이 매번 깨지는 것을 방지
 const EMPTY_PHOTOS: MediaFile[] = [];
 
-export const useTripPhotos = (tripKey: string) => {
+export const useTripPhotos = (tripKey: string, { enabled = true } = {}) => {
     const query = useQuery({
         queryKey: ['trip-images', tripKey],
+        enabled,
         queryFn: () => toResult(() => mediaAPI.getTripImages(tripKey)),
         select: (result): MediaFile[] => (result.success ? result.data.mediaFiles : EMPTY_PHOTOS),
     });

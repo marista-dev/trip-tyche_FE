@@ -95,7 +95,7 @@ const iconStyle = css`
 const textStyle = (isValid: boolean) => css`
     margin-left: 4px;
     font-size: 12px;
-    color: ${!isValid ? '#ef4444' : '#374151'};
+    color: ${!isValid ? COLORS.TEXT.ERROR : '#374151'};
 `;
 
 const selectedOverlayStyle = css`

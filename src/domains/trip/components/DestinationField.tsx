@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 
 import { css } from '@emotion/react';
 import { Check, ChevronDown, Globe, MapPin, Search, X } from 'lucide-react';
@@ -18,105 +18,53 @@ import {
 import { useTripSummaryList } from '@/domains/trip/hooks/queries';
 import BottomSheet from '@/shared/components/common/BottomSheet';
 import { COLORS } from '@/shared/constants/style';
-import theme from '@/shared/styles/theme';
 
-const ACCENT = theme.COLORS.PRIMARY;
+const { PRIMARY } = COLORS;
 
-// 처음엔 대표 지역만 2줄(7개 + 더보기)로 보여준다. 나머지는 '더보기'와 검색으로 찾는다.
+// 처음엔 2줄(7개 + 더보기)만 보인다.
 const FEATURED_REGIONS = ['제주', '부산', '서울', '강릉', '경주', '여수', '전주'];
+const FEATURED_OPTIONS = regionOptions.filter((o) => FEATURED_REGIONS.includes(o.name));
+
+const COUNTRY_GROUPS = (() => {
+    const groups = new Map<string, typeof overseasCountries>();
+    overseasCountries.forEach((c) => {
+        const letter = getIndexLetter(c.nameKo);
+        groups.set(letter, [...(groups.get(letter) ?? []), c]);
+    });
+    return [...groups.entries()];
+})();
 
 interface DestinationFieldProps {
     value: string;
     onChange: (value: string) => void;
-    /** 사진 위치로 추정한 여행지. 시트 맨 위에 추천으로 보여준다. */
+    /** 사진 위치로 추정한 여행지 */
     suggestion?: DetectedDestination | null;
     /** 폼에 보이는 라벨('여행지 *')의 id — 버튼을 '여행지, 부산'처럼 읽게 한다 */
     labelledBy?: string;
 }
 
-/**
- * 여행지 입력칸 + 선택 시트.
- *
- * 예전엔 검색 없는 드롭다운에 84개국을 가나다순으로 늘어놔, 국내 여행도 '대한민국'을 스크롤해 찾아야 했다.
- * 시트는 사진 위치 추천 → 국내 지역 → 다녀온 곳 → 전체 나라(ㄱㄴㄷ 인덱스) 순으로 보여주고,
- * 검색은 한글·초성·영어·공항 코드·별칭(하와이 → 미국)을 모두 받는다.
- */
+/** 여행지 입력칸 + 선택 시트 */
 const DestinationField = ({ value, onChange, suggestion, labelledBy }: DestinationFieldProps) => {
     const uid = useId();
     const valueId = `${uid}-value`;
     const sheetTitleId = `${uid}-title`;
     const [isOpen, setIsOpen] = useState(false);
-    const [query, setQuery] = useState('');
-    const [showAllRegions, setShowAllRegions] = useState(false);
-    const listRef = useRef<HTMLDivElement>(null);
-    const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+    const close = useCallback(() => setIsOpen(false), []);
 
     const display = formatDestination(value);
-    const { data: summaryResult } = useTripSummaryList(isOpen);
-
-    // 다녀온 나라(국내는 지역 단위). 지금 고른 값과 추천은 따로 보여주므로 뺀다.
-    const visited = useMemo(() => {
-        const trips = summaryResult?.success ? summaryResult.data : [];
-        const seen = new Set<string>();
-        trips.forEach((t) => t.country && seen.add(t.country));
-        // 작성 중인 여행의 임시값('미정' 등)처럼 목록에 없는 값은 뺀다.
-        return [...seen]
-            .filter((v) => v !== suggestion?.value)
-            .filter((v) => {
-                const { country, isDomestic } = parseDestination(v);
-                return isDomestic || Boolean(country);
-            })
-            .slice(0, 6);
-    }, [summaryResult, suggestion?.value]);
-
-    const grouped = useMemo(() => {
-        const groups = new Map<string, typeof overseasCountries>();
-        overseasCountries.forEach((c) => {
-            const letter = getIndexLetter(c.nameKo);
-            groups.set(letter, [...(groups.get(letter) ?? []), c]);
-        });
-        return [...groups.entries()];
-    }, []);
-
-    const results = query.trim() ? searchDestinations(query) : null;
-
-    const open = () => {
-        setQuery('');
-        setShowAllRegions(false);
-        setIsOpen(true);
-    };
+    const suggestionDisplay = suggestion ? formatDestination(suggestion.value) : null;
 
     const select = (next: string) => {
         onChange(next);
-        setIsOpen(false);
+        close();
     };
-
-    const scrollToLetter = (letter: string) => {
-        const target = sectionRefs.current.get(letter);
-        const list = listRef.current;
-        if (target && list) list.scrollTo({ top: target.offsetTop - list.offsetTop, behavior: 'smooth' });
-    };
-
-    const isSelected = (v: string) => v === value;
-    const isKoreaWithoutRegion = value === KOREA_VALUE;
-
-    // 지금 고른 지역이 '더보기' 안쪽에 있으면 처음부터 펼쳐 보여준다.
-    const selectedRegionHidden = regionOptions
-        .filter((o) => !FEATURED_REGIONS.includes(o.name))
-        .some((o) => o.value === value);
-    const regionsShown =
-        showAllRegions || selectedRegionHidden
-            ? regionOptions
-            : regionOptions.filter((o) => FEATURED_REGIONS.includes(o.name));
-    const isExpanded = regionsShown.length === regionOptions.length;
-    const suggestionDisplay = suggestion ? formatDestination(suggestion.value) : null;
 
     return (
         <>
             <button
                 type='button'
                 css={trigger}
-                onClick={open}
+                onClick={() => setIsOpen(true)}
                 aria-haspopup='dialog'
                 aria-labelledby={labelledBy ? `${labelledBy} ${valueId}` : undefined}
             >
@@ -135,198 +83,249 @@ const DestinationField = ({ value, onChange, suggestion, labelledBy }: Destinati
                 <ChevronDown size={16} css={triggerIcon} />
             </button>
 
-            {/* 사진 위치로 해외 나라를 추정했지만 아직 안 골랐을 때 — 한 번에 고르게 한다 */}
-            {!value && suggestion && !suggestion.isConfident && (
+            {/* 해외 추정은 자동 선택하지 않고 제안만 한다 */}
+            {!value && suggestion && suggestionDisplay && !suggestion.isConfident && (
                 <button type='button' css={hintButton} onClick={() => onChange(suggestion.value)}>
                     <MapPin size={12} />
-                    사진 위치로 보면 {formatDestination(suggestion.value)?.emoji}{' '}
-                    {formatDestination(suggestion.value)?.name} 같아요 · <strong>선택</strong>
+                    사진 위치로 보면 {suggestionDisplay.emoji} {suggestionDisplay.name} 같아요 · <strong>선택</strong>
                 </button>
             )}
 
-            <BottomSheet isOpen={isOpen} onClose={() => setIsOpen(false)} maxHeight='88vh' labelledBy={sheetTitleId}>
-                <div css={sheetBody}>
-                    <h2 id={sheetTitleId} css={sheetTitle}>
-                        어디로 다녀왔나요?
-                    </h2>
-                    <label css={searchBox}>
-                        <Search size={16} color={COLORS.SLATE[500]} />
-                        <input
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            placeholder='나라·지역 검색 (일본, ㅇㅂ, japan)'
-                            aria-label='나라·지역 검색'
-                            css={searchInput}
-                            enterKeyHint='search'
-                        />
-                        {query && (
-                            <button
-                                type='button'
-                                css={clearButton}
-                                onClick={() => setQuery('')}
-                                aria-label='검색어 지우기'
-                            >
-                                <span>
-                                    <X size={12} aria-hidden='true' />
-                                </span>
-                            </button>
-                        )}
-                    </label>
-
-                    <div ref={listRef} css={scrollArea}>
-                        {results ? (
-                            results.length > 0 ? (
-                                <ul css={rowList}>
-                                    {results.map((o) => (
-                                        <li key={o.value}>
-                                            <button type='button' css={row} onClick={() => select(o.value)}>
-                                                <span css={rowEmoji} aria-hidden>
-                                                    {o.emoji}
-                                                </span>
-                                                <span css={rowName}>{o.name}</span>
-                                                {o.sub && <span css={rowSub}>{o.sub}</span>}
-                                                {isSelected(o.value) && <Check size={16} color={ACCENT} />}
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p css={emptyText}>찾는 곳이 없어요. 나라 이름으로 검색해 보세요.</p>
-                            )
-                        ) : (
-                            <>
-                                {suggestion && suggestionDisplay && (
-                                    <button
-                                        type='button'
-                                        css={suggestionCard(isSelected(suggestion.value))}
-                                        onClick={() => select(suggestion.value)}
-                                    >
-                                        <MapPin size={16} color={ACCENT} />
-                                        <span css={suggestionText}>
-                                            <span css={suggestionLabel}>사진 위치</span>
-                                            <span css={rowName}>
-                                                {suggestionDisplay.emoji} {suggestionDisplay.name}
-                                            </span>
-                                        </span>
-                                        {isSelected(suggestion.value) ? (
-                                            <Check size={16} color={ACCENT} />
-                                        ) : (
-                                            <span css={suggestionAction}>선택</span>
-                                        )}
-                                    </button>
-                                )}
-
-                                <section css={section}>
-                                    <h3 css={sectionLabel}>국내</h3>
-                                    <div css={tileGrid(4)}>
-                                        {regionsShown.map((o) => (
-                                            <button
-                                                key={o.value}
-                                                type='button'
-                                                css={tile(isSelected(o.value))}
-                                                onClick={() => select(o.value)}
-                                            >
-                                                {o.name}
-                                            </button>
-                                        ))}
-                                        {isExpanded ? (
-                                            <button
-                                                type='button'
-                                                css={tile(isKoreaWithoutRegion)}
-                                                onClick={() => select(KOREA_VALUE)}
-                                            >
-                                                그 외 지역
-                                            </button>
-                                        ) : (
-                                            <button
-                                                type='button'
-                                                css={[tile(false), moreTile]}
-                                                onClick={() => setShowAllRegions(true)}
-                                            >
-                                                더보기
-                                            </button>
-                                        )}
-                                    </div>
-                                </section>
-
-                                {visited.length > 0 && (
-                                    <section css={section}>
-                                        <h3 css={sectionLabel}>다녀온 곳</h3>
-                                        <div css={tileGrid(3)}>
-                                            {visited.map((v) => {
-                                                const d = formatDestination(v)!;
-                                                return (
-                                                    <button
-                                                        key={`visited-${v}`}
-                                                        type='button'
-                                                        css={tile(isSelected(v))}
-                                                        onClick={() => select(v)}
-                                                    >
-                                                        <span css={tileLabel}>
-                                                            {d.emoji} {d.name}
-                                                        </span>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </section>
-                                )}
-
-                                <section css={section}>
-                                    <h3 css={sectionLabel}>해외</h3>
-                                    {grouped.map(([letter, countries]) => (
-                                        <div
-                                            key={letter}
-                                            ref={(el) => {
-                                                if (el) sectionRefs.current.set(letter, el);
-                                                else sectionRefs.current.delete(letter);
-                                            }}
-                                        >
-                                            <div css={letterHeader}>{letter}</div>
-                                            <ul css={rowList}>
-                                                {countries.map((c) => (
-                                                    <li key={c.value}>
-                                                        <button type='button' css={row} onClick={() => select(c.value)}>
-                                                            <span css={rowEmoji} aria-hidden>
-                                                                {c.emoji}
-                                                            </span>
-                                                            <span css={rowName}>{c.nameKo}</span>
-                                                            <span css={rowSub}>{c.nameEn}</span>
-                                                            {getCountryKey(value) === c.value && (
-                                                                <Check size={16} color={ACCENT} />
-                                                            )}
-                                                        </button>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    ))}
-                                </section>
-                            </>
-                        )}
-                    </div>
-
-                    {!results && (
-                        <nav css={indexBar} aria-label='나라 이름 초성으로 이동'>
-                            {grouped.map(([letter]) => (
-                                <button
-                                    key={letter}
-                                    type='button'
-                                    css={indexButton}
-                                    onClick={() => scrollToLetter(letter)}
-                                >
-                                    {letter}
-                                </button>
-                            ))}
-                        </nav>
-                    )}
-                </div>
+            <BottomSheet isOpen={isOpen} onClose={close} maxHeight='88vh' height='88vh' labelledBy={sheetTitleId}>
+                <DestinationSheet titleId={sheetTitleId} value={value} suggestion={suggestion} onSelect={select} />
             </BottomSheet>
         </>
     );
 };
 
-/* ── 입력칸 — 폼의 다른 입력칸과 같은 틀(fieldBox) ── */
+interface DestinationSheetProps {
+    titleId: string;
+    value: string;
+    suggestion?: DetectedDestination | null;
+    onSelect: (value: string) => void;
+}
+
+/** 시트가 열렸을 때만 그려진다 — 닫힌 동안 나라 목록을 만들지 않고, 열 때마다 검색어가 비워진다. */
+const DestinationSheet = ({ titleId, value, suggestion, onSelect }: DestinationSheetProps) => {
+    const [query, setQuery] = useState('');
+    const [showAllRegions, setShowAllRegions] = useState(false);
+    const listRef = useRef<HTMLDivElement>(null);
+    const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+    const { data: summaryResult } = useTripSummaryList(true);
+    const trips = summaryResult?.success ? summaryResult.data : undefined;
+
+    // 다녀온 곳. 추천과 겹치는 값, 목록에 없는 임시값('미정' 등)은 뺀다.
+    const visited = useMemo(
+        () =>
+            [...new Set((trips ?? []).map((t) => t.country).filter(Boolean))]
+                .filter((v) => v !== suggestion?.value)
+                .filter((v) => {
+                    const { country, isDomestic } = parseDestination(v);
+                    return isDomestic || Boolean(country);
+                })
+                .slice(0, 6),
+        [trips, suggestion?.value],
+    );
+
+    const results = query.trim() ? searchDestinations(query) : null;
+    const selectedCountry = getCountryKey(value);
+    const suggestionDisplay = suggestion ? formatDestination(suggestion.value) : null;
+
+    // 고른 지역이 접힌 쪽에 있으면 펼친다.
+    const isExpanded =
+        showAllRegions ||
+        (!FEATURED_OPTIONS.some((o) => o.value === value) && regionOptions.some((o) => o.value === value));
+    const regionsShown = isExpanded ? regionOptions : FEATURED_OPTIONS;
+
+    const scrollToLetter = (letter: string) => {
+        const target = sectionRefs.current.get(letter);
+        const list = listRef.current;
+        if (target && list) list.scrollTo({ top: target.offsetTop - list.offsetTop, behavior: 'smooth' });
+    };
+
+    return (
+        <div css={sheetBody}>
+            <h2 id={titleId} css={sheetTitle}>
+                어디로 다녀왔나요?
+            </h2>
+            <label css={searchBox}>
+                <Search size={16} color={COLORS.SLATE[500]} />
+                <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder='나라·지역 검색 (일본, ㅇㅂ, japan)'
+                    aria-label='나라·지역 검색'
+                    css={searchInput}
+                    enterKeyHint='search'
+                />
+                {query && (
+                    <button type='button' css={clearButton} onClick={() => setQuery('')} aria-label='검색어 지우기'>
+                        <span>
+                            <X size={12} aria-hidden='true' />
+                        </span>
+                    </button>
+                )}
+            </label>
+
+            <div ref={listRef} css={scrollArea}>
+                {results ? (
+                    results.length > 0 ? (
+                        <ul css={rowList}>
+                            {results.map((o) => (
+                                <OptionRow
+                                    key={o.value}
+                                    {...o}
+                                    selected={o.value === value}
+                                    onClick={() => onSelect(o.value)}
+                                />
+                            ))}
+                        </ul>
+                    ) : (
+                        <p css={emptyText}>찾는 곳이 없어요. 나라 이름으로 검색해 보세요.</p>
+                    )
+                ) : (
+                    <>
+                        {suggestion && suggestionDisplay && (
+                            <button
+                                type='button'
+                                css={suggestionCard(suggestion.value === value)}
+                                onClick={() => onSelect(suggestion.value)}
+                            >
+                                <MapPin size={16} color={PRIMARY} />
+                                <span css={suggestionText}>
+                                    <span css={suggestionLabel}>사진 위치</span>
+                                    <span css={rowName}>
+                                        {suggestionDisplay.emoji} {suggestionDisplay.name}
+                                    </span>
+                                </span>
+                                {suggestion.value === value ? (
+                                    <Check size={16} color={PRIMARY} />
+                                ) : (
+                                    <span css={suggestionAction}>선택</span>
+                                )}
+                            </button>
+                        )}
+
+                        <section css={section}>
+                            <h3 css={sectionLabel}>국내</h3>
+                            <div css={tileGrid(4)}>
+                                {regionsShown.map((o) => (
+                                    <button
+                                        key={o.value}
+                                        type='button'
+                                        css={tile(o.value === value)}
+                                        onClick={() => onSelect(o.value)}
+                                    >
+                                        {o.name}
+                                    </button>
+                                ))}
+                                {isExpanded ? (
+                                    <button
+                                        type='button'
+                                        css={tile(value === KOREA_VALUE)}
+                                        onClick={() => onSelect(KOREA_VALUE)}
+                                    >
+                                        그 외 지역
+                                    </button>
+                                ) : (
+                                    <button
+                                        type='button'
+                                        css={[tile(false), moreTile]}
+                                        onClick={() => setShowAllRegions(true)}
+                                    >
+                                        더보기
+                                    </button>
+                                )}
+                            </div>
+                        </section>
+
+                        {visited.length > 0 && (
+                            <section css={section}>
+                                <h3 css={sectionLabel}>다녀온 곳</h3>
+                                <div css={tileGrid(3)}>
+                                    {visited.map((v) => {
+                                        const d = formatDestination(v)!;
+                                        return (
+                                            <button
+                                                key={v}
+                                                type='button'
+                                                css={tile(v === value)}
+                                                onClick={() => onSelect(v)}
+                                            >
+                                                <span css={tileLabel}>
+                                                    {d.emoji} {d.name}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </section>
+                        )}
+
+                        <section css={section}>
+                            <h3 css={sectionLabel}>해외</h3>
+                            {COUNTRY_GROUPS.map(([letter, countries]) => (
+                                <div
+                                    key={letter}
+                                    ref={(el) => {
+                                        if (el) sectionRefs.current.set(letter, el);
+                                        else sectionRefs.current.delete(letter);
+                                    }}
+                                >
+                                    <div css={letterHeader}>{letter}</div>
+                                    <ul css={rowList}>
+                                        {countries.map((c) => (
+                                            <OptionRow
+                                                key={c.value}
+                                                emoji={c.emoji}
+                                                name={c.nameKo}
+                                                sub={c.nameEn}
+                                                selected={selectedCountry === c.value}
+                                                onClick={() => onSelect(c.value)}
+                                            />
+                                        ))}
+                                    </ul>
+                                </div>
+                            ))}
+                        </section>
+                    </>
+                )}
+            </div>
+
+            {!results && (
+                <nav css={indexBar} aria-label='나라 이름 초성으로 이동'>
+                    {COUNTRY_GROUPS.map(([letter]) => (
+                        <button key={letter} type='button' css={indexButton} onClick={() => scrollToLetter(letter)}>
+                            {letter}
+                        </button>
+                    ))}
+                </nav>
+            )}
+        </div>
+    );
+};
+
+interface OptionRowProps {
+    emoji: string;
+    name: string;
+    sub?: string;
+    selected: boolean;
+    onClick: () => void;
+}
+
+const OptionRow = ({ emoji, name, sub, selected, onClick }: OptionRowProps) => (
+    <li>
+        <button type='button' css={row} onClick={onClick}>
+            <span css={rowEmoji} aria-hidden>
+                {emoji}
+            </span>
+            <span css={rowName}>{name}</span>
+            {sub && <span css={rowSub}>{sub}</span>}
+            {selected && <Check size={16} color={PRIMARY} />}
+        </button>
+    </li>
+);
+
 const trigger = css`
     ${fieldBox};
     width: 100%;
@@ -341,7 +340,7 @@ const trigger = css`
 
     &:focus-visible {
         outline: none;
-        border-color: ${ACCENT};
+        border-color: ${PRIMARY};
     }
 `;
 
@@ -364,7 +363,7 @@ const triggerSub = css`
     padding: 2px 7px;
     border-radius: 999px;
     background: ${COLORS.BACKGROUND.PRIMARY_LIGHT};
-    color: ${ACCENT};
+    color: ${PRIMARY};
     font-size: 11px;
     font-weight: 700;
 `;
@@ -375,7 +374,6 @@ const triggerPlaceholder = css`
 
 const hintButton = css`
     ${fieldHelp};
-    /* 글자 한 줄이지만 누르는 영역은 32px 높이로 */
     margin-top: 0;
     margin-left: 2px;
     min-height: 32px;
@@ -388,17 +386,16 @@ const hintButton = css`
     cursor: pointer;
 
     strong {
-        color: ${ACCENT};
+        color: ${PRIMARY};
     }
 `;
 
-/* ── 시트 ── */
 const sheetBody = css`
     position: relative;
     display: flex;
     flex-direction: column;
-    height: calc(88vh - 60px);
-    height: calc(88dvh - 60px - env(safe-area-inset-bottom, 0px));
+    flex: 1;
+    min-height: 0;
 `;
 
 const sheetTitle = css`
@@ -436,7 +433,6 @@ const searchInput = css`
     }
 `;
 
-// 회색 원(20px)은 그대로 보이고, 누르는 영역은 32px.
 const clearButton = css`
     display: grid;
     place-items: center;
@@ -458,7 +454,7 @@ const clearButton = css`
     }
 `;
 
-// 시트 자체는 드래그로 닫히므로 목록은 별도 스크롤 영역으로 둔다(터치 스크롤이 드래그에 먹히지 않게).
+// 터치 스크롤이 시트 드래그에 먹히지 않게 목록은 별도 스크롤 영역으로 둔다.
 const scrollArea = css`
     flex: 1;
     min-height: 0;
@@ -496,9 +492,9 @@ const tile = (selected: boolean) => css`
     align-items: center;
     justify-content: center;
     border-radius: 12px;
-    border: 1px solid ${selected ? ACCENT : '${COLORS.SLATE[200]}'};
-    background: ${selected ? '${COLORS.BACKGROUND.PRIMARY_LIGHT}' : '#fff'};
-    color: ${selected ? ACCENT : '${COLORS.SLATE[700]}'};
+    border: 1px solid ${selected ? PRIMARY : COLORS.SLATE[200]};
+    background: ${selected ? COLORS.BACKGROUND.PRIMARY_LIGHT : COLORS.BACKGROUND.WHITE};
+    color: ${selected ? PRIMARY : COLORS.SLATE[700]};
     font-size: 13px;
     font-weight: 600;
     font-family: inherit;
@@ -529,7 +525,7 @@ const suggestionCard = (selected: boolean) => css`
     align-items: center;
     gap: 12px;
     border-radius: 14px;
-    border: 1px solid ${selected ? ACCENT : 'rgba(0, 113, 227, 0.18)'};
+    border: 1px solid ${selected ? PRIMARY : 'rgba(0, 113, 227, 0.18)'};
     background: rgba(0, 113, 227, 0.05);
     text-align: left;
     font-family: inherit;
@@ -548,23 +544,23 @@ const suggestionText = css`
 const suggestionLabel = css`
     font-size: 11px;
     font-weight: 700;
-    color: ${ACCENT};
+    color: ${PRIMARY};
 `;
 
 const suggestionAction = css`
     font-size: 13px;
     font-weight: 700;
-    color: ${ACCENT};
+    color: ${PRIMARY};
 `;
 
 const letterHeader = css`
     position: sticky;
     top: 0;
     padding: 8px 0 4px;
-    background: #fff;
+    background: ${COLORS.BACKGROUND.WHITE};
     font-size: 12px;
     font-weight: 700;
-    color: ${ACCENT};
+    color: ${PRIMARY};
 `;
 
 const rowList = css`
@@ -639,7 +635,7 @@ const indexButton = css`
     background: none;
     font-size: 10px;
     font-weight: 700;
-    color: ${ACCENT};
+    color: ${PRIMARY};
     cursor: pointer;
 `;
 

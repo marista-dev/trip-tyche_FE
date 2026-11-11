@@ -20,7 +20,7 @@ import { useToastStore } from '@/shared/stores/useToastStore';
 type Step = 0 | 1;
 
 const SigninPage = () => {
-    // 게스트 로그인 유도 시트에서 넘어오면 소개를 건너뛰고 바로 로그인 버튼 단계를 보여준다.
+    // 로그인 유도 시트에서 오면 소개를 건너뛰고 로그인 버튼 단계로.
     const { state } = useLocation() as { state: { step?: Step } | null };
     const [step, setStep] = useState<Step>(state?.step === 1 ? 1 : 0);
     const loginAsGuest = useUserStore((s) => s.loginAsGuest);

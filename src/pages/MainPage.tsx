@@ -126,7 +126,7 @@ const MainPage = () => {
                             </p>
                         )}
                     </div>
-                    {/* 게스트에게도 보여준다 — 누르면 로그인 유도. 숨기면 '티켓을 만들 수 있다'는 사실 자체를 모른다. */}
+                    {/* 게스트에게도 보여 만들 수 있다는 걸 알리고, 누르면 로그인을 유도한다 */}
                     <Button
                         css={addButton}
                         onClick={() => requireMember('trip', createNewTrip)}

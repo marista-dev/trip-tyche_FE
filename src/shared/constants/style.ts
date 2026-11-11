@@ -16,9 +16,9 @@ export const COLORS = {
         WHITE: '#ffffff',
         PLACEHOLDER: 'rgba(15, 23, 42, 0.35)',
         SUCCESS: '#059669',
-        // 흰 바탕 4.5:1 이상(WCAG AA). #ef4444는 3.76이라 작은 경고 문구가 읽히지 않았다.
+        // 흰 바탕 4.5:1(WCAG AA)
         ERROR: '#dc2626',
-        // 보조 글자도 흰 바탕 4.5:1 이상. 예전 0.4/0.5는 2.6/3.4라 낮 야외에서 읽기 어려웠다.
+        // 보조 글자도 흰 바탕 4.5:1 이상(WCAG AA)
         DESCRIPTION: 'rgba(15, 23, 42, 0.68)',
         DESCRIPTION_LIGHT: 'rgba(15, 23, 42, 0.62)',
         SECONDARY: 'rgba(15, 23, 42, 0.64)',
@@ -47,14 +47,13 @@ export const COLORS = {
         NAV: 'rgba(255, 255, 255, 0.92)',
         DARK_CARD: '#0055d4',
     },
-    /** 입력칸 테두리 — 흰 바탕 3:1(WCAG 1.4.11). Mantine 기본 #ced4da는 1.5라 칸 경계가 흐렸다. */
+    /** 입력칸 테두리 — 흰 바탕 3:1(WCAG 1.4.11) */
     INPUT_BORDER: '#8b95a5',
-    /** 중립 회색 단계(tailwind slate). 칩·구분선·보조 텍스트에 쓴다. */
+    /** 중립 회색(tailwind slate) */
     SLATE: {
         100: '#f1f5f9',
         200: '#e2e8f0',
         300: '#cbd5e1',
-        400: '#94a3b8',
         500: '#64748b',
         600: '#475569',
         700: '#334155',

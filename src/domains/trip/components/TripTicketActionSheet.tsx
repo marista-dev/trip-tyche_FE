@@ -26,9 +26,50 @@ interface TripTicketActionSheetProps {
         delete: () => void;
     };
     onShare: () => void;
-    /** 게스트가 잠긴 동작(공유·삭제)을 눌렀을 때. 로그인 유도 시트를 연다. */
-    onLocked: (id: 'share' | 'delete') => void;
+    /** 게스트가 잠긴 동작을 눌렀을 때 */
+    onLocked: (id: LockedAction) => void;
 }
+
+type ActionId = 'edit' | 'photo' | 'share' | 'delete';
+type LockedAction = Extract<ActionId, 'share' | 'delete'>;
+type ActionMode = 'owner' | 'shared' | 'guest';
+interface ActionCopy {
+    label: string;
+    sub: string;
+    tone: 'default' | 'danger';
+    locked?: boolean;
+}
+
+const ACTION_BASE: { id: ActionId; Icon: typeof Edit }[] = [
+    { id: 'edit', Icon: Edit },
+    { id: 'photo', Icon: Image },
+    { id: 'share', Icon: Share2 },
+    { id: 'delete', Icon: Trash2 },
+];
+
+const LOGIN_REQUIRED = '로그인하면 사용할 수 있어요';
+
+// 게스트는 체험 여행의 소유자지만 쓰기 권한이 없다 — 보기는 열고 쓰기는 잠근다.
+const ACTION_COPY: Record<ActionMode, Record<ActionId, ActionCopy>> = {
+    owner: {
+        edit: { label: '여행 정보 수정', sub: '제목, 날짜, 해시태그', tone: 'default' },
+        photo: { label: '사진 관리', sub: '추가 · 삭제 · 위치 수정', tone: 'default' },
+        share: { label: '친구에게 공유', sub: '링크 복사 또는 앱으로 보내기', tone: 'default' },
+        delete: { label: '여행 삭제', sub: '복구할 수 없어요', tone: 'danger' },
+    },
+    shared: {
+        edit: { label: '정보 보기', sub: '제목, 날짜, 해시태그', tone: 'default' },
+        photo: { label: '사진 보기', sub: '추가 · 삭제 · 위치 수정', tone: 'default' },
+        share: { label: '공유 정보', sub: '링크 복사 또는 앱으로 보내기', tone: 'default' },
+        delete: { label: '공유 해제', sub: '이 티켓에 더 이상 접근할 수 없어요', tone: 'danger' },
+    },
+    guest: {
+        edit: { label: '정보 보기', sub: '제목, 날짜, 해시태그', tone: 'default' },
+        photo: { label: '사진 보기', sub: '지도 위 사진과 날짜별 기록', tone: 'default' },
+        share: { label: '친구에게 공유', sub: LOGIN_REQUIRED, tone: 'default', locked: true },
+        delete: { label: '여행 삭제', sub: LOGIN_REQUIRED, tone: 'default', locked: true },
+    },
+};
 
 const TripTicketActionSheet = ({
     open,
@@ -82,97 +123,15 @@ const TripTicketActionSheet = ({
 
     if (!mounted) return null;
 
-    const { departure, arrival: destinationIata } = getTicketView(trip);
+    const { departure, arrival } = getTicketView(trip);
 
-    /*
-     * 게스트의 체험용 여행은 소유자가 게스트 본인이다. 예전엔 '공유받은 티켓' 메뉴를 보여줘
-     * '공유 해제'를 누르면 실제로는 여행 삭제(DELETE)가 나가 401 → 로그인 화면으로 튕겼다.
-     * 보기는 열어두고, 쓰기는 자물쇠로 표시해 누르면 로그인을 안내한다.
-     */
-    const guestActions = [
-        { id: 'edit', label: '정보 보기', sub: '제목, 날짜, 해시태그', Icon: Edit, tone: 'default' as const },
-        { id: 'photo', label: '사진 보기', sub: '지도 위 사진과 날짜별 기록', Icon: Image, tone: 'default' as const },
-        {
-            id: 'share',
-            label: '친구에게 공유',
-            sub: '로그인하면 사용할 수 있어요',
-            Icon: Share2,
-            tone: 'default' as const,
-            locked: true,
-        },
-        {
-            id: 'delete',
-            label: '여행 삭제',
-            sub: '로그인하면 사용할 수 있어요',
-            Icon: Trash2,
-            tone: 'default' as const,
-            locked: true,
-        },
-    ];
+    const mode: ActionMode = isGuest ? 'guest' : isOwner ? 'owner' : 'shared';
+    const actions = ACTION_BASE.map(({ id, Icon }) => ({ id, Icon, ...ACTION_COPY[mode][id] }));
 
-    const actions: {
-        id: string;
-        label: string;
-        sub: string;
-        Icon: typeof Edit;
-        tone: 'default' | 'danger';
-        locked?: boolean;
-    }[] = isGuest
-        ? guestActions
-        : isOwner
-          ? [
-                {
-                    id: 'edit',
-                    label: '여행 정보 수정',
-                    sub: '제목, 날짜, 해시태그',
-                    Icon: Edit,
-                    tone: 'default' as const,
-                },
-                {
-                    id: 'photo',
-                    label: '사진 관리',
-                    sub: '추가 · 삭제 · 위치 수정',
-                    Icon: Image,
-                    tone: 'default' as const,
-                },
-                {
-                    id: 'share',
-                    label: '친구에게 공유',
-                    sub: '링크 복사 또는 앱으로 보내기',
-                    Icon: Share2,
-                    tone: 'default' as const,
-                },
-                { id: 'delete', label: '여행 삭제', sub: '복구할 수 없어요', Icon: Trash2, tone: 'danger' as const },
-            ]
-          : [
-                { id: 'edit', label: '정보 보기', sub: '제목, 날짜, 해시태그', Icon: Edit, tone: 'default' as const },
-                {
-                    id: 'photo',
-                    label: '사진 보기',
-                    sub: '추가 · 삭제 · 위치 수정',
-                    Icon: Image,
-                    tone: 'default' as const,
-                },
-                {
-                    id: 'share',
-                    label: '공유 정보',
-                    sub: '링크 복사 또는 앱으로 보내기',
-                    Icon: Share2,
-                    tone: 'default' as const,
-                },
-                {
-                    id: 'delete',
-                    label: '공유 해제',
-                    sub: '이 티켓에 더 이상 접근할 수 없어요',
-                    Icon: Trash2,
-                    tone: 'danger' as const,
-                },
-            ];
-
-    const handleAction = (id: string) => {
+    const handleAction = (id: ActionId) => {
         onClose();
-        if (isGuest && (id === 'share' || id === 'delete')) {
-            onLocked(id);
+        if (ACTION_COPY[mode][id].locked) {
+            onLocked(id as LockedAction);
             return;
         }
         if (id === 'edit') handler.edit(isCompletedTrip);
@@ -210,9 +169,11 @@ const TripTicketActionSheet = ({
                     left: 0;
                     right: 0;
                     bottom: 0;
-                    background: #fff;
+                    margin: 0 auto;
+                    max-width: 428px;
+                    background: ${COLORS.BACKGROUND.WHITE};
                     border-radius: 20px 20px 0 0;
-                    padding-bottom: 32px;
+                    padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
                     transform: ${show ? 'translateY(0)' : 'translateY(100%)'};
                     transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1);
                     box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.2);
@@ -286,7 +247,7 @@ const TripTicketActionSheet = ({
                                 margin-bottom: 3px;
                             `}
                         >
-                            {departure} → {destinationIata}
+                            {departure} → {arrival}
                         </div>
                         <div
                             css={css`
@@ -382,7 +343,7 @@ const TripTicketActionSheet = ({
                                         <div
                                             css={css`
                                                 font-size: 11px;
-                                                color: rgba(15, 23, 42, 0.5);
+                                                color: ${COLORS.TEXT.SECONDARY};
                                                 margin-top: 1px;
                                             `}
                                         >

@@ -81,7 +81,7 @@ describe('표기', () => {
         expect(formatDot('2025-03-05')).toBe('2025.03.05');
         expect(formatDot('')).toBe('');
         expect(formatPeriod('2025-03-05', '2025-03-09')).toBe('3월 5일–9일');
-        // 달이 바뀌면 끝 날짜에도 월을 붙인다 (예전 사진 관리 헤더는 "3월 30일–2일"로 표시했다)
+        // 달이 바뀌면 끝 날짜에도 월을 붙인다
         expect(formatPeriod('2025-03-30', '2025-04-02')).toBe('3월 30일–4월 2일');
         expect(formatPeriod('2025-03-05', '2025-03-05')).toBe('3월 5일');
         expect(getTripDays('2025-03-30', '2025-04-02')).toBe(4);

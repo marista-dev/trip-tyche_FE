@@ -15,12 +15,12 @@ import { getImageDateFromImage } from '@/domains/media/utils';
 import TripInfoForm from '@/domains/trip/components/TripInfoForm';
 import { FORM } from '@/domains/trip/constants';
 import { useTripFormSubmit } from '@/domains/trip/hooks/mutations';
-import { useTripFormValidation } from '@/domains/trip/hooks/useTripFormValidation';
 import { TripInfo } from '@/domains/trip/types';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import { ANALYTICS_EVENTS, track } from '@/libs/analytics';
 import { mediaAPI, tripAPI } from '@/libs/apis';
 import { toResult } from '@/libs/apis/shared/utils';
+import { validateFormComplete } from '@/libs/utils/validate';
 import { pickImagesFromGallery } from '@/platform/native/gallery';
 import Button from '@/shared/components/common/Button';
 import Header from '@/shared/components/common/Header';
@@ -45,7 +45,7 @@ const TripImageUploadPage = () => {
     const { isModalOpen, closeModal } = useBrowserCheck();
     const downloadUrl = useAppDownloadUrl(isModalOpen);
 
-    const { isFormComplete } = useTripFormValidation(tripForm);
+    const isFormComplete = validateFormComplete(tripForm);
     const { images, progress, prepareUploadFiles, uploadImagesToS3, retryFailedUploads, waitForBackgroundUpload } =
         useImageUpload();
 
@@ -72,10 +72,7 @@ const TripImageUploadPage = () => {
     // 추출된 이미지 → tripForm의 mediaFilesDates 동기화 (날짜 픽커 인디케이터에 사용).
     useEffect(() => {
         const imageDates = getImageDateFromImage(images || null);
-        /*
-         * 사진 날짜만 갱신하고 입력값은 건드리지 않는다. images는 업로드 진행 중에도 다시 설정되는데,
-         * 예전엔 그때마다 폼 전체를 초기화해 사진 위치로 자동 선택한 여행지나 사용자가 쓴 제목이 지워졌다.
-         */
+        // images는 업로드 중에도 다시 설정된다 — 사진 날짜만 갱신하고 입력값은 둔다.
         setTripForm((prev) => ({ ...prev, mediaFilesDates: imageDates ?? [] }));
     }, [images]);
 

@@ -2,6 +2,7 @@ import { css } from '@emotion/react';
 import { Ticket } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+import { GUEST_TTL_HOURS } from '@/domains/user/guestPolicy';
 import { LoginPromptReason, useLoginPromptStore } from '@/domains/user/stores/useLoginPromptStore';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import SheetDialog from '@/shared/components/common/BottomSheet/SheetDialog';
@@ -37,10 +38,7 @@ const COPY: Record<LoginPromptReason, { title: string; description: string }> = 
 
 const BENEFITS = ['내 사진으로 여행 경로 자동 기록', '친구와 티켓 공유', '기록은 계속 보관'];
 
-/**
- * 게스트가 회원 전용 동작을 시도했을 때 뜨는 로그인 유도 시트.
- * RootLayout에 하나만 마운트하고 useLoginPromptStore로 연다.
- */
+/** RootLayout에 하나만 두고 useLoginPromptStore로 연다. */
 const LoginPromptSheet = () => {
     const isOpen = useLoginPromptStore((s) => s.isOpen);
     const reason = useLoginPromptStore((s) => s.reason);
@@ -52,11 +50,7 @@ const LoginPromptSheet = () => {
 
     const goToSignin = () => {
         close();
-        /*
-         * 로그인 화면은 이미 인증된 사용자를 막지 않으므로 먼저 이동한다.
-         * 게스트 세션을 끊는 건 그다음 — 순서를 바꾸면 RequireAuth가 state 없이 먼저 리다이렉트해
-         * 로그인 버튼 단계(step 1)가 아니라 소개 화면으로 떨어진다.
-         */
+        // 이동 먼저, 로그아웃은 나중 — 반대면 RequireAuth가 state 없이 리다이렉트해 소개 화면으로 간다.
         navigate(ROUTES.PATH.SIGNIN, { replace: true, state: { step: 1 } });
         void logout();
     };
@@ -81,12 +75,11 @@ const LoginPromptSheet = () => {
                     <li key={benefit}>{benefit}</li>
                 ))}
             </ul>
-            <p css={expiryNote}>게스트 체험 기록은 4시간 뒤 사라져요.</p>
+            <p css={expiryNote}>게스트 체험 기록은 {GUEST_TTL_HOURS}시간 뒤 사라져요.</p>
         </SheetDialog>
     );
 };
 
-// 아이콘·체크 표시 없이 글 목록으로. 항목 사이는 얇은 구분선 대신 간격으로만 나눈다.
 const benefitList = css`
     list-style: none;
     margin: 0;

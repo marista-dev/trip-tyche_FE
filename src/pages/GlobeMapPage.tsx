@@ -1323,13 +1323,13 @@ const nicknameCardSub = css`
 
 const nicknameInputWrap = (valid: boolean) => css`
     width: 100%;
-    border: 1.5px solid ${valid ? '#e2e8f0' : '#ef4444'};
+    border: 1.5px solid ${valid ? '#e2e8f0' : COLORS.TEXT.ERROR};
     border-radius: 12px;
     overflow: hidden;
     margin-bottom: 8px;
     transition: border-color 0.2s;
     &:focus-within {
-        border-color: ${valid ? ACCENT : '#ef4444'};
+        border-color: ${valid ? ACCENT : COLORS.TEXT.ERROR};
     }
 `;
 
@@ -1349,7 +1349,7 @@ const nicknameInputField = css`
 
 const nicknameErrorMsg = css`
     font-size: 12px;
-    color: #ef4444;
+    color: ${COLORS.TEXT.ERROR};
     align-self: flex-start;
     margin-bottom: 8px;
 `;

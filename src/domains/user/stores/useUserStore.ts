@@ -75,10 +75,7 @@ const useUserStore = create<UserState>()((set, get) => ({
         } catch {
             // API 실패해도 클라이언트 세션은 반드시 초기화
         } finally {
-            /*
-             * 앱은 토큰을 기기 저장소에 둔다. 지우지 않으면 로그아웃 뒤에도 Bearer 헤더가 실려 나가고,
-             * 앱을 다시 켜면 hydrate된 토큰으로 이전 계정(특히 게스트)으로 되살아난다.
-             */
+            // 앱은 토큰을 기기에 둔다 — 지우지 않으면 재실행 시 이전 계정으로 되살아난다.
             if (isNative()) await clearTokens();
             queryClient.clear();
             set(() => ({

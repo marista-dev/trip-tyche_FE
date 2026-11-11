@@ -3,7 +3,7 @@ import { useRef } from 'react';
 import { css } from '@emotion/react';
 
 import { DateConflict, DateConflictChoice } from '@/domains/media/hooks/usePhotoUpload';
-import { formatMonthDay, formatPeriod } from '@/domains/trip/tripDates';
+import { formatDateSummary, formatPeriod } from '@/domains/trip/tripDates';
 import SheetDialog from '@/shared/components/common/BottomSheet/SheetDialog';
 import { COLORS } from '@/shared/constants/style';
 
@@ -12,22 +12,16 @@ interface DateConflictSheetProps {
     onResolve: (choice: DateConflictChoice) => void;
 }
 
-/**
- * 사진을 추가할 때 여행 기간 밖에 찍힌 사진이 섞여 있으면 올리기 전에 묻는다.
- * 기간을 늘리거나, 그대로 추가하거나, 취소할 수 있다. 바깥을 눌러 닫으면 취소다.
- */
+/** 기간 밖에 찍힌 사진을 올리기 전에 묻는다. 바깥을 눌러 닫으면 취소. */
 const DateConflictSheet = ({ conflict, onResolve }: DateConflictSheetProps) => {
-    // 닫히는 애니메이션 동안 내용이 비지 않도록 마지막 값을 들고 있는다.
+    // 닫히는 애니메이션 동안 마지막 내용을 유지한다.
     const lastRef = useRef<DateConflict | null>(null);
     if (conflict) lastRef.current = conflict;
     const shown = conflict ?? lastRef.current;
     if (!shown) return null;
 
     const { outsideDates, outsideCount, totalCount, current, extended } = shown;
-    const dateText =
-        outsideDates.length === 1
-            ? formatMonthDay(outsideDates[0])
-            : `${formatMonthDay(outsideDates[0])} 외 ${outsideDates.length - 1}일`;
+    const dateText = formatDateSummary(outsideDates);
     const photoText = totalCount === 1 ? '이 사진은' : `${totalCount}장 중 ${outsideCount}장은`;
 
     return (
