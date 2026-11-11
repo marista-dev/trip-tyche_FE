@@ -1,4 +1,4 @@
-import { posthog, type Properties } from 'posthog-js';
+import type { PostHog, Properties } from 'posthog-js';
 
 import type { UserInfo } from '@/domains/user/types';
 import { isNative } from '@/platform';
@@ -48,36 +48,70 @@ interface PendingEvent {
 let initialized = false;
 
 /*
+ * posthog-js(gzip 약 125KB)는 첫 화면을 그린 뒤 한가할 때 불러온다. 메인 번들에 넣으면 모든 화면의 첫 표시가 그만큼 늦어진다.
+ * 로드 전에 들어온 호출은 순서대로 모아 뒀다가 로드되면 실행한다. 새로고침을 건너는 이벤트는 원래 sessionStorage에 적으므로
+ * 로드 전에 페이지를 떠나도 잃지 않는다.
+ */
+let client: PostHog | null = null;
+let loading: Promise<void> | null = null;
+const queued: ((ph: PostHog) => void)[] = [];
+
+const withClient = (fn: (ph: PostHog) => void) => {
+    if (client) fn(client);
+    else queued.push(fn);
+};
+
+const whenIdle = (fn: () => void) => {
+    const run = () =>
+        'requestIdleCallback' in window ? window.requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 300);
+    if (document.readyState === 'complete') run();
+    else window.addEventListener('load', run, { once: true });
+};
+
+/*
  * reset()은 super property까지 지운다. 그래서 reset 뒤에는 platform·app_version을 다시 등록하지 않으면
  * 로그아웃·계정 전환 이후의 이벤트에서 이 값이 빠진다.
  */
-const registerBaseProperties = () => {
-    posthog.register({
+const registerBaseProperties = (ph: PostHog) => {
+    ph.register({
         platform: isNative() ? 'app' : 'web',
         app_version: APP_VERSION_NAME,
     });
 };
 
-export const initAnalytics = (): void => {
+/** 수집을 켠다. 실제 로드는 첫 화면 이후에 일어나며, 끝나면 resolve된다(호출부는 기다리지 않아도 된다). */
+export const initAnalytics = (): Promise<void> => {
     const key = import.meta.env.VITE_POSTHOG_KEY;
-    if (!key || initialized) return;
-
-    posthog.init(key, {
-        api_host: import.meta.env.VITE_POSTHOG_HOST,
-        // 익명 방문자는 프로필을 만들지 않는다. identify된 사용자만 person으로 남아 비용과 노이즈를 줄인다.
-        person_profiles: 'identified_only',
-        // SPA라 페이지 이동이 전체 로드가 아니다. history 변경을 $pageview로 잡아야 라우팅이 측정된다.
-        capture_pageview: 'history_change',
-        autocapture: false,
-        disable_session_recording: true,
-        // 아래 자동 수집은 기본값이 아니라 PostHog 프로젝트의 원격 설정을 따른다. 프로젝트에서 켜져도 요소 텍스트(닉네임)나
-        // 예외 메시지가 새지 않도록 코드에서 명시적으로 막는다.
-        capture_dead_clicks: false,
-        capture_heatmaps: false,
-        capture_exceptions: false,
-    });
-    registerBaseProperties();
+    if (!key) return Promise.resolve();
+    if (loading) return loading;
     initialized = true;
+
+    loading = new Promise<void>((resolve) => whenIdle(resolve))
+        .then(() => import('posthog-js'))
+        .then(({ posthog }) => {
+            posthog.init(key, {
+                api_host: import.meta.env.VITE_POSTHOG_HOST,
+                // 익명 방문자는 프로필을 만들지 않는다. identify된 사용자만 person으로 남아 비용과 노이즈를 줄인다.
+                person_profiles: 'identified_only',
+                // SPA라 페이지 이동이 전체 로드가 아니다. history 변경을 $pageview로 잡아야 라우팅이 측정된다.
+                capture_pageview: 'history_change',
+                autocapture: false,
+                disable_session_recording: true,
+                // 아래 자동 수집은 기본값이 아니라 PostHog 프로젝트의 원격 설정을 따른다. 프로젝트에서 켜져도 요소 텍스트(닉네임)나
+                // 예외 메시지가 새지 않도록 코드에서 명시적으로 막는다.
+                capture_dead_clicks: false,
+                capture_heatmaps: false,
+                capture_exceptions: false,
+            });
+            registerBaseProperties(posthog);
+            client = posthog;
+            queued.splice(0).forEach((fn) => fn(posthog));
+        })
+        .catch(() => {
+            // 차단기(광고 차단 등)로 로드에 실패해도 앱은 그대로 동작한다. 모아 둔 호출만 버린다.
+            queued.length = 0;
+        });
+    return loading;
 };
 
 export const identifyUser = ({ userId, role, createdAt }: AnalyticsIdentity): void => {
@@ -91,23 +125,27 @@ export const identifyUser = ({ userId, role, createdAt }: AnalyticsIdentity): vo
      * _isIdentified는 밑줄 접두 내부 API다(타입에는 선언돼 있다). posthog-js 업그레이드 때 이 호출이 깨지지 않는지
      * analytics.test.ts의 identify 테스트와 함께 확인한다.
      */
-    if (posthog._isIdentified() && posthog.get_distinct_id() !== distinctId) {
-        posthog.reset();
-        registerBaseProperties();
-    }
-    posthog.identify(distinctId, { role, signed_up_at: createdAt });
+    withClient((ph) => {
+        if (ph._isIdentified() && ph.get_distinct_id() !== distinctId) {
+            ph.reset();
+            registerBaseProperties(ph);
+        }
+        ph.identify(distinctId, { role, signed_up_at: createdAt });
+    });
 };
 
 export const track = (event: AnalyticsEvent, props?: Properties): void => {
     if (!initialized) return;
-    posthog.capture(event, props);
+    withClient((ph) => ph.capture(event, props));
 };
 
 // 로그아웃에서만 호출한다. 비로그인 방문자도 부팅마다 인증 실패 경로를 타므로 거기서 호출하면 익명 id가 매번 바뀐다.
 export const resetAnalytics = (): void => {
     if (!initialized) return;
-    posthog.reset();
-    registerBaseProperties();
+    withClient((ph) => {
+        ph.reset();
+        registerBaseProperties(ph);
+    });
 };
 
 /*

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { APP_VERSION_NAME } from '@/platform/native/appVersion';
+
 const { posthogMock, platformMock } = vi.hoisted(() => ({
     posthogMock: {
         init: vi.fn(),
@@ -32,7 +34,7 @@ const loadInitialized = async () => {
     vi.stubEnv('VITE_POSTHOG_KEY', TEST_KEY);
     vi.stubEnv('VITE_POSTHOG_HOST', TEST_HOST);
     const analytics = await loadAnalytics();
-    analytics.initAnalytics();
+    await analytics.initAnalytics();
     posthogMock.register.mockClear();
     return analytics;
 };
@@ -57,7 +59,7 @@ describe('키가 없으면 no-op', () => {
         const analytics = await loadAnalytics();
         window.history.replaceState(null, '', '/?signup=true');
 
-        analytics.initAnalytics();
+        await analytics.initAnalytics();
         analytics.identifyUser({ userId: 1, role: 'USER', createdAt: '2026-11-11T21:00:55.253692' });
         analytics.track('trip_created');
         analytics.queuePendingEvent('guest_started');
@@ -92,7 +94,7 @@ describe('initAnalytics', () => {
         vi.stubEnv('VITE_POSTHOG_HOST', TEST_HOST);
         const analytics = await loadAnalytics();
 
-        analytics.initAnalytics();
+        await analytics.initAnalytics();
 
         expect(posthogMock.init).toHaveBeenCalledWith(
             TEST_KEY,
@@ -113,9 +115,9 @@ describe('initAnalytics', () => {
         vi.stubEnv('VITE_POSTHOG_KEY', TEST_KEY);
         const analytics = await loadAnalytics();
 
-        analytics.initAnalytics();
+        await analytics.initAnalytics();
 
-        expect(posthogMock.register).toHaveBeenCalledWith({ platform: 'web', app_version: '1.0.1' });
+        expect(posthogMock.register).toHaveBeenCalledWith({ platform: 'web', app_version: APP_VERSION_NAME });
     });
 
     it('네이티브 앱이면 platform: app을 등록한다', async () => {
@@ -123,7 +125,7 @@ describe('initAnalytics', () => {
         vi.stubEnv('VITE_POSTHOG_KEY', TEST_KEY);
         const analytics = await loadAnalytics();
 
-        analytics.initAnalytics();
+        await analytics.initAnalytics();
 
         expect(posthogMock.register).toHaveBeenCalledWith(expect.objectContaining({ platform: 'app' }));
     });
@@ -132,8 +134,7 @@ describe('initAnalytics', () => {
         vi.stubEnv('VITE_POSTHOG_KEY', TEST_KEY);
         const analytics = await loadAnalytics();
 
-        analytics.initAnalytics();
-        analytics.initAnalytics();
+        await Promise.all([analytics.initAnalytics(), analytics.initAnalytics()]);
 
         expect(posthogMock.init).toHaveBeenCalledTimes(1);
     });
@@ -213,7 +214,7 @@ describe('identifyUser', () => {
 
         analytics.identifyUser(identity);
 
-        expect(posthogMock.register).toHaveBeenCalledWith({ platform: 'web', app_version: '1.0.1' });
+        expect(posthogMock.register).toHaveBeenCalledWith({ platform: 'web', app_version: APP_VERSION_NAME });
         expect(posthogMock.register.mock.invocationCallOrder[0]).toBeGreaterThan(
             posthogMock.reset.mock.invocationCallOrder[0],
         );
@@ -237,7 +238,7 @@ describe('track / resetAnalytics', () => {
         analytics.resetAnalytics();
 
         expect(posthogMock.reset).toHaveBeenCalledTimes(1);
-        expect(posthogMock.register).toHaveBeenCalledWith({ platform: 'web', app_version: '1.0.1' });
+        expect(posthogMock.register).toHaveBeenCalledWith({ platform: 'web', app_version: APP_VERSION_NAME });
     });
 
     it('ANALYTICS_EVENTS는 계획의 네 이벤트 이름이다', async () => {
@@ -422,5 +423,25 @@ describe('consumeSignupQuery', () => {
         window.history.replaceState(null, '', '/?signup=false');
         expect(analytics.consumeSignupQuery()).toBe(false);
         expect(window.location.search).toBe('?signup=false');
+    });
+});
+
+describe('지연 로드', () => {
+    it('로드 전에 들어온 호출은 모아 뒀다가 로드되면 순서대로 실행한다', async () => {
+        vi.stubEnv('VITE_POSTHOG_KEY', TEST_KEY);
+        const analytics = await loadAnalytics();
+
+        const ready = analytics.initAnalytics();
+        analytics.identifyUser({ userId: 7, role: 'USER', createdAt: '2025-01-01' });
+        analytics.track(analytics.ANALYTICS_EVENTS.TRIP_CREATED);
+        expect(posthogMock.init).not.toHaveBeenCalled();
+
+        await ready;
+
+        expect(posthogMock.init).toHaveBeenCalledTimes(1);
+        expect(posthogMock.identify.mock.invocationCallOrder[0]).toBeLessThan(
+            posthogMock.capture.mock.invocationCallOrder[0],
+        );
+        expect(posthogMock.capture).toHaveBeenCalledWith('trip_created', undefined);
     });
 });
