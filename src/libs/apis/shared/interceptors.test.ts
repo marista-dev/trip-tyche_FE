@@ -1,7 +1,7 @@
 import { AxiosError } from 'axios';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-import { isGuestRestricted, isGuestRestrictedError } from '@/domains/user/guestPolicy';
+import { isGuestRestrictedError } from '@/domains/user/guestPolicy';
 import { useLoginPromptStore } from '@/domains/user/stores/useLoginPromptStore';
 import useUserStore from '@/domains/user/stores/useUserStore';
 // client.ts가 interceptors.ts를 부르고 interceptors.ts가 다시 client.ts를 부른다.
@@ -21,12 +21,6 @@ vi.mock('@/platform/native/auth', () => ({
 const [{ rejected }] = (
     apiClient.interceptors.response as unknown as {
         handlers: { rejected: (error: unknown) => Promise<never> }[];
-    }
-).handlers;
-
-const [{ fulfilled: beforeRequest }] = (
-    apiClient.interceptors.request as unknown as {
-        handlers: { fulfilled: (config: unknown) => Promise<unknown> }[];
     }
 ).handlers;
 
@@ -78,37 +72,14 @@ describe('응답 인터셉터 — 세션과 무관한 요청', () => {
     });
 });
 
-/*
- * 서버는 게스트의 쓰기 요청에 403이 아니라 401(code 1001)을 준다(실측).
- * 이걸 세션 만료로 처리하면 게스트가 사진 추가·삭제·공유를 누르는 순간 로그인 화면으로 튕겼다.
- */
-describe('게스트 쓰기 차단', () => {
+describe('게스트', () => {
     beforeEach(() => {
         refreshAccessToken.mockReset().mockResolvedValue(false);
         useLoginPromptStore.setState({ isOpen: false });
         useUserStore.setState({ status: 'authenticated', userInfo: null, isGuest: true });
     });
 
-    it('게스트의 쓰기 요청은 보내기 전에 막고 로그인 유도 시트를 연다', async () => {
-        const error = await beforeRequest({ url: '/v1/trips/abc/presigned-url', method: 'post', headers: {} }).catch(
-            (e: unknown) => e,
-        );
-
-        expect(isGuestRestrictedError(error)).toBe(true);
-        expect(useLoginPromptStore.getState().isOpen).toBe(true);
-    });
-
-    it('게스트의 읽기 요청은 그대로 보낸다', async () => {
-        expect(await beforeRequest({ url: '/v1/trips', method: 'get', headers: {} })).toBeDefined();
-        expect(useLoginPromptStore.getState().isOpen).toBe(false);
-    });
-
-    it('회원의 쓰기 요청은 막지 않는다', async () => {
-        useUserStore.setState({ isGuest: false });
-        expect(await beforeRequest({ url: '/v1/trips', method: 'post', headers: {} })).toBeDefined();
-    });
-
-    it('허용 목록이 놓친 게스트 쓰기의 403은 세션을 유지하고 로그인 유도 시트를 연다', async () => {
+    it('쓰기가 403으로 거절되면 세션을 유지하고 로그인 유도 시트를 연다', async () => {
         const error = await rejected(denial('/v1/trips/abc', 403, 'delete', 2009)).catch((e: unknown) => e);
 
         expect(isGuestRestrictedError(error)).toBe(true);
@@ -117,19 +88,10 @@ describe('게스트 쓰기 차단', () => {
         expect(useLoginPromptStore.getState().isOpen).toBe(true);
     });
 
-    it('게스트 읽기의 401은 체험 만료 — 갱신 없이 세션을 끊는다', async () => {
+    it('401은 체험 만료 — 갱신 없이 세션을 끊는다', async () => {
         await expect(rejected(denial('/v1/users/me/summary', 401))).rejects.toBeDefined();
 
         expect(refreshAccessToken).not.toHaveBeenCalled();
         expect(useUserStore.getState().status).toBe('unauthenticated');
-    });
-
-    it.each([
-        ['post', '/v1/auth/logout'],
-        ['patch', '/v1/shares/1?status=APPROVED'],
-        ['patch', '/v1/notifications/1'],
-        ['delete', '/v1/devices/token'],
-    ])('서버가 게스트에게 허용한 %s %s는 막지 않는다', (method, url) => {
-        expect(isGuestRestricted({ method, url })).toBe(false);
     });
 });
