@@ -1,9 +1,7 @@
 <div align="center">
-  <img src="docs/images/mock.png" alt="TripTyche" width="100%">
 
-  <br/>
+# [TRIP TYCHE](https://triptyche.cloud)
 
-  [🌐 triptyche](https://triptyche.cloud)
-
+<img src="docs/readme/gallery.gif" width="100%" alt="TRIP TYCHE">
 
 </div>
