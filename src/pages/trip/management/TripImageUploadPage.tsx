@@ -18,6 +18,7 @@ import { useTripFormSubmit } from '@/domains/trip/hooks/mutations';
 import { useTripFormValidation } from '@/domains/trip/hooks/useTripFormValidation';
 import { TripInfo } from '@/domains/trip/types';
 import useUserStore from '@/domains/user/stores/useUserStore';
+import { ANALYTICS_EVENTS, track } from '@/libs/analytics';
 import { mediaAPI, tripAPI } from '@/libs/apis';
 import { toResult } from '@/libs/apis/shared/utils';
 import { pickImagesFromGallery } from '@/platform/native/gallery';
@@ -56,6 +57,10 @@ const TripImageUploadPage = () => {
     // step3 phase0에서 handleUpdateForm이 이 ref를 사용해 PUT 호출 → retry 시에도 같은 값 사용.
     const submittedTripFormRef = useRef<TripInfo | null>(null);
 
+    // photos_uploaded 퍼널 이벤트용. 이 페이지는 usePhotoUpload를 거치지 않아 여기서 직접 센다.
+    const uploadBatchSizeRef = useRef(0);
+    const photosTrackedRef = useRef(false);
+
     const { tripKey } = useParams();
     const { pathname } = useLocation();
     const navigate = useNavigate();
@@ -84,6 +89,17 @@ const TripImageUploadPage = () => {
         setCoverPhotoUrl(url);
         return () => URL.revokeObjectURL(url);
     }, [images]);
+
+    // Step3가 await하는 업로드 완료 시점(S3 + 메타등록 + status 전환까지 성공)에만 센다.
+    // 실패하면 throw되어 여기까지 오지 않고, retry나 StrictMode 재실행으로 다시 불려도 ref로 1회만 보낸다.
+    // 함수 identity가 바뀌면 Step3의 runPhases useEffect가 재발화하므로 deps는 안정적인 값만 둔다.
+    const waitForUploadAndTrack = useCallback(async () => {
+        await waitForBackgroundUpload();
+        if (photosTrackedRef.current) return;
+        photosTrackedRef.current = true;
+        // 장수만 보낸다. 파일명·tripKey는 식별 정보라 속성에 넣지 않는다.
+        track(ANALYTICS_EVENTS.PHOTOS_UPLOADED, { count: uploadBatchSizeRef.current });
+    }, [waitForBackgroundUpload]);
 
     const handleFinalize = useMemo(
         () => async () => {
@@ -124,6 +140,7 @@ const TripImageUploadPage = () => {
     const processSelectedImages = async (selectedImages: File[]) => {
         setStep('processing');
         const uniqueFiles = await prepareUploadFiles(selectedImages);
+        uploadBatchSizeRef.current = uniqueFiles.length;
         // S3 업로드는 백그라운드로 진행되며, 정보 입력 화면 진입을 막지 않는다.
         // 실제 업로드 완료는 Step3에서 waitForBackgroundUpload로 추적된다.
         // 신규 등록일 때는 status 전환도 같은 체인에 묶어 실패 시 step3 retry 화면에 surface되도록 한다.
@@ -173,7 +190,7 @@ const TripImageUploadPage = () => {
                 return (
                     <TripCreateCompleteStep
                         tripInfo={tripForm}
-                        waitForBackgroundUpload={waitForBackgroundUpload}
+                        waitForBackgroundUpload={waitForUploadAndTrack}
                         onUpdateForm={handleUpdateForm}
                         onFinalize={handleFinalize}
                         coverPhotoUrl={coverPhotoUrl}
