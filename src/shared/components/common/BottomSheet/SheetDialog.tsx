@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useId } from 'react';
 
 import { css } from '@emotion/react';
 
@@ -40,31 +40,36 @@ const SheetDialog = ({
     primary,
     secondary,
     tertiary,
-}: SheetDialogProps) => (
-    <BottomSheet isOpen={isOpen} onClose={onClose}>
-        <div css={body}>
-            {eyebrow && <p css={eyebrowStyle}>{eyebrow}</p>}
-            <h2 css={titleStyle}>{title}</h2>
-            {description && <p css={descriptionStyle}>{description}</p>}
-            {children && <div css={content}>{children}</div>}
-            <div css={actions}>
-                <button type='button' css={primaryButton} onClick={() => primary.onClick()}>
-                    {primary.label}
-                </button>
-                {secondary && (
-                    <button type='button' css={secondaryButton} onClick={() => secondary.onClick()}>
-                        {secondary.label}
+}: SheetDialogProps) => {
+    const titleId = useId();
+    return (
+        <BottomSheet isOpen={isOpen} onClose={onClose} labelledBy={titleId}>
+            <div css={body}>
+                {eyebrow && <p css={eyebrowStyle}>{eyebrow}</p>}
+                <h2 id={titleId} css={titleStyle}>
+                    {title}
+                </h2>
+                {description && <p css={descriptionStyle}>{description}</p>}
+                {children && <div css={content}>{children}</div>}
+                <div css={actions}>
+                    <button type='button' css={primaryButton} onClick={() => primary.onClick()}>
+                        {primary.label}
                     </button>
-                )}
-                {tertiary && (
-                    <button type='button' css={textButton} onClick={() => tertiary.onClick()}>
-                        {tertiary.label}
-                    </button>
-                )}
+                    {secondary && (
+                        <button type='button' css={secondaryButton} onClick={() => secondary.onClick()}>
+                            {secondary.label}
+                        </button>
+                    )}
+                    {tertiary && (
+                        <button type='button' css={textButton} onClick={() => tertiary.onClick()}>
+                            {tertiary.label}
+                        </button>
+                    )}
+                </div>
             </div>
-        </div>
-    </BottomSheet>
-);
+        </BottomSheet>
+    );
+};
 
 const body = css`
     display: flex;

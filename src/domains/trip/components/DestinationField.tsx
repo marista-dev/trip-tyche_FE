@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 
 import { css } from '@emotion/react';
 import { Check, ChevronDown, Globe, MapPin, Search, X } from 'lucide-react';
@@ -30,6 +30,8 @@ interface DestinationFieldProps {
     onChange: (value: string) => void;
     /** 사진 위치로 추정한 여행지. 시트 맨 위에 추천으로 보여준다. */
     suggestion?: DetectedDestination | null;
+    /** 폼에 보이는 라벨('여행지 *')의 id — 버튼을 '여행지, 부산'처럼 읽게 한다 */
+    labelledBy?: string;
 }
 
 /**
@@ -39,7 +41,10 @@ interface DestinationFieldProps {
  * 시트는 사진 위치 추천 → 국내 지역 → 다녀온 곳 → 전체 나라(ㄱㄴㄷ 인덱스) 순으로 보여주고,
  * 검색은 한글·초성·영어·공항 코드·별칭(하와이 → 미국)을 모두 받는다.
  */
-const DestinationField = ({ value, onChange, suggestion }: DestinationFieldProps) => {
+const DestinationField = ({ value, onChange, suggestion, labelledBy }: DestinationFieldProps) => {
+    const uid = useId();
+    const valueId = `${uid}-value`;
+    const sheetTitleId = `${uid}-title`;
     const [isOpen, setIsOpen] = useState(false);
     const [query, setQuery] = useState('');
     const [showAllRegions, setShowAllRegions] = useState(false);
@@ -108,16 +113,24 @@ const DestinationField = ({ value, onChange, suggestion }: DestinationFieldProps
 
     return (
         <>
-            <button type='button' css={trigger} onClick={open} aria-haspopup='dialog'>
+            <button
+                type='button'
+                css={trigger}
+                onClick={open}
+                aria-haspopup='dialog'
+                aria-labelledby={labelledBy ? `${labelledBy} ${valueId}` : undefined}
+            >
                 <Globe size={16} css={triggerIcon} />
                 {display ? (
-                    <span css={triggerValue}>
+                    <span id={valueId} css={triggerValue}>
                         <span aria-hidden>{display.emoji}</span>
                         {display.name}
                         {display.sub && <span css={triggerSub}>{display.sub}</span>}
                     </span>
                 ) : (
-                    <span css={triggerPlaceholder}>어디로 다녀왔나요?</span>
+                    <span id={valueId} css={triggerPlaceholder}>
+                        어디로 다녀왔나요?
+                    </span>
                 )}
                 <ChevronDown size={16} css={triggerIcon} />
             </button>
@@ -131,15 +144,18 @@ const DestinationField = ({ value, onChange, suggestion }: DestinationFieldProps
                 </button>
             )}
 
-            <BottomSheet isOpen={isOpen} onClose={() => setIsOpen(false)} maxHeight='88vh'>
+            <BottomSheet isOpen={isOpen} onClose={() => setIsOpen(false)} maxHeight='88vh' labelledBy={sheetTitleId}>
                 <div css={sheetBody}>
-                    <h2 css={sheetTitle}>어디로 다녀왔나요?</h2>
+                    <h2 id={sheetTitleId} css={sheetTitle}>
+                        어디로 다녀왔나요?
+                    </h2>
                     <label css={searchBox}>
                         <Search size={16} color={COLORS.SLATE[500]} />
                         <input
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                             placeholder='나라·지역 검색 (일본, ㅇㅂ, japan)'
+                            aria-label='나라·지역 검색'
                             css={searchInput}
                             enterKeyHint='search'
                         />

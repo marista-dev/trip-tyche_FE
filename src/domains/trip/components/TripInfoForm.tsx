@@ -1,4 +1,4 @@
-import { Dispatch, SetStateAction, useEffect, useMemo, useRef, useState } from 'react';
+import { Dispatch, SetStateAction, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { css } from '@emotion/react';
 import { DatePickerInput, DatesRangeValue, DateValue } from '@mantine/dates';
@@ -39,6 +39,14 @@ const HASHTAG_SUGGESTIONS = FORM.HASHTAG_MENU.slice(0, 3);
 const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripInfoFormProps) => {
     const { tripTitle, country, startDate, endDate, hashtags, mediaFilesDates = [] } = tripForm;
     const [tagInput, setTagInput] = useState('');
+    // 보이는 라벨(h2)과 입력칸을 aria-labelledby로 잇는다 — 화면낭독기가 '여행 기간' 등을 읽게.
+    const labelId = useId();
+    const ids = {
+        date: `${labelId}-date`,
+        country: `${labelId}-country`,
+        title: `${labelId}-title`,
+        tag: `${labelId}-tag`,
+    };
     // 시작일만 고른 '진행 중' 상태. 끝날까지 고르면 tripForm에 반영하고 비운다.
     const [draftRange, setDraftRange] = useState<DatesRangeValue | null>(null);
 
@@ -186,7 +194,9 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
         <div css={card}>
             <section>
                 <div css={titleRow}>
-                    <h2 css={fieldLabel}>{FORM.TITLE.DATE}</h2>
+                    <h2 id={ids.date} css={fieldLabel}>
+                        {FORM.TITLE.DATE}
+                    </h2>
                     <button type='button' css={togglePill} onClick={toggleDayTrip} aria-pressed={isDayTrip}>
                         <span css={toggleTrack(isDayTrip)}>
                             <span css={toggleKnob(isDayTrip)} />
@@ -201,6 +211,7 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
                         value={toLocalDate(startDate)}
                         onChange={handleSingleDateChange}
                         {...sharedPickerProps}
+                        aria-labelledby={ids.date}
                         valueFormatter={({ date }) => (date instanceof Date ? formatRange(date, null) : '')}
                     />
                 ) : (
@@ -213,6 +224,7 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
                         value={pickerValue}
                         onChange={handleDateChange}
                         {...sharedPickerProps}
+                        aria-labelledby={ids.date}
                         valueFormatter={({ date }) =>
                             Array.isArray(date) ? formatRange(date[0] as Date | null, date[1] as Date | null) : ''
                         }
@@ -246,8 +258,11 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
             </section>
 
             <section>
-                <h2 css={fieldLabel}>{FORM.TITLE.COUNTRY}</h2>
+                <h2 id={ids.country} css={fieldLabel}>
+                    {FORM.TITLE.COUNTRY}
+                </h2>
                 <DestinationField
+                    labelledBy={ids.country}
                     value={country}
                     onChange={(value) => onChangeTripInfo((prev: Trip) => ({ ...prev, country: value }))}
                     suggestion={detected}
@@ -255,8 +270,11 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
             </section>
 
             <section>
-                <h2 css={fieldLabel}>{FORM.TITLE.TITLE}</h2>
+                <h2 id={ids.title} css={fieldLabel}>
+                    {FORM.TITLE.TITLE}
+                </h2>
                 <Input
+                    aria-labelledby={ids.title}
                     value={tripTitle}
                     onChange={(value) => onChangeTripInfo((prev: Trip) => ({ ...prev, tripTitle: value }))}
                     placeholder='최대 12자까지 입력할 수 있습니다'
@@ -267,7 +285,9 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
 
             <section>
                 <div css={titleRow}>
-                    <h2 css={fieldLabel}>{FORM.TITLE.HASHTAG}</h2>
+                    <h2 id={ids.tag} css={fieldLabel}>
+                        {FORM.TITLE.HASHTAG}
+                    </h2>
                     <span css={hashtagCount(isFull)}>
                         {hashtags.length} / {HASHTAG_MAX}
                     </span>
@@ -275,17 +295,17 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
 
                 <div css={hashtagInputWrap(isFull)}>
                     {hashtags.map((tag) => (
-                        <span
+                        <button
                             key={tag}
+                            type='button'
                             css={selectedChip}
                             onClick={() => removeTag(tag)}
-                            role='button'
                             aria-label={`${tag} 태그 제거`}
                         >
                             <span css={chipHash}>#</span>
                             {tag}
-                            <X size={11} css={chipX} />
-                        </span>
+                            <X size={11} css={chipX} aria-hidden='true' />
+                        </button>
                     ))}
                     {!isFull && (
                         <input
@@ -295,6 +315,7 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = [] }: TripI
                             onBlur={() => tagInput && addTag(tagInput)}
                             placeholder={hashtags.length === 0 ? '태그 입력 후 Enter' : '+ 추가'}
                             maxLength={HASHTAG_MAX_LEN}
+                            aria-labelledby={ids.tag}
                             css={tagInputStyle}
                         />
                     )}
@@ -426,6 +447,8 @@ const hashtagInputWrap = (isFull: boolean) => css`
 `;
 
 const selectedChip = css`
+    border: none;
+    font-family: inherit;
     display: inline-flex;
     align-items: center;
     gap: 3px;

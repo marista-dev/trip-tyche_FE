@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 import { css } from '@emotion/react';
 import { AnimatePresence, motion, PanInfo } from 'framer-motion';
@@ -9,9 +9,27 @@ interface BottomSheetProps {
     onClose: () => void;
     children: React.ReactNode;
     maxHeight?: string;
+    /** 시트 제목 요소의 id. 화면낭독기가 시트를 열 때 이 제목을 읽는다. */
+    labelledBy?: string;
 }
 
-const BottomSheet = ({ isOpen, onClose, children, maxHeight = '80vh' }: BottomSheetProps) => {
+const BottomSheet = ({ isOpen, onClose, children, maxHeight = '80vh', labelledBy }: BottomSheetProps) => {
+    const sheetRef = useRef<HTMLDivElement>(null);
+
+    /*
+     * 열리면 포커스를 시트로 옮기고, 닫히면 연 버튼으로 돌려놓는다.
+     * 안 그러면 화면낭독기 사용자는 시트가 떠도 뒤 화면을 계속 읽는다.
+     */
+    useEffect(() => {
+        if (!isOpen) return;
+        const opener = document.activeElement as HTMLElement | null;
+        const raf = requestAnimationFrame(() => sheetRef.current?.focus({ preventScroll: true }));
+        return () => {
+            cancelAnimationFrame(raf);
+            opener?.focus?.({ preventScroll: true });
+        };
+    }, [isOpen]);
+
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
@@ -53,8 +71,11 @@ const BottomSheet = ({ isOpen, onClose, children, maxHeight = '80vh' }: BottomSh
                     />
                     <motion.div
                         css={sheetStyle(maxHeight)}
+                        ref={sheetRef}
                         role='dialog'
                         aria-modal='true'
+                        aria-labelledby={labelledBy}
+                        tabIndex={-1}
                         drag='y'
                         dragConstraints={{ top: 0, bottom: 0 }}
                         dragElastic={0.2}
@@ -94,6 +115,11 @@ const sheetStyle = (maxHeight: string) => css`
     border-radius: 20px 20px 0 0;
     padding: 14px 20px 28px;
     z-index: 1101;
+
+    /* 프로그램으로 옮긴 포커스(시트 전체)에는 테두리를 그리지 않는다 */
+    &:focus {
+        outline: none;
+    }
 `;
 
 const handleBarStyle = css`
