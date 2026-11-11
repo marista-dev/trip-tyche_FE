@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { Browser } from '@capacitor/browser';
 import { css } from '@emotion/react';
+import { useLocation } from 'react-router-dom';
 
 import backgroundImage from '@/assets/images/background-mobile.webp';
 import GuestButton from '@/domains/user/components/GuestButton';
@@ -19,7 +20,9 @@ import { useToastStore } from '@/shared/stores/useToastStore';
 type Step = 0 | 1;
 
 const SigninPage = () => {
-    const [step, setStep] = useState<Step>(0);
+    // 게스트 로그인 유도 시트에서 넘어오면 소개를 건너뛰고 바로 로그인 버튼 단계를 보여준다.
+    const { state } = useLocation() as { state: { step?: Step } | null };
+    const [step, setStep] = useState<Step>(state?.step === 1 ? 1 : 0);
     const loginAsGuest = useUserStore((s) => s.loginAsGuest);
     const showToast = useToastStore((s) => s.showToast);
 

@@ -4,6 +4,7 @@ import { css } from '@emotion/react';
 import { Outlet } from 'react-router-dom';
 
 import WebSocketBanner from '@/domains/notification/banner/WebSocketBanner';
+import LoginPromptSheet from '@/domains/user/components/LoginPromptSheet';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import { socket } from '@/libs/socket';
 import AppUpdateGate from '@/platform/native/components/AppUpdateGate';
@@ -32,6 +33,7 @@ const RootLayout = () => {
             <WebSocketBanner />
             <AppUpdateGate />
             <AndroidAppPrompt />
+            <LoginPromptSheet />
         </div>
     );
 };
