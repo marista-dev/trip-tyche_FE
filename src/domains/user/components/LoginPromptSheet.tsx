@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { LoginPromptReason, useLoginPromptStore } from '@/domains/user/stores/useLoginPromptStore';
 import useUserStore from '@/domains/user/stores/useUserStore';
-import BottomSheet from '@/shared/components/common/BottomSheet';
+import SheetDialog from '@/shared/components/common/BottomSheet/SheetDialog';
 import { ROUTES } from '@/shared/constants/route';
 import { COLORS } from '@/shared/constants/style';
 
@@ -68,52 +68,39 @@ const LoginPromptSheet = () => {
     };
 
     return (
-        <BottomSheet isOpen={isOpen} onClose={close}>
-            <div css={body}>
+        <SheetDialog
+            isOpen={isOpen}
+            onClose={close}
+            icon={
                 <div css={stub}>
                     <span css={stubIcon}>
                         <Icon size={22} strokeWidth={2} />
                     </span>
                     <span css={passLabel}>GUEST PASS</span>
                 </div>
-
-                <h2 css={titleStyle}>{title}</h2>
-                <p css={descriptionStyle}>{description}</p>
-
-                <ul css={benefitList}>
-                    {BENEFITS.map((benefit) => (
-                        <li key={benefit} css={benefitItem}>
-                            <span css={checkMark}>
-                                <Check size={12} strokeWidth={3} />
-                            </span>
-                            {benefit}
-                        </li>
-                    ))}
-                </ul>
-
-                <p css={expiryNote}>
-                    <Clock size={13} strokeWidth={2.2} aria-hidden='true' />
-                    게스트 체험 기록은 4시간 뒤 사라져요
-                </p>
-
-                <button type='button' css={primaryButton} onClick={goToSignin}>
-                    로그인하고 시작하기
-                </button>
-                <button type='button' css={secondaryButton} onClick={close}>
-                    계속 둘러볼게요
-                </button>
-            </div>
-        </BottomSheet>
+            }
+            title={title}
+            description={description}
+            primary={{ label: '로그인하고 시작하기', onClick: goToSignin }}
+            tertiary={{ label: '계속 둘러볼게요', onClick: close }}
+        >
+            <ul css={benefitList}>
+                {BENEFITS.map((benefit) => (
+                    <li key={benefit} css={benefitItem}>
+                        <span css={checkMark}>
+                            <Check size={12} strokeWidth={3} />
+                        </span>
+                        {benefit}
+                    </li>
+                ))}
+            </ul>
+            <p css={expiryNote}>
+                <Clock size={13} strokeWidth={2.2} aria-hidden='true' />
+                게스트 체험 기록은 4시간 뒤 사라져요
+            </p>
+        </SheetDialog>
     );
 };
-
-const body = css`
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    padding: 4px 4px 0;
-`;
 
 const stub = css`
     position: relative;
@@ -134,7 +121,7 @@ const stub = css`
         width: 10px;
         height: 10px;
         border-radius: 50%;
-        background: #ffffff;
+        background: ${COLORS.BACKGROUND.WHITE};
         transform: translateY(-50%);
     }
     &::before {
@@ -150,7 +137,7 @@ const stubIcon = css`
     height: 40px;
     border-radius: 10px;
     background: ${COLORS.PRIMARY};
-    color: #ffffff;
+    color: ${COLORS.TEXT.WHITE};
     display: flex;
     align-items: center;
     justify-content: center;
@@ -163,34 +150,15 @@ const passLabel = css`
     color: ${COLORS.PRIMARY};
 `;
 
-const titleStyle = css`
-    margin: 0;
-    font-size: 19px;
-    font-weight: 700;
-    letter-spacing: -0.4px;
-    line-height: 1.35;
-    color: ${COLORS.TICKET_BAND};
-    word-break: keep-all;
-`;
-
-const descriptionStyle = css`
-    margin: 8px 0 0;
-    font-size: 14px;
-    line-height: 1.5;
-    color: rgba(15, 23, 42, 0.6);
-    word-break: keep-all;
-`;
-
 const benefitList = css`
     list-style: none;
-    margin: 20px 0 0;
+    margin: 0;
     padding: 14px 16px;
-    width: 100%;
     display: flex;
     flex-direction: column;
     gap: 10px;
     border-radius: 14px;
-    background: rgba(15, 23, 42, 0.03);
+    background: ${COLORS.SURFACE_SUBTLE};
     text-align: left;
 `;
 
@@ -200,7 +168,7 @@ const benefitItem = css`
     gap: 10px;
     font-size: 13px;
     font-weight: 500;
-    color: ${COLORS.TICKET_BAND};
+    color: ${COLORS.TEXT.BLACK};
 `;
 
 const checkMark = css`
@@ -208,7 +176,7 @@ const checkMark = css`
     height: 20px;
     flex-shrink: 0;
     border-radius: 50%;
-    background: rgba(0, 113, 227, 0.12);
+    background: ${COLORS.BACKGROUND.PRIMARY_LIGHT};
     color: ${COLORS.PRIMARY};
     display: flex;
     align-items: center;
@@ -216,49 +184,13 @@ const checkMark = css`
 `;
 
 const expiryNote = css`
-    margin: 14px 0 18px;
+    margin: 14px 0 0;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 5px;
     font-size: 12px;
-    color: rgba(15, 23, 42, 0.45);
-`;
-
-const primaryButton = css`
-    width: 100%;
-    height: 52px;
-    border: none;
-    border-radius: 14px;
-    background: ${COLORS.PRIMARY};
-    color: #ffffff;
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: -0.2px;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    transition: background 0.15s ease;
-
-    @media (hover: hover) {
-        &:hover {
-            background: ${COLORS.PRIMARY_HOVER};
-        }
-    }
-    &:active {
-        transform: scale(0.99);
-    }
-`;
-
-const secondaryButton = css`
-    width: 100%;
-    height: 44px;
-    margin-top: 6px;
-    border: none;
-    background: none;
-    color: rgba(15, 23, 42, 0.5);
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
+    color: ${COLORS.TEXT.DESCRIPTION_LIGHT};
 `;
 
 export default LoginPromptSheet;

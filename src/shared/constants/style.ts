@@ -45,6 +45,21 @@ export const COLORS = {
         NAV: 'rgba(255, 255, 255, 0.92)',
         DARK_CARD: '#0055d4',
     },
+    /** 입력칸 테두리 — Mantine Input 기본값과 같다. 직접 만든 입력칸도 이 값을 써야 모양이 맞는다. */
+    INPUT_BORDER: '#ced4da',
+    /** 중립 회색 단계(tailwind slate). 칩·구분선·보조 텍스트에 쓴다. */
+    SLATE: {
+        100: '#f1f5f9',
+        200: '#e2e8f0',
+        300: '#cbd5e1',
+        400: '#94a3b8',
+        500: '#64748b',
+        600: '#475569',
+        700: '#334155',
+    },
+    /** 카드 안의 옅은 면(혜택 목록·기간 비교 등) */
+    SURFACE_SUBTLE: 'rgba(15, 23, 42, 0.03)',
+    SURFACE_SOFT: 'rgba(15, 23, 42, 0.05)',
     BORDER: 'rgba(0, 0, 0, 0.08)',
     BORDER_LIGHT: 'rgba(0, 0, 0, 0.05)',
     BOX_SHADOW: {
