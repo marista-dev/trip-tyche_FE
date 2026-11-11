@@ -13,8 +13,8 @@ interface SheetAction {
 interface SheetDialogProps {
     isOpen: boolean;
     onClose: () => void;
-    /** 제목 위 아이콘 영역. 기본 배지(SheetDialog.Icon)나 직접 만든 요소를 넣는다. */
-    icon?: ReactNode;
+    /** 제목 위 작은 머리말(예: GUEST PASS). 아이콘 배지는 쓰지 않는다 — 글자 크기·굵기로만 위계를 준다. */
+    eyebrow?: ReactNode;
     title: string;
     description?: ReactNode;
     /** 설명과 버튼 사이에 들어갈 내용(혜택 목록, 기간 비교 등) */
@@ -26,13 +26,14 @@ interface SheetDialogProps {
 }
 
 /**
- * 바텀시트 형태의 확인 대화상자 — 아이콘 · 제목 · 설명 · (내용) · 버튼 3단.
+ * 바텀시트 형태의 확인 대화상자 — (머리말) · 제목 · 설명 · (내용) · 버튼.
+ * 왼쪽 정렬, 아이콘 없이 글로만 위계를 준다(애플 기본 앱·토스의 시트처럼).
  * 로그인 유도, 날짜 확인처럼 사용자의 선택을 받는 시트가 같은 모양을 쓰도록 한 곳에 둔다.
  */
 const SheetDialog = ({
     isOpen,
     onClose,
-    icon,
+    eyebrow,
     title,
     description,
     children,
@@ -42,7 +43,7 @@ const SheetDialog = ({
 }: SheetDialogProps) => (
     <BottomSheet isOpen={isOpen} onClose={onClose}>
         <div css={body}>
-            {icon}
+            {eyebrow && <p css={eyebrowStyle}>{eyebrow}</p>}
             <h2 css={titleStyle}>{title}</h2>
             {description && <p css={descriptionStyle}>{description}</p>}
             {children && <div css={content}>{children}</div>}
@@ -65,33 +66,27 @@ const SheetDialog = ({
     </BottomSheet>
 );
 
-/** 기본 아이콘 배지 — 옅은 파랑 바탕의 둥근 사각형 */
-const SheetIcon = ({ children }: { children: ReactNode }) => <span css={iconBadge}>{children}</span>;
-
-SheetDialog.Icon = SheetIcon;
-
 const body = css`
     display: flex;
     flex-direction: column;
-    align-items: center;
-    text-align: center;
-    padding: 4px 4px 0;
+    text-align: left;
+    padding: 6px 4px 0;
 `;
 
-const iconBadge = css`
-    width: 48px;
-    height: 48px;
-    margin-bottom: 16px;
-    border-radius: 14px;
-    background: ${COLORS.BACKGROUND.PRIMARY_LIGHT};
+const eyebrowStyle = css`
+    margin: 0 0 6px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
     color: ${COLORS.PRIMARY};
-    display: grid;
-    place-items: center;
 `;
 
 const titleStyle = css`
     margin: 0;
-    font-size: 19px;
+    font-size: 21px;
     font-weight: 700;
     letter-spacing: -0.4px;
     line-height: 1.35;
@@ -101,7 +96,7 @@ const titleStyle = css`
 
 const descriptionStyle = css`
     margin: 8px 0 0;
-    font-size: 14px;
+    font-size: 15px;
     line-height: 1.55;
     color: ${COLORS.TEXT.DESCRIPTION};
     word-break: keep-all;

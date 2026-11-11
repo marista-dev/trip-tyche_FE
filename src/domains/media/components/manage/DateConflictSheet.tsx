@@ -1,7 +1,6 @@
 import { useRef } from 'react';
 
 import { css } from '@emotion/react';
-import { CalendarRange } from 'lucide-react';
 
 import { DateConflict, DateConflictChoice } from '@/domains/media/hooks/usePhotoUpload';
 import { formatMonthDay, formatPeriod } from '@/domains/trip/tripDates';
@@ -35,11 +34,6 @@ const DateConflictSheet = ({ conflict, onResolve }: DateConflictSheetProps) => {
         <SheetDialog
             isOpen={Boolean(conflict)}
             onClose={() => onResolve('cancel')}
-            icon={
-                <SheetDialog.Icon>
-                    <CalendarRange size={22} strokeWidth={2} />
-                </SheetDialog.Icon>
-            }
             title='여행 기간과 날짜가 달라요'
             description={
                 <>

@@ -1,5 +1,5 @@
 import { css } from '@emotion/react';
-import { Check, Clock, ImagePlus, LucideIcon, PencilLine, Share2, Ticket, Trash2, UserRound } from 'lucide-react';
+import { Ticket } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { LoginPromptReason, useLoginPromptStore } from '@/domains/user/stores/useLoginPromptStore';
@@ -8,34 +8,28 @@ import SheetDialog from '@/shared/components/common/BottomSheet/SheetDialog';
 import { ROUTES } from '@/shared/constants/route';
 import { COLORS } from '@/shared/constants/style';
 
-const COPY: Record<LoginPromptReason, { Icon: LucideIcon; title: string; description: string }> = {
+const COPY: Record<LoginPromptReason, { title: string; description: string }> = {
     photo: {
-        Icon: ImagePlus,
         title: '사진을 올리려면 로그인이 필요해요',
         description: '내 사진의 위치와 날짜로 지도 위에 여행 경로를 그려드려요.',
     },
     trip: {
-        Icon: Ticket,
         title: '나만의 여행 티켓을 만들어보세요',
         description: '로그인하면 티켓을 발권하고 사진으로 여행을 기록할 수 있어요.',
     },
     edit: {
-        Icon: PencilLine,
         title: '저장하려면 로그인이 필요해요',
         description: '게스트 모드에서는 둘러보기만 할 수 있어요.',
     },
     profile: {
-        Icon: UserRound,
         title: '나만의 닉네임을 정해보세요',
         description: '로그인하면 프로필을 꾸미고 친구가 나를 찾을 수 있어요.',
     },
     share: {
-        Icon: Share2,
         title: '친구와 여행을 함께 보려면',
         description: '로그인하면 닉네임으로 친구를 찾아 티켓을 공유할 수 있어요.',
     },
     delete: {
-        Icon: Trash2,
         title: '체험용 여행은 삭제할 수 없어요',
         description: '로그인하면 내 여행을 자유롭게 만들고 정리할 수 있어요.',
     },
@@ -54,7 +48,7 @@ const LoginPromptSheet = () => {
     const logout = useUserStore((s) => s.logout);
     const navigate = useNavigate();
 
-    const { Icon, title, description } = COPY[reason];
+    const { title, description } = COPY[reason];
 
     const goToSignin = () => {
         close();
@@ -71,13 +65,11 @@ const LoginPromptSheet = () => {
         <SheetDialog
             isOpen={isOpen}
             onClose={close}
-            icon={
-                <div css={stub}>
-                    <span css={stubIcon}>
-                        <Icon size={22} strokeWidth={2} />
-                    </span>
-                    <span css={passLabel}>GUEST PASS</span>
-                </div>
+            eyebrow={
+                <>
+                    <Ticket size={13} strokeWidth={2.4} aria-hidden='true' />
+                    GUEST PASS
+                </>
             }
             title={title}
             description={description}
@@ -86,111 +78,33 @@ const LoginPromptSheet = () => {
         >
             <ul css={benefitList}>
                 {BENEFITS.map((benefit) => (
-                    <li key={benefit} css={benefitItem}>
-                        <span css={checkMark}>
-                            <Check size={12} strokeWidth={3} />
-                        </span>
-                        {benefit}
-                    </li>
+                    <li key={benefit}>{benefit}</li>
                 ))}
             </ul>
-            <p css={expiryNote}>
-                <Clock size={13} strokeWidth={2.2} aria-hidden='true' />
-                게스트 체험 기록은 4시간 뒤 사라져요
-            </p>
+            <p css={expiryNote}>게스트 체험 기록은 4시간 뒤 사라져요.</p>
         </SheetDialog>
     );
 };
 
-const stub = css`
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 14px 8px 8px;
-    margin-bottom: 18px;
-    border-radius: 14px;
-    background: ${COLORS.BACKGROUND.PRIMARY_LIGHT};
-
-    /* 탑승권 절취선 느낌의 양옆 노치 */
-    &::before,
-    &::after {
-        content: '';
-        position: absolute;
-        top: 50%;
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background: ${COLORS.BACKGROUND.WHITE};
-        transform: translateY(-50%);
-    }
-    &::before {
-        left: -5px;
-    }
-    &::after {
-        right: -5px;
-    }
-`;
-
-const stubIcon = css`
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    background: ${COLORS.PRIMARY};
-    color: ${COLORS.TEXT.WHITE};
-    display: flex;
-    align-items: center;
-    justify-content: center;
-`;
-
-const passLabel = css`
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 1.8px;
-    color: ${COLORS.PRIMARY};
-`;
-
+// 아이콘·체크 표시 없이 글 목록으로. 항목 사이는 얇은 구분선 대신 간격으로만 나눈다.
 const benefitList = css`
     list-style: none;
     margin: 0;
     padding: 14px 16px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
     border-radius: 14px;
     background: ${COLORS.SURFACE_SUBTLE};
-    text-align: left;
-`;
-
-const benefitItem = css`
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 13px;
-    font-weight: 500;
+    font-size: 14px;
+    line-height: 1.4;
     color: ${COLORS.TEXT.BLACK};
 `;
 
-const checkMark = css`
-    width: 20px;
-    height: 20px;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background: ${COLORS.BACKGROUND.PRIMARY_LIGHT};
-    color: ${COLORS.PRIMARY};
-    display: flex;
-    align-items: center;
-    justify-content: center;
-`;
-
 const expiryNote = css`
-    margin: 14px 0 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    font-size: 12px;
-    color: ${COLORS.TEXT.DESCRIPTION_LIGHT};
+    margin: 10px 0 0;
+    font-size: 13px;
+    color: ${COLORS.TEXT.DESCRIPTION};
 `;
 
 export default LoginPromptSheet;
