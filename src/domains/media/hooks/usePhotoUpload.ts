@@ -1,10 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 
 import { PendingPhoto } from '@/domains/media/components/manage/DateGroupSection';
 import { useImageUpload } from '@/domains/media/hooks/useImageUpload';
-import { getDateBounds, getDatesOutside, toPhotoDays } from '@/domains/trip/tripDates';
+import { getDateBounds, getDatesOutside, toDateString, toPhotoDays } from '@/domains/trip/tripDates';
 import { ANALYTICS_EVENTS, track } from '@/libs/analytics';
 import { isNative } from '@/platform';
 import { pickImagesFromGallery } from '@/platform/native/gallery';
@@ -75,6 +75,16 @@ export const usePhotoUpload = (tripKey: string, { tripRange, onExtendRange }: Us
         setDateConflict(null);
     };
 
+    // 시트가 떠 있는 채로 화면을 떠나면 취소로 마무리한다. 안 그러면 processFiles가 영원히 기다려
+    // finally(미리보기 URL 해제)가 돌지 않는다.
+    useEffect(
+        () => () => {
+            conflictResolverRef.current?.('cancel');
+            conflictResolverRef.current = null;
+        },
+        [],
+    );
+
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploadPhase, setUploadPhase] = useState<UploadPhase>('idle');
     const [pendingByDate, setPendingByDate] = useState<Record<string, PendingPhoto[]>>({});
@@ -115,8 +125,7 @@ export const usePhotoUpload = (tripKey: string, { tripRange, onExtendRange }: Us
         const stampBatch = Date.now();
         fileArray.forEach((file, idx) => {
             const stamp = Number.isFinite(file.lastModified) ? file.lastModified : Date.now();
-            const d = new Date(stamp);
-            const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            const dateKey = toDateString(new Date(stamp));
             let previewUrl: string;
             try {
                 previewUrl = URL.createObjectURL(file);
@@ -185,12 +194,14 @@ export const usePhotoUpload = (tripKey: string, { tripRange, onExtendRange }: Us
         }
     };
 
-    const uploadingText =
-        uploadPhase === 'extracting'
-            ? `사진 정보를 분석 중... ${Math.round(progress?.metadata ?? 0)}%`
-            : uploadPhase === 'uploading'
-              ? `사진 업로드 중... ${Math.round(progress?.upload ?? 0)}%`
-              : undefined;
+    // 날짜 확인 시트가 떠 있는 동안은 진행률을 숨긴다(시트 뒤로 '분석 중 100%'가 남지 않게).
+    const uploadingText = dateConflict
+        ? undefined
+        : uploadPhase === 'extracting'
+          ? `사진 정보를 분석 중... ${Math.round(progress?.metadata ?? 0)}%`
+          : uploadPhase === 'uploading'
+            ? `사진 업로드 중... ${Math.round(progress?.upload ?? 0)}%`
+            : undefined;
 
     return {
         fileInputRef,
