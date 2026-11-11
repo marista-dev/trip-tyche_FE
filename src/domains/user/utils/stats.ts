@@ -8,7 +8,7 @@ import { hasValidLocation } from '@/libs/utils/validate';
  * 설정(마이) 페이지 통계 집계용 순수 함수 모음.
  *
  * 현재는 프론트에서 여행 목록 + 여행별 media를 받아 클라이언트에서 집계한다.
- * 추후 백엔드 `GET /v1/users/me/stats`로 교체될 예정이며(`docs/prd-user-stats-api.md`),
+ * 추후 백엔드 `GET /v1/users/me/stats`로 교체될 예정이며,
  * 그 때는 useUserStats 내부만 단일 쿼리로 바꾸고 아래 타입을 그대로 재사용한다.
  */
 

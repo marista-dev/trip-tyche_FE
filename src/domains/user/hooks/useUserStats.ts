@@ -21,8 +21,8 @@ type TripMediaResult = Result<{ startDate: string; endDate: string; mediaFiles: 
  * queryKey는 사진 관리 영역(useTripImages/useTripPhotos)과 동일한 ['trip-images', tripKey]를 사용해
  * 캐시를 공유한다(select만 옵저버별로 다름).
  *
- * ⚠️ 여행 수만큼 요청이 발생하는 N+1 구조다. 추후 백엔드 `GET /v1/users/me/stats`로 교체 예정이며
- * (`docs/prd-user-stats-api.md`), 교체 시 이 훅 내부만 단일 쿼리로 바꾸면 반환 타입(UserStats)은 동일하게 유지된다.
+ * ⚠️ 여행 수만큼 요청이 발생하는 N+1 구조다. 추후 백엔드 `GET /v1/users/me/stats`로 교체 예정이며,
+ * 교체 시 이 훅 내부만 단일 쿼리로 바꾸면 반환 타입(UserStats)은 동일하게 유지된다.
  */
 export const useUserStats = (): { stats: UserStats; isLoading: boolean; isError: boolean } => {
     const tripsQuery = useTripTicketList(true);
