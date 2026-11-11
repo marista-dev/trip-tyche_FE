@@ -9,6 +9,7 @@ import { useTripTicketList } from '@/domains/trip/hooks/queries';
 import { Trip } from '@/domains/trip/types';
 import { useSummary } from '@/domains/user/hooks/queries';
 import useUserStore from '@/domains/user/stores/useUserStore';
+import { ANALYTICS_EVENTS, track } from '@/libs/analytics';
 import { tripAPI } from '@/libs/apis';
 import { toResult } from '@/libs/apis/shared/utils';
 import Button from '@/shared/components/common/Button';
@@ -68,6 +69,8 @@ const MainPage = () => {
     const createNewTrip = async () => {
         const result = await toResult(() => tripAPI.createNewTrip());
         if (result.success) {
+            // 여행 생성 퍼널 집계. 실패한 생성은 세지 않도록 success 분기 안에서만 보낸다.
+            track(ANALYTICS_EVENTS.TRIP_CREATED);
             const { tripKey } = result.data;
             navigate(`${ROUTES.PATH.TRIP.NEW(tripKey!)}`);
         } else {

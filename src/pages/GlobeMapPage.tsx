@@ -20,6 +20,7 @@ import { NICKNAME_FORM } from '@/domains/user/constants';
 import { useSummary } from '@/domains/user/hooks/queries';
 import { useNickname } from '@/domains/user/hooks/useNickname';
 import useUserStore from '@/domains/user/stores/useUserStore';
+import { ANALYTICS_EVENTS, track } from '@/libs/analytics';
 import { tripAPI } from '@/libs/apis';
 import { toResult } from '@/libs/apis/shared/utils';
 import { validateUserNickName } from '@/libs/utils/validate';
@@ -569,6 +570,8 @@ const GlobeMapPage = () => {
     const handleCreateFirst = async () => {
         const result = await toResult(() => tripAPI.createNewTrip());
         if (result.success) {
+            // 여행 생성 퍼널 집계. 실패한 생성은 세지 않도록 success 분기 안에서만 보낸다.
+            track(ANALYTICS_EVENTS.TRIP_CREATED);
             navigate(ROUTES.PATH.TRIP.NEW(result.data.tripKey!));
         } else {
             showToast(result.error);
