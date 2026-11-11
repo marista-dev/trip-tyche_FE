@@ -8,6 +8,7 @@ import ShareModal from '@/domains/share/components/ShareModal';
 import { getIataFromCountryString } from '@/domains/trip/airport';
 import TripTicketActionSheet from '@/domains/trip/components/TripTicketActionSheet';
 import { TICKET } from '@/domains/trip/constants';
+import { formatDuration } from '@/domains/trip/tripDates';
 import { Trip } from '@/domains/trip/types';
 import { useMemberOnly } from '@/domains/user/hooks/useMemberOnly';
 import useUserStore from '@/domains/user/stores/useUserStore';
@@ -62,12 +63,7 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
     const formattedEndDate = isCompletedTrip ? formatToDot(endDate) : '—';
     const sharedPeople = [ownerNickname || '', ...(sharedUsersNicknames || [])];
 
-    const durationLabel = (() => {
-        if (!isCompletedTrip) return '—';
-        const days =
-            Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
-        return days > 1 ? `${days - 1}박 ${days}일` : '당일치기';
-    })();
+    const durationLabel = isCompletedTrip ? (formatDuration(startDate, endDate) ?? '—') : '—';
 
     const seedHue = (tripTitle.charCodeAt(0) + tripTitle.charCodeAt(tripTitle.length - 1)) % 360;
     const fallbackBg = `linear-gradient(135deg, oklch(0.7 0.08 ${seedHue}) 0%, oklch(0.35 0.08 ${seedHue + 40}) 100%)`;

@@ -3,6 +3,7 @@ import { Plane } from 'lucide-react';
 
 import { getIataFromCountryString } from '@/domains/trip/airport';
 import { TICKET } from '@/domains/trip/constants';
+import { formatDuration, toLocalDate } from '@/domains/trip/tripDates';
 import { TripInfo } from '@/domains/trip/types';
 import { COLORS } from '@/shared/constants/style';
 
@@ -19,8 +20,8 @@ const ACCENT = COLORS.PRIMARY;
 
 const formatShort = (iso: string) => {
     if (!iso) return '';
-    const dt = new Date(iso);
-    if (isNaN(+dt)) return iso;
+    const dt = toLocalDate(iso);
+    if (!dt) return iso;
     const yy = String(dt.getFullYear()).slice(2);
     const mm = String(dt.getMonth() + 1).padStart(2, '0');
     const dd = String(dt.getDate()).padStart(2, '0');
@@ -31,14 +32,7 @@ const seededHue = (seed: string) => (seed.charCodeAt(0) || 65) % 360;
 
 const calcDuration = (start: string, end: string, isDayTrip: boolean) => {
     if (isDayTrip) return '당일치기';
-    if (!start || !end) return '—';
-    const s = new Date(start);
-    const e = new Date(end);
-    if (isNaN(+s) || isNaN(+e)) return '—';
-    const days = Math.round((+e - +s) / 86400000) + 1;
-    if (!isFinite(days) || days <= 0) return '—';
-    if (days === 1) return '당일치기';
-    return `${days - 1}박 ${days}일`;
+    return formatDuration(start, end) ?? '—';
 };
 
 const MiniTicketPreview = ({

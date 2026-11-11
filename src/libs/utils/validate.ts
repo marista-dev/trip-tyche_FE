@@ -18,14 +18,19 @@ export const validateUserNickName = (inputValue: string, minLength = 2, maxLengt
 };
 
 // 폼의 모든 필드에 입력했는지 검사
+/*
+ * 여행 정보 필수값 검사. 예전 구현은 Object.keys로 '키 이름'을 검사해 항상 true였다 —
+ * 날짜·나라가 비어도 등록 버튼이 눌려 서버 검증(@NotBlank)에서야 실패했다.
+ * 서버 응답에는 confirmed:false, shareId:null 같은 값도 섞이므로 필수 필드만 명시해 본다.
+ */
 export const validateFormComplete = (form: TripInfo) =>
-    Object.keys(form).every((value) => {
-        if (Array.isArray(value)) {
-            return value.length > 0;
-        } else {
-            return Boolean(value);
-        }
-    });
+    Boolean(form.tripTitle?.trim()) &&
+    Boolean(form.country) &&
+    Boolean(form.startDate) &&
+    Boolean(form.endDate) &&
+    form.startDate <= form.endDate &&
+    Array.isArray(form.hashtags) &&
+    form.hashtags.length > 0;
 
 // 유효한 위치인지 검사
 export const hasValidLocation = (location: Location | null): boolean =>

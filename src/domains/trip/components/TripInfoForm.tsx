@@ -2,49 +2,26 @@ import { Dispatch, SetStateAction, useEffect, useState } from 'react';
 
 import { css } from '@emotion/react';
 import { Select } from '@mantine/core';
-import { DatePickerInput, DayProps, DateValue, DatesRangeValue } from '@mantine/dates';
+import { DatePickerInput, DatesRangeValue } from '@mantine/dates';
 import 'dayjs/locale/ko';
-import dayjs from 'dayjs';
 import { Plane, Calendar, Globe, X } from 'lucide-react';
 
 import { COUNTRIES, FORM } from '@/domains/trip/constants';
-import { useTripDateRange } from '@/domains/trip/hooks/useTripDateRange';
+import {
+    formatDuration,
+    formatMonthDay,
+    formatRange,
+    getDateBounds,
+    getDatesOutside,
+    toDateString,
+    toLocalDate,
+    toPhotoDays,
+} from '@/domains/trip/tripDates';
 import { Trip } from '@/domains/trip/types';
 import Input from '@/shared/components/common/Input';
 import theme from '@/shared/styles/theme';
 
-// 여행 컨텍스트에 맞는 날짜 포맷 — 양쪽 날짜를 풀어 쓰고 요일을 함께 표기.
-// 예: "2025.03.05 (수) ~ 03.09 (일)"  또는  "2024.12.31 (화) ~ 2025.01.05 (일)"
-const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
-
-const withWeekday = (d: dayjs.Dayjs, includeYear: boolean) =>
-    `${d.format(includeYear ? 'YYYY.MM.DD' : 'MM.DD')} (${WEEKDAYS[d.day()]})`;
-
-const formatCompactSingle = (d: Date | string) => withWeekday(dayjs(d), true);
-
-const formatCompactRange = (start: Date | string | null, end: Date | string | null) => {
-    if (!start) return '';
-    if (!end) return formatCompactSingle(start);
-    const s = dayjs(start);
-    const e = dayjs(end);
-    if (s.isSame(e, 'day')) return formatCompactSingle(start);
-    if (s.year() !== e.year()) return `${withWeekday(s, true)} ~ ${withWeekday(e, true)}`;
-    return `${withWeekday(s, true)} ~ ${withWeekday(e, false)}`;
-};
-
-// 기간 요약 — "당일" / "N박 N일"
-const formatDuration = (start: string | null | undefined, end: string | null | undefined) => {
-    if (!start || !end) return null;
-    const days = dayjs(end).diff(dayjs(start), 'day') + 1;
-    if (days <= 0) return null;
-    if (days === 1) return '당일';
-    return `${days - 1}박 ${days}일`;
-};
-
-type DateSelectType = 'range' | 'single';
-type DateChangeHandler = (value: DateValue | DatesRangeValue) => void;
 interface TripInfoFormProps {
-    isEditing?: boolean;
     tripForm: Trip;
     onChangeTripInfo: Dispatch<SetStateAction<Trip>>;
 }
@@ -55,40 +32,41 @@ const HASHTAG_MAX_LEN = 12;
 // 추천 태그 — 풀 메뉴는 너무 길어 가독성을 해치므로 대표 3개만 노출.
 const HASHTAG_SUGGESTIONS = FORM.HASHTAG_MENU.slice(0, 3);
 
-const TripInfoForm = ({ isEditing = false, tripForm, onChangeTripInfo }: TripInfoFormProps) => {
-    const { tripTitle, country, startDate, endDate, hashtags, mediaFilesDates: imageDates = [] } = tripForm;
-    const [dateSelectType, setDateSelectType] = useState<DateSelectType>('range');
-    const [isSelectRange, setIsSelectRange] = useState<boolean>(true);
+const TripInfoForm = ({ tripForm, onChangeTripInfo }: TripInfoFormProps) => {
+    const { tripTitle, country, startDate, endDate, hashtags, mediaFilesDates = [] } = tripForm;
     const [tagInput, setTagInput] = useState('');
+    // 시작일만 고른 '진행 중' 상태. 끝날까지 고르면 tripForm에 반영하고 비운다.
+    const [draftRange, setDraftRange] = useState<DatesRangeValue | null>(null);
 
-    const defaultStartDate = imageDates[0];
-    const defaultEndDate = imageDates[imageDates.length - 1];
+    const photoDays = toPhotoDays(mediaFilesDates);
+    const photoBounds = getDateBounds(photoDays);
+    const outsideDates = getDatesOutside(photoDays, startDate, endDate);
 
-    const datePickerProps = useTripDateRange({
-        imageDates,
-        onChangeTripInfo,
-    });
+    const setRange = (start: string, end: string) =>
+        onChangeTripInfo((prev: Trip) => ({ ...prev, startDate: start, endDate: end }));
 
+    /*
+     * 사진 날짜로 기간을 미리 채운다. 예전엔 사진 기간을 회색 placeholder로만 보여줘
+     * 채워진 것처럼 보이는데 값은 비어 있어 '등록하기'가 막혔다.
+     */
     useEffect(() => {
-        if (imageDates.length === 1) {
-            setIsSelectRange(false);
-            setDateSelectType('single');
-        }
-    }, []);
+        if (!startDate && !endDate && photoBounds) setRange(photoBounds.start, photoBounds.end);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [photoBounds?.start, photoBounds?.end]);
 
-    useEffect(() => {
-        if (!isEditing) {
-            datePickerProps?.resetDates();
+    const handleDateChange = (value: DatesRangeValue) => {
+        const [from, to] = value;
+        if (from && to) {
+            setDraftRange(null);
+            setRange(toDateString(from), toDateString(to));
+            return;
         }
-    }, [dateSelectType]);
-
-    const toggleDayTrip = () => {
-        const next = dateSelectType === 'range' ? 'single' : 'range';
-        setDateSelectType(next);
-        setIsSelectRange(next === 'range');
+        setDraftRange(value);
     };
 
-    const isDayTrip = dateSelectType === 'single';
+    const pickerValue: DatesRangeValue = draftRange ?? [toLocalDate(startDate), toLocalDate(endDate)];
+    const duration = formatDuration(startDate, endDate);
+    const photoDaySet = new Set(photoDays);
 
     const removeTag = (tag: string) => {
         onChangeTripInfo((prev: Trip) => ({
@@ -120,28 +98,6 @@ const TripInfoForm = ({ isEditing = false, tripForm, onChangeTripInfo }: TripInf
     const remainingSuggestions = HASHTAG_SUGGESTIONS.filter((t) => !hashtags.includes(t));
     const isFull = hashtags.length >= HASHTAG_MAX;
 
-    const handleDateChange: DateChangeHandler = (value) => {
-        if (dateSelectType === 'range' && Array.isArray(value)) {
-            datePickerProps?.handleRangeDateChange(value as [DateValue, DateValue]);
-        } else if (dateSelectType === 'single' && !Array.isArray(value)) {
-            datePickerProps?.handleSingleDateChange(value as DateValue);
-        }
-    };
-
-    const renderCustomDay = (date: Date) => {
-        const isImage = imageDates.some(
-            (imageDate) => dayjs(imageDate).format('YYYY-MM-DD') === dayjs(date).format('YYYY-MM-DD'),
-        );
-        const isSelected = datePickerProps?.isStartOrEndDate(date) ?? false;
-
-        return (
-            <div css={dayContainerStyle}>
-                {isImage && <div css={dayIndicatorStyle(isSelected)} />}
-                {date.getDate()}
-            </div>
-        );
-    };
-
     const countryData = COUNTRIES.map((country) => ({
         value: `${country.value}`,
         label: `${country.emoji} ${country.nameKo}`,
@@ -150,91 +106,59 @@ const TripInfoForm = ({ isEditing = false, tripForm, onChangeTripInfo }: TripInf
     return (
         <div css={card}>
             <section>
-                <div css={titleRow}>
-                    <h2 css={fieldLabel}>{FORM.TITLE.DATE}</h2>
-                    <button type='button' css={togglePill} onClick={toggleDayTrip} aria-pressed={isDayTrip}>
-                        <span css={toggleTrack(isDayTrip)}>
-                            <span css={toggleKnob(isDayTrip)} />
-                        </span>
-                        <span css={toggleText(isDayTrip)}>당일치기</span>
-                    </button>
-                </div>
+                <h2 css={[fieldLabel, labelGap]}>{FORM.TITLE.DATE}</h2>
                 <DatePickerInput
-                    type={isSelectRange ? 'range' : 'default'}
-                    placeholder={
-                        !defaultStartDate || !defaultEndDate
-                            ? '여행 기간을 선택해주세요'
-                            : isSelectRange
-                              ? formatCompactRange(defaultStartDate, defaultEndDate)
-                              : formatCompactSingle(defaultStartDate)
-                    }
-                    value={
-                        datePickerProps.isInitialized
-                            ? isSelectRange
-                                ? [startDate ? new Date(startDate) : null, endDate ? new Date(endDate) : null]
-                                : startDate
-                                  ? new Date(startDate)
-                                  : null
-                            : isSelectRange
-                              ? datePickerProps?.dateRange
-                              : datePickerProps?.selectedDate
-                    }
+                    type='range'
+                    // 같은 날을 두 번 누르면 당일치기. 기본값(false)이면 선택이 풀려 하루짜리 여행을 못 고른다.
+                    allowSingleDateInRange
+                    placeholder='여행 기간을 선택해주세요'
+                    value={pickerValue}
+                    onChange={handleDateChange}
                     leftSection={<Calendar size={16} />}
                     locale='ko'
                     size='md'
                     radius='md'
-                    valueFormat='YYYY.MM.DD'
-                    valueFormatter={({ type, date }) => {
-                        if (type === 'range' && Array.isArray(date)) {
-                            return formatCompactRange(date[0] as Date | null, date[1] as Date | null);
-                        }
-                        if (date instanceof Date) return formatCompactSingle(date);
-                        return '';
-                    }}
-                    defaultDate={imageDates[0] ? new Date(imageDates[0]) : undefined}
-                    onChange={handleDateChange}
-                    onMouseLeave={datePickerProps?.handleDateMouseLeave}
-                    popoverProps={{ position: 'bottom' }}
+                    valueFormatter={({ date }) =>
+                        Array.isArray(date) ? formatRange(date[0] as Date | null, date[1] as Date | null) : ''
+                    }
+                    defaultDate={toLocalDate(startDate) ?? toLocalDate(photoBounds?.start) ?? undefined}
+                    popoverProps={{ position: 'bottom', onClose: () => setDraftRange(null) }}
                     classNames={{ input: 'trip-date-input' }}
                     css={datePickerInputNowrap}
-                    getDayProps={(date: Date) => {
-                        const defaultProps: Omit<Partial<DayProps>, 'classNames' | 'styles' | 'vars'> = {
-                            disabled: false,
-                            onMouseEnter: () => {},
-                            selected: false,
-                        };
-
-                        return (
-                            datePickerProps?.getCustomDayProps(
-                                date,
-                                datePickerProps.handleDateMouseEnter,
-                                dateSelectType,
-                            ) ?? defaultProps
-                        );
-                    }}
-                    renderDay={(date) => renderCustomDay(date)}
-                />
-                {(() => {
-                    const duration = formatDuration(startDate, endDate);
-                    return (
-                        <div css={dateMetaRow}>
-                            {duration && (
-                                <span css={durationBadge}>
-                                    <span css={durationDot} aria-hidden />
-                                    {duration}
-                                </span>
-                            )}
-                            {datePickerProps?.isError ? (
-                                <span css={errorStyle}>
-                                    선택하신 날짜 외에도 사진이 있어요.
-                                    {isSelectRange && ' 기간을 다시 확인해 주세요.'}
-                                </span>
-                            ) : (
-                                <span css={dateDescriptionStyle}>사진이 있는 날짜는 파란 점으로 표시됩니다</span>
-                            )}
+                    renderDay={(date) => (
+                        <div css={dayContainerStyle}>
+                            {photoDaySet.has(toDateString(date)) && <div css={dayIndicatorStyle} />}
+                            {date.getDate()}
                         </div>
-                    );
-                })()}
+                    )}
+                />
+                <div css={dateMetaRow}>
+                    {duration && (
+                        <span css={durationBadge}>
+                            <span css={durationDot} aria-hidden />
+                            {duration}
+                        </span>
+                    )}
+                    {outsideDates.length > 0 && photoBounds ? (
+                        <span css={errorStyle}>
+                            {formatMonthDay(outsideDates[0])}
+                            {outsideDates.length > 1 && ` 외 ${outsideDates.length - 1}일`} 사진이 기간 밖에 있어요.
+                            <button
+                                type='button'
+                                css={fitButton}
+                                onClick={() => setRange(photoBounds.start, photoBounds.end)}
+                            >
+                                사진 날짜에 맞추기
+                            </button>
+                        </span>
+                    ) : (
+                        <span css={dateDescriptionStyle}>
+                            {draftRange?.[0]
+                                ? '끝나는 날을 골라주세요 · 같은 날을 한 번 더 누르면 당일치기'
+                                : '사진이 있는 날짜는 파란 점으로 표시됩니다'}
+                        </span>
+                    )}
+                </div>
             </section>
 
             <section>
@@ -344,50 +268,27 @@ const titleRow = css`
     margin-bottom: 12px;
 `;
 
+const labelGap = css`
+    margin-bottom: 12px;
+`;
+
+const fitButton = css`
+    margin-left: 6px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: ${ACCENT};
+    font-size: inherit;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+`;
+
 const fieldLabel = css`
     font-size: ${theme.FONT_SIZES.MD};
     font-weight: bold;
     color: ${theme.COLORS.TEXT.BLACK};
-`;
-
-const togglePill = css`
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    user-select: none;
-    background: none;
-    border: none;
-    padding: 0;
-`;
-
-const toggleTrack = (on: boolean) => css`
-    width: 36px;
-    height: 20px;
-    border-radius: 100px;
-    background: ${on ? ACCENT : '#e2e8f0'};
-    position: relative;
-    transition: background 0.2s;
-    flex-shrink: 0;
-`;
-
-const toggleKnob = (on: boolean) => css`
-    position: absolute;
-    top: 2px;
-    left: ${on ? '17px' : '2px'};
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
-    transition: left 0.2s;
-`;
-
-const toggleText = (on: boolean) => css`
-    font-size: 11px;
-    font-weight: 700;
-    color: ${on ? ACCENT : '#94a3b8'};
-    transition: color 0.2s;
 `;
 
 const hashtagCount = (isFull: boolean) => css`
@@ -554,14 +455,16 @@ const dayContainerStyle = css`
     position: relative;
 `;
 
-const dayIndicatorStyle = (isSelected?: boolean) => css`
+// 선택된 날(파란 배경) 위에서도 보이도록 흰 테두리를 두른다.
+const dayIndicatorStyle = css`
     position: absolute;
     top: -2px;
     left: 50%;
     transform: translateX(-50%);
     width: 5px;
     height: 5px;
-    background-color: ${isSelected ? 'white' : theme.COLORS.PRIMARY};
+    background-color: ${theme.COLORS.PRIMARY};
+    box-shadow: 0 0 0 1px #fff;
     border-radius: 50%;
     z-index: 2;
 `;

@@ -100,7 +100,7 @@ const TripInfoEditPage = () => {
                     <MiniTicketPreview trip={tripForm} ownerNickname={userInfo?.nickname} />
                     <p css={previewHint}>↓ 아래를 편집하면 티켓이 실시간으로 바뀌어요</p>
                 </div>
-                <TripInfoForm isEditing={true} tripForm={tripForm} onChangeTripInfo={setTripForm} />
+                <TripInfoForm tripForm={tripForm} onChangeTripInfo={setTripForm} />
                 <div css={buttonWrapper}>
                     <Button
                         text={`여행 ${isDraft ? '등록' : '수정'}하기`}

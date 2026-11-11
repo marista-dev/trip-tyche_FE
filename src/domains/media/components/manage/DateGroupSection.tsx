@@ -5,6 +5,7 @@ import PendingPhotoCell from '@/domains/media/components/manage/PendingPhotoCell
 import PhotoGridCell from '@/domains/media/components/manage/PhotoGridCell';
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
 import { MediaFile } from '@/domains/media/types';
+import { toLocalDate } from '@/domains/trip/tripDates';
 
 export interface PendingPhoto {
     id: string;
@@ -25,8 +26,8 @@ const COLUMNS = 3;
 const GRID_GAP = 6;
 
 const formatLabel = (recordDate: string) => {
-    const d = new Date(recordDate);
-    if (Number.isNaN(d.getTime())) return recordDate;
+    const d = toLocalDate(recordDate);
+    if (!d) return recordDate;
     const month = d.getMonth() + 1;
     const day = d.getDate();
     const weekday = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];

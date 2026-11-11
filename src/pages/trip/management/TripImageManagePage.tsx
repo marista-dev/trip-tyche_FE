@@ -27,6 +27,7 @@ import {
     getImageGroupByDate,
 } from '@/domains/media/utils';
 import { useTripInfo } from '@/domains/trip/hooks/queries';
+import { toLocalDate } from '@/domains/trip/tripDates';
 import { useMemberOnly } from '@/domains/user/hooks/useMemberOnly';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import InlineDatePickSheet from '@/pages/trip/management/InlineDatePickSheet';
@@ -38,9 +39,9 @@ import { useToastStore } from '@/shared/stores/useToastStore';
 
 const formatDateRange = (start?: string, end?: string): string => {
     if (!start || !end) return '';
-    const s = new Date(start);
-    const e = new Date(end);
-    if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return '';
+    const s = toLocalDate(start);
+    const e = toLocalDate(end);
+    if (!s || !e) return '';
     const days = Math.max(1, Math.round((e.getTime() - s.getTime()) / 86_400_000) + 1);
     const fmt = (d: Date) => `${d.getMonth() + 1}월 ${d.getDate()}일`;
     if (s.toDateString() === e.toDateString()) return `${fmt(s)} · 1일`;
