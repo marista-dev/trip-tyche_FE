@@ -16,7 +16,6 @@ export interface ShareModalProps {
     tripTitle: string;
     isOwner: boolean;
     sharedPeople: string[];
-    /** 티켓과 같은 날짜 표기("2025.11.11 (화)" / "2025.10.03 (금) — 10.05 (일)") */
     dateLine: string;
     onClose: () => void;
 }

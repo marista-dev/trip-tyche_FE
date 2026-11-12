@@ -30,7 +30,6 @@ interface TripInfoFormProps {
     onChangeTripInfo: Dispatch<SetStateAction<Trip>>;
     /** 여행지 추정용 사진 GPS */
     photoLocations?: PhotoLocation[];
-    /** 당일여행 토글 상태 — 미리보기 티켓(AIR ↔ 1-Day 패스)을 토글에 맞춰 바꾼다 */
     onDayTripChange?: (isDayTrip: boolean) => void;
 }
 
@@ -138,7 +137,7 @@ const TripInfoForm = ({
             setRange(before.start, before.end);
             return;
         }
-        // 되돌릴 기간이 없으면 끝나는 날을 비워 고르게 한다 — 하루짜리로 남으면 끈 토글과 티켓 모양이 어긋난다
+        // 하루짜리로 남겨 두면 토글은 꺼졌는데 미리보기는 1-Day 패스로 남는다
         if (startDate && endDate === startDate) setRange(startDate, '');
     };
 
@@ -243,7 +242,6 @@ const TripInfoForm = ({
                     />
                 )}
                 <div css={dateMetaRow}>
-                    {/* 당일여행이면 토글이 이미 보여준다 */}
                     {duration && !isDayTrip && (
                         <span css={durationBadge}>
                             <span css={durationDot} aria-hidden />
@@ -379,7 +377,7 @@ const titleRow = css`
     }
 `;
 
-// Mantine Switch에 폼 글자 규격을 맞추고, 줄 높이는 그대로 둔 채 터치 영역만 44px로 넓힌다.
+// 줄 높이는 그대로 두고 터치 영역만 44px로 넓힌다
 const dayTripSwitch = css`
     .mantine-Switch-body {
         align-items: center;

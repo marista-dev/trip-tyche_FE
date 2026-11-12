@@ -4,6 +4,8 @@ import { Plane } from 'lucide-react';
 import DayPassTicket from '@/domains/trip/components/ticket/DayPassTicket';
 import { notchMask } from '@/domains/trip/components/ticket/notchMask';
 import RouteEnd from '@/domains/trip/components/ticket/RouteEnd';
+import { DAY_PASS_HEIGHT } from '@/domains/trip/components/ticket/ticketGeometry';
+import { ticketPhoto } from '@/domains/trip/components/ticket/ticketPhoto';
 import { getTicketView } from '@/domains/trip/ticketView';
 import { TripInfo } from '@/domains/trip/types';
 import { COLORS } from '@/shared/constants/style';
@@ -13,9 +15,9 @@ interface MiniTicketPreviewProps {
     ownerNickname?: string;
     coverPhotoUrl?: string;
     photoCount?: number;
-    sample?: boolean;
-    /** 정해지면 날짜 대신 이 값으로 1-Day 패스/탑승권을 고른다 — 등록·수정 화면은 당일여행 토글을 따른다 */
-    dayTrip?: boolean;
+    isSample?: boolean;
+    /** 지정하면 날짜 대신 이 값으로 1-Day 패스/탑승권을 고른다 */
+    isDayTrip?: boolean;
 }
 
 const MiniTicketPreview = ({
@@ -23,15 +25,16 @@ const MiniTicketPreview = ({
     ownerNickname = '여행자',
     coverPhotoUrl,
     photoCount,
-    sample = false,
-    dayTrip,
+    isSample = false,
+    isDayTrip,
 }: MiniTicketPreviewProps) => {
-    const { from, to, placeEn, isDayTrip, dateLine, duration, fallbackBg } = getTicketView(trip);
-    const photosLabel = typeof photoCount === 'number' ? `${photoCount}장` : '—';
+    const ticketView = getTicketView(trip);
+    const { from, to, placeEn, dateLine, duration, fallbackBg } = ticketView;
+    const photoCountLabel = typeof photoCount === 'number' ? `${photoCount}장` : '—';
     const title = trip.tripTitle || <span css={titleFaint}>여행 제목</span>;
-    const previewBadgeEl = sample && <div css={previewBadge}>미리보기</div>;
+    const previewBadge = isSample && <div css={previewBadgeStyle}>미리보기</div>;
 
-    if (dayTrip ?? isDayTrip) {
+    if (isDayTrip ?? ticketView.isDayTrip) {
         return (
             <DayPassTicket
                 title={title}
@@ -41,9 +44,8 @@ const MiniTicketPreview = ({
                 photoUrl={coverPhotoUrl}
                 photoAlt={trip.tripTitle}
                 fallbackBg={fallbackBg}
-                // 등록 화면은 폼이 아래에 이어지므로 낮게. 그 외는 탑승권 미리보기(약 270px)와 맞춰 토글 때 폼이 밀리지 않게
-                height={sample ? 208 : 270}
-                action={previewBadgeEl}
+                height={isSample ? DAY_PASS_HEIGHT.compactPreview : DAY_PASS_HEIGHT.preview}
+                action={previewBadge}
             />
         );
     }
@@ -51,26 +53,26 @@ const MiniTicketPreview = ({
     return (
         <div css={cardShadow}>
             <div css={card}>
-                <div css={top(fallbackBg)}>
-                    {coverPhotoUrl && <img src={coverPhotoUrl} alt={trip.tripTitle} css={coverImage} />}
+                <div css={hero(fallbackBg)}>
+                    {coverPhotoUrl && <img src={coverPhotoUrl} alt={trip.tripTitle} css={ticketPhoto} />}
                     <div css={overlay} />
                     <div css={brandChip}>
                         <span css={brandDot} />
                         TYCHE AIR
                     </div>
-                    {previewBadgeEl && <div css={previewBadgePosition}>{previewBadgeEl}</div>}
-                    <div css={topInfo}>
+                    {previewBadge && <div css={previewBadgePosition}>{previewBadge}</div>}
+                    <div css={heroText}>
                         <div css={dateText}>{dateLine || '여행 기간'}</div>
                         <div css={titleText}>{title}</div>
                     </div>
                 </div>
-                <div css={bottom}>
+                <div css={band}>
                     <div css={routeRow}>
-                        <RouteEnd point={from} side='from' size={20} />
+                        <RouteEnd point={from} side='from' codeFontSize={20} />
                         <div css={dashLine} />
                         <Plane size={13} color='#fff' />
                         <div css={dashLine} />
-                        <RouteEnd point={to} side='to' size={20} />
+                        <RouteEnd point={to} side='to' codeFontSize={20} />
                     </div>
                     <div css={metaRow}>
                         <div>
@@ -83,15 +85,15 @@ const MiniTicketPreview = ({
                         </div>
                         <div>
                             <div css={metaLabel}>PHOTOS</div>
-                            <div css={metaValueAccent}>{photosLabel}</div>
+                            <div css={metaValueAccent}>{photoCountLabel}</div>
                         </div>
                     </div>
                     {trip.hashtags?.length > 0 && (
                         <div css={tags}>
-                            {trip.hashtags.map((t) => (
-                                <span key={t} css={tag}>
-                                    <span css={hash}>#</span>
-                                    {t}
+                            {trip.hashtags.map((hashtag) => (
+                                <span key={hashtag} css={tag}>
+                                    <span css={hashMark}>#</span>
+                                    {hashtag}
                                 </span>
                             ))}
                         </div>
@@ -102,40 +104,34 @@ const MiniTicketPreview = ({
     );
 };
 
-const TOP_HEIGHT = 140;
+const MINI_BOARDING_PASS = {
+    radius: 18,
+    heroHeight: 140,
+    notchRadius: 7,
+    notchInset: 25,
+} as const;
 
-// mask가 자기 box-shadow까지 자르므로 그림자는 바깥 요소에 둔다.
-// 구멍이 카드 안쪽이라 box-shadow(테두리 안쪽엔 안 그려짐)여야 구멍 속이 회색이 아니라 배경 그대로 보인다
 const cardShadow = css`
-    border-radius: 18px;
+    border-radius: ${MINI_BOARDING_PASS.radius}px;
     box-shadow: 0 14px 36px rgba(15, 23, 42, 0.18);
 `;
 
-// 사진과 띠 경계의 반원 구멍을 실제로 뚫는다 — 어느 페이지 배경 위에서도 자연스럽게
 const card = css`
     position: relative;
-    border-radius: 18px;
+    border-radius: ${MINI_BOARDING_PASS.radius}px;
     overflow: hidden;
     background: ${COLORS.TICKET_BAND};
-    ${notchMask(7, [
-        ['25px', `${TOP_HEIGHT}px`],
-        ['calc(100% - 25px)', `${TOP_HEIGHT}px`],
+    ${notchMask(MINI_BOARDING_PASS.notchRadius, [
+        [`${MINI_BOARDING_PASS.notchInset}px`, `${MINI_BOARDING_PASS.heroHeight}px`],
+        [`calc(100% - ${MINI_BOARDING_PASS.notchInset}px)`, `${MINI_BOARDING_PASS.heroHeight}px`],
     ])}
 `;
 
-const top = (fallback: string) => css`
+const hero = (fallbackBg: string) => css`
     position: relative;
-    height: ${TOP_HEIGHT}px;
-    background: ${fallback};
+    height: ${MINI_BOARDING_PASS.heroHeight}px;
+    background: ${fallbackBg};
     overflow: hidden;
-`;
-
-const coverImage = css`
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
 `;
 
 const overlay = css`
@@ -174,7 +170,7 @@ const previewBadgePosition = css`
     right: 13px;
 `;
 
-const previewBadge = css`
+const previewBadgeStyle = css`
     flex-shrink: 0;
     font-size: 9px;
     font-weight: 700;
@@ -184,7 +180,7 @@ const previewBadge = css`
     border-radius: 100px;
 `;
 
-const topInfo = css`
+const heroText = css`
     position: absolute;
     bottom: 12px;
     left: 16px;
@@ -213,7 +209,7 @@ const titleFaint = css`
     opacity: 0.55;
 `;
 
-const bottom = css`
+const band = css`
     position: relative;
     background: ${COLORS.TICKET_BAND};
     color: #fff;
@@ -272,7 +268,7 @@ const tag = css`
     font-size: 10.5px;
 `;
 
-const hash = css`
+const hashMark = css`
     color: ${COLORS.PRIMARY};
     font-weight: 700;
     margin-right: 2px;

@@ -23,7 +23,6 @@ import { useToastStore } from '@/shared/stores/useToastStore';
 const TripInfoEditPage = () => {
     const [tripForm, setTripForm] = useState<TripInfo>(FORM.INITIAL);
     const [isTripFinalizing, setIsTripFinalizing] = useState(false);
-    // 미리보기 티켓 모양은 날짜가 아니라 당일여행 토글이 정한다
     const [isDayTrip, setIsDayTrip] = useState(false);
     const showToast = useToastStore((state) => state.showToast);
     const userInfo = useUserStore((state) => state.userInfo);
@@ -93,7 +92,7 @@ const TripInfoEditPage = () => {
             />
             <main css={mainStyle}>
                 <div css={previewWrapper}>
-                    <MiniTicketPreview trip={tripForm} ownerNickname={userInfo?.nickname} dayTrip={isDayTrip} />
+                    <MiniTicketPreview trip={tripForm} ownerNickname={userInfo?.nickname} isDayTrip={isDayTrip} />
                     <p css={previewHint}>↓ 아래를 편집하면 티켓이 실시간으로 바뀌어요</p>
                 </div>
                 <TripInfoForm

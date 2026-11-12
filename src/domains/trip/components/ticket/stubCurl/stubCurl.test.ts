@@ -1,21 +1,23 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { GLASS, parseLinearGradient, STUB_LAYERS } from '@/domains/trip/components/ticket/stubCurl/bakeStub';
+import { STUB_LAYERS } from '@/domains/trip/components/ticket/stubCurl/bakeStub';
+import { parseLinearGradient } from '@/domains/trip/components/ticket/stubCurl/cssGradient';
 import { createCurlGrid, CURL, curlPose, deformCurl } from '@/domains/trip/components/ticket/stubCurl/curlMath';
 import { decideCurlTap, withinBudget } from '@/domains/trip/components/ticket/stubCurl/loadStubCurl';
+import { DAY_PASS_HEIGHT, DAY_PASS_STUB } from '@/domains/trip/components/ticket/ticketGeometry';
 
 describe('말림 탭 판단', () => {
     it('재생 중 탭은 무시한다', () => {
-        expect(decideCurlTap({ playing: true, reducedMotion: false, hasStub: true })).toBe('ignore');
+        expect(decideCurlTap({ isPlaying: true, isReducedMotion: false, hasStub: true })).toBe('ignore');
     });
 
     it('모션 줄이기·옆면 없음이면 효과 없이 바로 이동', () => {
-        expect(decideCurlTap({ playing: false, reducedMotion: true, hasStub: true })).toBe('navigate');
-        expect(decideCurlTap({ playing: false, reducedMotion: false, hasStub: false })).toBe('navigate');
+        expect(decideCurlTap({ isPlaying: false, isReducedMotion: true, hasStub: true })).toBe('navigate');
+        expect(decideCurlTap({ isPlaying: false, isReducedMotion: false, hasStub: false })).toBe('navigate');
     });
 
     it('그 밖에는 말림', () => {
-        expect(decideCurlTap({ playing: false, reducedMotion: false, hasStub: true })).toBe('curl');
+        expect(decideCurlTap({ isPlaying: false, isReducedMotion: false, hasStub: true })).toBe('curl');
     });
 });
 
@@ -68,24 +70,22 @@ describe('기본 그라디언트 읽기', () => {
 });
 
 describe('종이 말림 모양', () => {
-    // 82×268 옆면을 2px 격자로
-    const W = 82;
-    const H = 268;
-    const cols = W / 2 + 1;
-    const rows = H / 2 + 1;
+    const GRID_STEP = 2;
+    const cols = DAY_PASS_STUB.width / GRID_STEP + 1;
+    const rows = DAY_PASS_HEIGHT.ticketList / GRID_STEP + 1;
     const u = new Float32Array(cols * rows);
     const v = new Float32Array(cols * rows);
     for (let r = 0; r < rows; r++)
         for (let c = 0; c < cols; c++) {
-            u[r * cols + c] = c * 2;
-            v[r * cols + c] = r * 2;
+            u[r * cols + c] = c * GRID_STEP;
+            v[r * cols + c] = r * GRID_STEP;
         }
     const grid = createCurlGrid(u, v);
     const at = (out: Float32Array, c: number, r: number) => out.subarray((r * cols + c) * 3, (r * cols + c) * 3 + 3);
 
     it('시작 프레임은 평평 — HTML 옆면과 같은 자리', () => {
         const out = new Float32Array(u.length * 3);
-        deformCurl(grid, curlPose(0, grid.range).fold, out);
+        deformCurl(grid, curlPose(0, grid.foldRange).foldProgress, out);
         for (let i = 0; i < u.length; i++) {
             expect(out[i * 3]).toBeCloseTo(u[i]);
             expect(out[i * 3 + 1]).toBeCloseTo(v[i]);
@@ -106,20 +106,20 @@ describe('종이 말림 모양', () => {
         for (let r = 0; r < rows - 1; r++) {
             const a = at(out, cols - 1, r);
             const b = at(out, cols - 1, r + 1);
-            expect(Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])).toBeLessThanOrEqual(2 + 1e-3);
-            expect(Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])).toBeGreaterThan(1.9);
+            expect(Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])).toBeLessThanOrEqual(GRID_STEP + 1e-3);
+            expect(Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])).toBeGreaterThan(GRID_STEP - 0.1);
         }
     });
 
     it('끝나는 시점에는 다 사라져 있다', () => {
-        expect(curlPose(CURL.fadeMs[1], grid.range).opacity).toBe(0);
+        expect(curlPose(CURL.fadeMs[1], grid.foldRange).opacity).toBe(0);
         expect(CURL.endMs).toBeGreaterThanOrEqual(CURL.fadeMs[1]);
     });
 });
 
 describe('말림 안쪽 면', () => {
     it('흰 종이·워터마크가 아니라 HTML 옆면과 같은 어두운 유리', () => {
-        expect(GLASS).toBe('rgba(15, 23, 42, 0.58)');
+        expect(DAY_PASS_STUB.glassColor).toBe('rgba(15, 23, 42, 0.58)');
         expect(STUB_LAYERS.back).toEqual(['backdrop', 'glass']);
     });
 

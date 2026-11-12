@@ -1,14 +1,15 @@
 import { useState } from 'react';
 
-import { css, keyframes } from '@emotion/react';
-import { Plus, Trash } from 'lucide-react';
+import { css } from '@emotion/react';
 
 import { useTripImages } from '@/domains/media/hooks/queries';
 import ShareModal from '@/domains/share/components/ShareModal';
+import BoardingPassTicket from '@/domains/trip/components/ticket/BoardingPassTicket';
 import DayPassTicket from '@/domains/trip/components/ticket/DayPassTicket';
-import { notchMask } from '@/domains/trip/components/ticket/notchMask';
-import RouteEnd from '@/domains/trip/components/ticket/RouteEnd';
+import DraftTicketOverlay from '@/domains/trip/components/ticket/DraftTicketOverlay';
 import { useStubCurl } from '@/domains/trip/components/ticket/stubCurl/useStubCurl';
+import { DAY_PASS_HEIGHT } from '@/domains/trip/components/ticket/ticketGeometry';
+import TicketMoreButton from '@/domains/trip/components/ticket/TicketMoreButton';
 import TripTicketActionSheet from '@/domains/trip/components/TripTicketActionSheet';
 import { getTicketView } from '@/domains/trip/ticketView';
 import { Trip } from '@/domains/trip/types';
@@ -17,10 +18,23 @@ import { useLoginPromptStore } from '@/domains/user/stores/useLoginPromptStore';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import ConfirmModal from '@/shared/components/common/Modal/ConfirmModal';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
-import { COLORS } from '@/shared/constants/style';
 import { useTicketHandler } from '@/shared/hooks/useTicketHandler';
 import { useTicketNavigation } from '@/shared/hooks/useTicketNavigation';
 import { useToastStore } from '@/shared/stores/useToastStore';
+
+const REMOVE_CONFIRM_COPY = {
+    owner: {
+        title: '여행 티켓을 삭제하시겠습니까?',
+        description:
+            '여행 티켓을 삭제하면 해당 여행의 정보와 사진들은 다시 복구할 수 없습니다. 그래도 삭제하시겠습니까?',
+        confirmText: '삭제',
+    },
+    shared: {
+        title: '공유를 해제하시겠습니까?',
+        description: '공유를 해제하면 더 이상 이 여행 티켓에 접근할 수 없게 됩니다. 계속하시겠습니까?',
+        confirmText: '해제',
+    },
+};
 
 const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
     const {
@@ -37,7 +51,7 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
     } = tripInfo;
 
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-    const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const [isActionSheetOpen, setIsActionSheetOpen] = useState(false);
     const showToast = useToastStore((state) => state.showToast);
     const userInfo = useUserStore((state) => state.userInfo);
     const isGuest = useUserStore((state) => state.isGuest);
@@ -51,57 +65,23 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
             onError: (message) => showToast(message),
         },
     );
-    const { isAnimating, handleCardClick } = useTicketNavigation(tripKey!);
-    // 1-Day 패스는 옆면이 말려 떨어진 뒤 이동한다(탑승권은 비행기 애니메이션 그대로)
+    const { isPlaneFlying, openTrip } = useTicketNavigation(tripKey!);
     const { stubRef, play: playStubCurl } = useStubCurl();
 
-    const { data: imagesData } = useTripImages(tripKey ?? '');
-    const mediaFiles = imagesData?.success ? imagesData.data : undefined;
+    const { data: imagesResult } = useTripImages(tripKey ?? '');
+    const mediaFiles = imagesResult?.success ? imagesResult.data : undefined;
     const coverPhoto = isCompletedTrip ? mediaFiles?.[0]?.mediaLink : undefined;
-    const photosCount = mediaFiles !== undefined ? `${mediaFiles.length}장` : '—';
+    const photoCountLabel = mediaFiles !== undefined ? `${mediaFiles.length}장` : '—';
 
     if (isCompletedTrip === undefined) return null;
 
     const isOwner = userInfo?.nickname === ownerNickname;
-    const {
-        from,
-        to,
-        placeEn,
-        isDayTrip,
-        dateLine,
-        startText: formattedStartDate,
-        endText: formattedEndDate,
-        duration: durationLabel,
-        fallbackBg,
-    } = getTicketView({ tripTitle, country, startDate, endDate }, { completed: !!isCompletedTrip });
+    const ticketView = getTicketView({ tripTitle, country, startDate, endDate }, { completed: !!isCompletedTrip });
     const sharedPeople = [ownerNickname || '', ...(sharedUsersNicknames || [])];
+    const removeConfirmCopy = isOwner ? REMOVE_CONFIRM_COPY.owner : REMOVE_CONFIRM_COPY.shared;
 
-    const sharedLabel = !isOwner && <span css={sharedLabelStyle}>공유받은 티켓</span>;
-    const moreButton = (variant: 'band' | 'photo') => (
-        <button
-            aria-label='옵션 더보기'
-            onClick={(e) => {
-                e.stopPropagation();
-                setIsSheetOpen(true);
-            }}
-            css={[moreButtonStyle, variant === 'photo' && moreButtonOnPhotoStyle]}
-        >
-            <svg
-                width='16'
-                height='16'
-                viewBox='0 0 24 24'
-                fill='none'
-                stroke='currentColor'
-                strokeWidth='2.2'
-                strokeLinecap='round'
-                strokeLinejoin='round'
-            >
-                <circle cx='5' cy='12' r='1.5' />
-                <circle cx='12' cy='12' r='1.5' />
-                <circle cx='19' cy='12' r='1.5' />
-            </svg>
-        </button>
-    );
+    const sharedBadge = !isOwner && <span css={sharedBadgeStyle}>공유받은 티켓</span>;
+    const openActionSheet = () => setIsActionSheetOpen(true);
 
     return (
         <div css={containerStyle}>
@@ -109,135 +89,54 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
             {isUnLinking && <Indicator text='공유 티켓 삭제 중...' />}
 
             {!isCompletedTrip && (
-                <div css={uncompletedOverlayStyle}>
-                    <div css={uncompletedButtonsStyle}>
-                        <button
-                            css={uncompletedActionStyle}
-                            onClick={() => handler.edit(isCompletedTrip)}
-                            aria-label='여행 정보 이어서 작성하기'
-                        >
-                            <Plus size={14} aria-hidden='true' /> 여행 정보 이어서 작성하기
-                        </button>
-                        <div css={separatorStyle} aria-hidden='true' />
-                        <button
-                            css={uncompletedDeleteStyle}
-                            onClick={() => requireMember('delete', handler.delete)}
-                            aria-label='삭제하기'
-                        >
-                            <Trash size={14} aria-hidden='true' /> 삭제하기
-                        </button>
-                    </div>
-                </div>
+                <DraftTicketOverlay
+                    onContinue={() => handler.edit(isCompletedTrip)}
+                    onDelete={() => requireMember('delete', handler.delete)}
+                />
             )}
 
-            {isDayTrip ? (
+            {ticketView.isDayTrip ? (
                 <div
-                    onClick={() => handleCardClick({ play: playStubCurl })}
-                    css={[cardClickableStyle, dayPassClickableStyle]}
+                    onClick={() => openTrip({ playExitEffect: playStubCurl })}
+                    css={[clickableStyle, noTapHighlightStyle]}
                 >
                     <DayPassTicket
                         stubRef={stubRef}
                         title={tripTitle}
-                        dateLine={dateLine}
-                        placeEn={placeEn}
+                        dateLine={ticketView.dateLine}
+                        placeEn={ticketView.placeEn}
                         hashtags={hashtags}
                         photoUrl={coverPhoto}
                         photoAlt={tripTitle}
-                        fallbackBg={fallbackBg}
-                        height={268}
-                        badge={sharedLabel}
-                        action={moreButton('photo')}
+                        fallbackBg={ticketView.fallbackBg}
+                        height={DAY_PASS_HEIGHT.ticketList}
+                        badge={sharedBadge}
+                        action={<TicketMoreButton placement='photo' onClick={openActionSheet} />}
                     />
                 </div>
             ) : (
-                <div css={boardingShadowStyle}>
-                    <div onClick={() => handleCardClick()} css={[cardClickableStyle, boardingCardStyle]}>
-                        {/* Photo Hero */}
-                        <div css={photoHeroStyle(fallbackBg)}>
-                            {coverPhoto && <img src={coverPhoto} alt={tripTitle} css={coverPhotoStyle} />}
-                            <div css={gradientTopStyle} />
-                            <div css={gradientBottomStyle} />
-
-                            {/* TYCHE AIR badge */}
-                            <div css={badgeContainerStyle}>
-                                <span css={badgeStyle}>
-                                    <span css={badgeDotStyle} />
-                                    TYCHE AIR
-                                </span>
-                                {sharedLabel}
-                            </div>
-
-                            {/* Date + Title overlay */}
-                            <div css={heroOverlayStyle}>
-                                <div css={heroDateStyle}>
-                                    {dateLine || `${formattedStartDate} — ${formattedEndDate}`}
-                                </div>
-                                <div css={heroTitleStyle}>{tripTitle}</div>
-                            </div>
-                        </div>
-
-                        {/* Boarding-pass band */}
-                        <div css={bandStyle}>
-                            {/* Route row */}
-                            <div css={routeRowStyle}>
-                                <RouteEnd point={from} side='from' />
-                                <div css={routeLineStyle}>
-                                    <div css={dashedLineStyle} />
-                                    <div css={dashedLineStyle} />
-                                    {isAnimating && (
-                                        <svg
-                                            width='14'
-                                            height='14'
-                                            viewBox='0 0 24 24'
-                                            fill='#fff'
-                                            css={planeTraverseStyle}
-                                            aria-hidden='true'
-                                        >
-                                            <path d='M21 16v-2l-8-5V3.5a1.5 1.5 0 00-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5L21 16z' />
-                                        </svg>
-                                    )}
-                                </div>
-                                <RouteEnd point={to} side='to' />
-                            </div>
-
-                            {/* Meta row */}
-                            <div css={metaRowStyle}>
-                                <div>
-                                    <div css={metaLabelStyle}>PASSENGER</div>
-                                    <div css={metaValueStyle}>{ownerNickname || '—'}</div>
-                                </div>
-                                <div>
-                                    <div css={metaLabelStyle}>DURATION</div>
-                                    <div css={metaValueStyle}>{durationLabel}</div>
-                                </div>
-                                <div>
-                                    <div css={metaLabelStyle}>PHOTOS</div>
-                                    <div css={[metaValueStyle, metaValueAccentStyle]}>{photosCount}</div>
-                                </div>
-                            </div>
-
-                            {/* Hashtags + ⋯ button */}
-                            <div css={tagRowStyle}>
-                                <div css={tagGroupStyle}>
-                                    {hashtags
-                                        .filter((tag) => tag !== '')
-                                        .map((tag, i) => (
-                                            <span key={i} css={tagChipStyle}>
-                                                <span css={hashStyle}>#</span>
-                                                {tag}
-                                            </span>
-                                        ))}
-                                </div>
-                                {moreButton('band')}
-                            </div>
-                        </div>
-                    </div>
+                <div onClick={() => openTrip()} css={clickableStyle}>
+                    <BoardingPassTicket
+                        title={tripTitle}
+                        dateLine={ticketView.dateLine || `${ticketView.startText} — ${ticketView.endText}`}
+                        from={ticketView.from}
+                        to={ticketView.to}
+                        passenger={ownerNickname || '—'}
+                        duration={ticketView.duration}
+                        photoCountLabel={photoCountLabel}
+                        hashtags={hashtags}
+                        photoUrl={coverPhoto}
+                        fallbackBg={ticketView.fallbackBg}
+                        badge={sharedBadge}
+                        action={<TicketMoreButton placement='band' onClick={openActionSheet} />}
+                        isPlaneFlying={isPlaneFlying}
+                    />
                 </div>
             )}
 
             <TripTicketActionSheet
-                open={isSheetOpen}
-                onClose={() => setIsSheetOpen(false)}
+                open={isActionSheetOpen}
+                onClose={() => setIsActionSheetOpen(false)}
                 trip={{ tripTitle, country, coverPhoto, startDate, endDate }}
                 isOwner={isOwner}
                 isGuest={isGuest}
@@ -249,13 +148,9 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
 
             {isModalOpen && (
                 <ConfirmModal
-                    title={isOwner ? '여행 티켓을 삭제하시겠습니까?' : '공유를 해제하시겠습니까?'}
-                    description={
-                        isOwner
-                            ? '여행 티켓을 삭제하면 해당 여행의 정보와 사진들은 다시 복구할 수 없습니다. 그래도 삭제하시겠습니까?'
-                            : '공유를 해제하면 더 이상 이 여행 티켓에 접근할 수 없게 됩니다. 계속하시겠습니까?'
-                    }
-                    confirmText={isOwner ? '삭제' : '해제'}
+                    title={removeConfirmCopy.title}
+                    description={removeConfirmCopy.description}
+                    confirmText={removeConfirmCopy.confirmText}
                     cancelText='취소'
                     confirmModal={isOwner ? deleteTrip : () => unlinkShared(shareId!)}
                     closeModal={closeModal}
@@ -268,7 +163,7 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
                     tripTitle={tripTitle}
                     isOwner={isOwner}
                     sharedPeople={sharedPeople}
-                    dateLine={dateLine}
+                    dateLine={ticketView.dateLine}
                     onClose={() => setIsShareModalOpen(false)}
                 />
             )}
@@ -276,9 +171,7 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
     );
 };
 
-/* ── Styles ────────────────────────────────────────────────────────── */
-
-// 티켓 모양·그림자는 안쪽 카드가 가진다. 여기에 mask·filter를 걸면 안에 든 fixed 요소(Indicator·모달)까지 잘린다
+// 티켓 모양·그림자는 안쪽 카드가 가진다 — 여기에 mask·filter를 걸면 안의 fixed 요소(Indicator·모달)까지 잘린다
 const containerStyle = css`
     width: 100%;
     margin-bottom: 8px;
@@ -286,102 +179,16 @@ const containerStyle = css`
     user-select: none;
 `;
 
-const HERO_HEIGHT = 200;
-
-// mask가 자기 box-shadow까지 자르므로 그림자는 바깥 요소에 둔다.
-// 구멍이 티켓 안쪽이라 drop-shadow면 구멍 속이 그림자로 회색이 된다 → box-shadow(테두리 안쪽엔 안 그려짐)로 배경이 그대로 보이게
-const boardingShadowStyle = css`
-    border-radius: 20px;
-    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
-`;
-
-// 사진과 띠 경계의 반원 구멍을 실제로 뚫는다 — 어느 페이지 배경 위에서도 자연스럽게
-const boardingNotches = notchMask(8, [
-    ['28px', `${HERO_HEIGHT}px`],
-    ['calc(100% - 28px)', `${HERO_HEIGHT}px`],
-]);
-
-const boardingCardStyle = css`
-    border-radius: 20px;
-    overflow: hidden;
-    background: ${COLORS.TICKET_BAND};
-    ${boardingNotches}
-`;
-
-const cardClickableStyle = css`
+const clickableStyle = css`
     cursor: pointer;
 `;
 
 // 안드로이드 기본 탭 하이라이트가 말림 효과 위에 파란 사각형으로 덮이지 않게
-const dayPassClickableStyle = css`
+const noTapHighlightStyle = css`
     -webkit-tap-highlight-color: transparent;
 `;
 
-const photoHeroStyle = (fallbackBg: string) => css`
-    position: relative;
-    height: ${HERO_HEIGHT}px;
-    background: ${fallbackBg};
-    overflow: hidden;
-`;
-
-const coverPhotoStyle = css`
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center 35%;
-`;
-
-const gradientTopStyle = css`
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.08) 0%, transparent 30%);
-    pointer-events: none;
-`;
-
-const gradientBottomStyle = css`
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(to bottom, transparent 55%, rgba(15, 23, 42, 0.7) 88%, rgba(15, 23, 42, 0.95) 100%);
-    pointer-events: none;
-`;
-
-const badgeContainerStyle = css`
-    position: absolute;
-    top: 12px;
-    left: 14px;
-    z-index: 2;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-`;
-
-const badgeStyle = css`
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: #fff;
-    padding: 4px 10px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 100px;
-    backdrop-filter: blur(8px);
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-`;
-
-const badgeDotStyle = css`
-    display: inline-block;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: ${COLORS.PRIMARY};
-    flex-shrink: 0;
-`;
-
-const sharedLabelStyle = css`
+const sharedBadgeStyle = css`
     font-size: 10px;
     font-weight: 600;
     color: rgba(255, 255, 255, 0.85);
@@ -389,225 +196,6 @@ const sharedLabelStyle = css`
     border-radius: 100px;
     padding: 3px 8px;
     backdrop-filter: blur(8px);
-`;
-
-const heroOverlayStyle = css`
-    position: absolute;
-    bottom: 12px;
-    left: 16px;
-    right: 16px;
-    z-index: 2;
-`;
-
-const heroDateStyle = css`
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.7);
-    letter-spacing: 0.3px;
-    text-transform: uppercase;
-    font-weight: 600;
-    margin-bottom: 4px;
-`;
-
-const heroTitleStyle = css`
-    font-size: 18px;
-    font-weight: 700;
-    color: #fff;
-    letter-spacing: -0.3px;
-`;
-
-const bandStyle = css`
-    position: relative;
-    background: ${COLORS.TICKET_BAND};
-    color: #fff;
-    padding: 16px 18px;
-`;
-
-const routeRowStyle = css`
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
-`;
-
-const routeLineStyle = css`
-    flex: 1;
-    height: 16px;
-    display: flex;
-    align-items: center;
-    min-width: 0;
-    position: relative;
-    overflow: hidden;
-`;
-
-const dashedLineStyle = css`
-    flex: 1;
-    height: 1px;
-    background: repeating-linear-gradient(to right, rgba(255, 255, 255, 0.4) 0 3px, transparent 3px 7px);
-`;
-
-const metaRowStyle = css`
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-`;
-
-const metaLabelStyle = css`
-    font-size: 9px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.45);
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    margin-bottom: 3px;
-`;
-
-const metaValueStyle = css`
-    font-size: 12px;
-    font-weight: 700;
-    color: #fff;
-`;
-
-const metaValueAccentStyle = css`
-    color: ${COLORS.PRIMARY};
-`;
-
-const tagRowStyle = css`
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 10px;
-    margin-top: 12px;
-`;
-
-const tagGroupStyle = css`
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-    flex: 1;
-    min-width: 0;
-`;
-
-const tagChipStyle = css`
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.8);
-    padding: 3px 9px;
-    border-radius: 100px;
-    font-size: 11px;
-    display: inline-flex;
-    gap: 2px;
-`;
-
-const hashStyle = css`
-    color: ${COLORS.PRIMARY};
-    font-weight: 700;
-`;
-
-const moreButtonStyle = css`
-    flex-shrink: 0;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.1);
-    border: none;
-    color: rgba(255, 255, 255, 0.75);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.15s;
-    -webkit-tap-highlight-color: transparent;
-
-    &:hover {
-        background: rgba(255, 255, 255, 0.18);
-    }
-`;
-
-const moreButtonOnPhotoStyle = css`
-    width: 28px;
-    height: 28px;
-    background: rgba(15, 23, 42, 0.35);
-    color: #fff;
-    backdrop-filter: blur(8px);
-
-    &:hover {
-        background: rgba(15, 23, 42, 0.5);
-    }
-`;
-
-const uncompletedOverlayStyle = css`
-    width: 100%;
-    height: 100%;
-    position: absolute;
-    top: 0;
-    left: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background-color: rgba(0, 0, 0, 0.48);
-    /* 컨테이너가 더는 라운드로 자르지 않으므로 직접 둥글리고, 반원 구멍도 함께 뚫는다 */
-    border-radius: 20px;
-    ${boardingNotches}
-    z-index: 9;
-    cursor: pointer;
-`;
-
-const uncompletedButtonsStyle = css`
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: ${COLORS.TEXT.TITLE};
-    background-color: ${COLORS.BACKGROUND.WHITE};
-    border: none;
-    border-radius: 24px;
-    cursor: pointer;
-    box-shadow: ${COLORS.BOX_SHADOW.PHOTO_CARD};
-    font-size: 14px;
-    font-weight: 500;
-    letter-spacing: -0.224px;
-`;
-
-const uncompletedActionStyle = css`
-    padding: 10px 12px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 6px;
-    color: ${COLORS.TEXT.DESCRIPTION};
-    background: none;
-    border: none;
-    cursor: pointer;
-`;
-
-const uncompletedDeleteStyle = css`
-    padding: 10px 12px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 6px;
-    border: none;
-    color: ${COLORS.TEXT.ERROR};
-    background: none;
-    cursor: pointer;
-`;
-
-const separatorStyle = css`
-    width: 1px;
-    height: 60%;
-    background: ${COLORS.BORDER};
-    align-self: center;
-    flex-shrink: 0;
-`;
-
-const planeTraverseKeyframes = keyframes`
-    from { left: -4px; }
-    to   { left: calc(100% - 10px); }
-`;
-
-const planeTraverseStyle = css`
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%) rotate(90deg);
-    animation: ${planeTraverseKeyframes} 900ms ease-in-out forwards;
-    pointer-events: none;
 `;
 
 export default TripTicket;

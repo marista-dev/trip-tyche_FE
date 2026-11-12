@@ -3,28 +3,25 @@ import { ReactNode, Ref } from 'react';
 import { css } from '@emotion/react';
 
 import { notchMask } from '@/domains/trip/components/ticket/notchMask';
-import { STUB_TORN_ATTR } from '@/domains/trip/components/ticket/stubCurl/stubTorn';
+import { DAY_PASS_ROOT_PROPS, STUB_TORN_ATTR } from '@/domains/trip/components/ticket/stubCurl/stubTorn';
+import { DAY_PASS_SHADE_STOPS, DAY_PASS_STUB, TICKET_RADIUS } from '@/domains/trip/components/ticket/ticketGeometry';
+import { ticketPhoto } from '@/domains/trip/components/ticket/ticketPhoto';
 import { COLORS } from '@/shared/constants/style';
 
 interface DayPassTicketProps {
     title: ReactNode;
     dateLine: string;
-    /** 옆면에 세로로 쓰는 영문 지명 */
     placeEn: string;
     hashtags?: string[];
     photoUrl?: string;
     photoAlt?: string;
     fallbackBg: string;
     height: number;
-    /** 브랜드 칩 옆에 붙는 라벨 (예: 공유받은 티켓) */
     badge?: ReactNode;
-    /** 우측 상단 (더보기 버튼, 미리보기 배지) */
     action?: ReactNode;
-    /** 옆면 요소 — 탭했을 때 말림 효과가 이 자리를 대신 그린다 */
     stubRef?: Ref<HTMLDivElement>;
 }
 
-/** 당일여행용 1-Day 패스. 사진 위에 유리 질감 옆면을 얹는다. */
 const DayPassTicket = ({
     title,
     dateLine,
@@ -38,12 +35,12 @@ const DayPassTicket = ({
     action,
     stubRef,
 }: DayPassTicketProps) => {
-    const tags = hashtags.filter((tag) => tag !== '');
+    const visibleTags = hashtags.filter((tag) => tag !== '');
 
     return (
-        <div css={shadowWrap} data-day-pass=''>
-            <div css={pass(fallbackBg, height)}>
-                {photoUrl && <img src={photoUrl} alt={photoAlt} css={photo} />}
+        <div css={shadowWrap} {...DAY_PASS_ROOT_PROPS}>
+            <div css={passBody(fallbackBg, height)}>
+                {photoUrl && <img src={photoUrl} alt={photoAlt} css={ticketPhoto} />}
 
                 <div css={topRow}>
                     <div css={badgeGroup}>
@@ -59,11 +56,11 @@ const DayPassTicket = ({
                 <div css={info}>
                     {dateLine && <div css={dateText}>{dateLine}</div>}
                     <div css={titleText}>{title}</div>
-                    {tags.length > 0 && (
+                    {visibleTags.length > 0 && (
                         <div css={tagGroup}>
-                            {tags.map((tag, i) => (
-                                <span key={`${tag}-${i}`} css={tagChip}>
-                                    <span css={hash}>#</span>
+                            {visibleTags.map((tag, index) => (
+                                <span key={`${tag}-${index}`} css={tagChip}>
+                                    <span css={hashMark}>#</span>
                                     {tag}
                                 </span>
                             ))}
@@ -84,72 +81,48 @@ const DayPassTicket = ({
     );
 };
 
-const STUB_WIDTH = 82;
+const NOTCH_X = `calc(100% - ${DAY_PASS_STUB.width - DAY_PASS_STUB.notchOffsetX}px)`;
+const SHADE_GRADIENT = `linear-gradient(180deg, ${DAY_PASS_SHADE_STOPS.map(({ color, percent }) => `${color} ${percent}%`).join(', ')})`;
 
-/** 절취선 구멍: 옆면 왼쪽 가장자리(테두리 2px 안쪽 1px)를 중심으로 위아래 반원 */
-const NOTCH_RADIUS = 9;
-const NOTCH_X = `calc(100% - ${STUB_WIDTH - 1}px)`;
-
-// clip-path·mask가 그림자를 자르므로 그림자는 바깥에 둔다.
-// box-shadow 대신 drop-shadow — 뚫린 구멍과 말림 효과로 옆면이 빠진 모양을 그림자가 따라간다
+// mask·clip-path가 그림자를 자르므로 바깥에 둔다. drop-shadow라야 구멍·말려 빠진 옆면 모양을 따라간다
 const shadowWrap = css`
-    border-radius: 20px;
+    border-radius: ${TICKET_RADIUS}px;
     filter: drop-shadow(0 10px 13px rgba(15, 23, 42, 0.16));
 `;
 
-// backdrop-filter 자식이 overflow:hidden 라운드를 벗어나는 문제 → isolate + clip-path로 자른다
-const pass = (fallbackBg: string, height: number) => css`
+// backdrop-filter 자식이 overflow:hidden 라운드를 벗어나므로 isolate + clip-path로 자른다
+const passBody = (fallbackBg: string, height: number) => css`
     position: relative;
     height: ${height}px;
-    border-radius: 20px;
+    border-radius: ${TICKET_RADIUS}px;
     overflow: hidden;
     isolation: isolate;
-    clip-path: inset(0 round 20px);
-    ${notchMask(NOTCH_RADIUS, [
+    clip-path: inset(0 round ${TICKET_RADIUS}px);
+    ${notchMask(DAY_PASS_STUB.notchRadius, [
         [NOTCH_X, '0'],
         [NOTCH_X, '100%'],
     ])}
     color: #fff;
     background: ${fallbackBg};
 
-    /* 옆면 자리를 잘라 낸다 — 그 자리는 WebGL 조각이 대신 그리고, 몸통 쪽 반쪽 구멍만 남는다 */
     [${STUB_TORN_ATTR}] > & {
-        clip-path: inset(0 ${STUB_WIDTH}px 0 0 round 20px 0 0 20px);
+        clip-path: inset(0 ${DAY_PASS_STUB.width}px 0 0 round ${TICKET_RADIUS}px 0 0 ${TICKET_RADIUS}px);
     }
 
     &::after {
         content: '';
         position: absolute;
         inset: 0;
-        background: linear-gradient(
-            180deg,
-            rgba(0, 0, 0, 0.18) 0%,
-            transparent 26%,
-            transparent 44%,
-            rgba(15, 23, 42, 0.5) 72%,
-            rgba(15, 23, 42, 0.86) 100%
-        );
+        background: ${SHADE_GRADIENT};
         pointer-events: none;
     }
-`;
-
-// 오른쪽 옆면이 사진을 가리므로, 사진 중심을 보이는 영역(옆면 왼쪽)의 가운데에 맞춘다.
-// 옆면 폭만큼 왼쪽으로 넓혀 카드 전체는 그대로 채운다 — 옆면 유리 뒤에도 진짜 사진이 흐려 보인다
-const photo = css`
-    position: absolute;
-    top: 0;
-    left: -${STUB_WIDTH}px;
-    width: calc(100% + ${STUB_WIDTH}px);
-    height: 100%;
-    object-fit: cover;
-    object-position: center 35%;
 `;
 
 const topRow = css`
     position: absolute;
     top: 13px;
     left: 13px;
-    right: ${STUB_WIDTH + 14}px;
+    right: ${DAY_PASS_STUB.width + 14}px;
     z-index: 2;
     display: flex;
     justify-content: space-between;
@@ -190,7 +163,7 @@ const brandDot = css`
 const info = css`
     position: absolute;
     left: 16px;
-    right: ${STUB_WIDTH + 16}px;
+    right: ${DAY_PASS_STUB.width + 16}px;
     bottom: 15px;
     z-index: 2;
 `;
@@ -230,7 +203,7 @@ const tagChip = css`
     backdrop-filter: blur(6px);
 `;
 
-const hash = css`
+const hashMark = css`
     opacity: 0.6;
     margin-right: 1px;
 `;
@@ -240,17 +213,21 @@ const stub = css`
     top: 0;
     right: 0;
     bottom: 0;
-    width: ${STUB_WIDTH}px;
+    width: ${DAY_PASS_STUB.width}px;
     z-index: 1;
-    border-radius: 0 20px 20px 0;
-    /* 절취선은 dashed 대신 그라디언트(6px 선 / 4px 간격) — 말림 효과의 캔버스 텍스처와 픽셀 단위로 맞춘다 */
+    border-radius: 0 ${TICKET_RADIUS}px ${TICKET_RADIUS}px 0;
+    /* 절취선은 dashed 대신 그라디언트 — bakeStub의 캔버스 텍스처와 픽셀 단위로 맞춘다 */
     background:
-        linear-gradient(rgba(255, 255, 255, 0.5) 0 6px, transparent 6px 10px) 0 0 / 2px 10px repeat-y border-box,
-        rgba(15, 23, 42, 0.58);
-    backdrop-filter: blur(24px) saturate(1.4);
-    -webkit-backdrop-filter: blur(24px) saturate(1.4);
-    box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.08);
-    border-left: 2px solid transparent;
+        linear-gradient(
+                ${DAY_PASS_STUB.perforationColor} 0 ${DAY_PASS_STUB.perforationDash}px,
+                transparent ${DAY_PASS_STUB.perforationDash}px ${DAY_PASS_STUB.perforationPeriod}px
+            )
+            0 0 / ${DAY_PASS_STUB.perforationWidth}px ${DAY_PASS_STUB.perforationPeriod}px repeat-y border-box,
+        ${DAY_PASS_STUB.glassColor};
+    backdrop-filter: blur(${DAY_PASS_STUB.blurPx}px) saturate(${DAY_PASS_STUB.saturate});
+    -webkit-backdrop-filter: blur(${DAY_PASS_STUB.blurPx}px) saturate(${DAY_PASS_STUB.saturate});
+    box-shadow: inset 1px 0 0 ${DAY_PASS_STUB.highlightColor};
+    border-left: ${DAY_PASS_STUB.perforationWidth}px solid transparent;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -265,7 +242,6 @@ const dayNumber = css`
     letter-spacing: -0.04em;
 `;
 
-// DAY·PASS는 한 덩어리로 촘촘하게(1~2px), "1"과의 간격은 옆면 gap 그대로
 const kickerGroup = css`
     display: flex;
     flex-direction: column;

@@ -1,26 +1,23 @@
-/**
- * 말림 효과 청크(three.js 포함)를 메인 번들과 분리해 불러온다.
- * 이 파일은 메인 번들에 들어가므로 three를 직접 import하지 않는다.
- */
+// 메인 번들에 들어가는 파일이라 three를 직접 import하지 않는다
 type StubCurlModule = typeof import('./curl');
 
-/** 탭 후 청크를 기다릴 최대 시간. 넘기면 효과 없이 바로 이동 */
-export const LOAD_BUDGET_MS = 150;
+export const CURL_LOAD_BUDGET_MS = 150;
+const IDLE_PREFETCH_TIMEOUT_MS = 3000;
+const FALLBACK_PREFETCH_DELAY_MS = 1200;
 
-let pending: Promise<StubCurlModule> | null = null;
+let stubCurlModule: Promise<StubCurlModule> | null = null;
 
 export const loadStubCurl = () => {
-    pending ??= import('./curl').catch((error) => {
-        pending = null; // 네트워크 실패면 다음 탭에서 다시 시도
+    stubCurlModule ??= import('./curl').catch((error) => {
+        stubCurlModule = null;
         throw error;
     });
-    return pending;
+    return stubCurlModule;
 };
 
-/** 시간 안에 끝나면 결과, 아니면 null. 실패도 null — 효과는 없어도 되는 장식이다 */
-export const withinBudget = <T>(promise: Promise<T>, ms: number): Promise<T | null> =>
+export const withinBudget = <T>(promise: Promise<T>, budgetMs: number): Promise<T | null> =>
     new Promise((resolve) => {
-        const timer = setTimeout(() => resolve(null), ms);
+        const timer = setTimeout(() => resolve(null), budgetMs);
         promise.then(
             (value) => {
                 clearTimeout(timer);
@@ -38,31 +35,28 @@ export const prefersReducedMotion = () =>
 
 export type CurlTapAction = 'ignore' | 'navigate' | 'curl';
 
-/** 탭을 어떻게 처리할지. 재생 중 탭은 무시, 모션 줄이기·옆면 없음은 바로 이동 */
-export const decideCurlTap = ({
-    playing,
-    reducedMotion,
-    hasStub,
-}: {
-    playing: boolean;
-    reducedMotion: boolean;
+interface CurlTapState {
+    isPlaying: boolean;
+    isReducedMotion: boolean;
     hasStub: boolean;
-}): CurlTapAction => {
-    if (playing) return 'ignore';
-    if (reducedMotion || !hasStub) return 'navigate';
+}
+
+export const decideCurlTap = ({ isPlaying, isReducedMotion, hasStub }: CurlTapState): CurlTapAction => {
+    if (isPlaying) return 'ignore';
+    if (isReducedMotion || !hasStub) return 'navigate';
     return 'curl';
 };
 
-/** 유휴 시간에 청크를 미리 받는다. 반환값은 예약 취소 함수 */
+/** 반환값은 예약 취소 함수 */
 export const prefetchStubCurl = () => {
     if (prefersReducedMotion()) return () => {};
-    const run = () => {
+    const load = () => {
         loadStubCurl().catch(() => {});
     };
     if (typeof window.requestIdleCallback === 'function') {
-        const id = window.requestIdleCallback(run, { timeout: 3000 });
-        return () => window.cancelIdleCallback(id);
+        const idleId = window.requestIdleCallback(load, { timeout: IDLE_PREFETCH_TIMEOUT_MS });
+        return () => window.cancelIdleCallback(idleId);
     }
-    const id = window.setTimeout(run, 1200);
-    return () => window.clearTimeout(id);
+    const timeoutId = window.setTimeout(load, FALLBACK_PREFETCH_DELAY_MS);
+    return () => window.clearTimeout(timeoutId);
 };

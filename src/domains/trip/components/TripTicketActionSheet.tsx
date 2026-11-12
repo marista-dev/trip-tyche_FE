@@ -183,7 +183,6 @@ const TripTicketActionSheet = ({
                     overflow: auto;
                 `}
             >
-                {/* Handle */}
                 <div
                     css={css`
                         display: flex;
@@ -201,7 +200,6 @@ const TripTicketActionSheet = ({
                     />
                 </div>
 
-                {/* Trip preview header */}
                 <div
                     css={css`
                         padding: 12px 20px 16px;
@@ -268,7 +266,6 @@ const TripTicketActionSheet = ({
                     </div>
                 </div>
 
-                {/* Action list */}
                 <ul
                     css={css`
                         list-style: none;
@@ -383,7 +380,6 @@ const TripTicketActionSheet = ({
                     })}
                 </ul>
 
-                {/* Cancel */}
                 <div
                     css={css`
                         padding: 4px 16px 0;

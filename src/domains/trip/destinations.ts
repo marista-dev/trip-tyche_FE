@@ -98,20 +98,26 @@ export const formatDestination = (value?: string): { emoji: string; name: string
     return { emoji: country?.emoji ?? emoji, name: country?.nameKo ?? nameKo };
 };
 
-/** 티켓 경로의 한쪽 끝. 해외는 공항 코드, 국내는 한글 지명 + 영문 보조 표기 */
 export interface RoutePoint {
     label: string;
     sub?: string;
     isCode: boolean;
 }
 
-/** 국내: "국내 → 제주"(공항 코드를 지어내지 않는다), 해외: "ICN → NRT" */
-export const getRoute = (value?: string): { from: RoutePoint; to: RoutePoint } => {
+export interface TicketRoute {
+    from: RoutePoint;
+    to: RoutePoint;
+}
+
+const DOMESTIC_DEPARTURE: RoutePoint = { label: '국내', sub: 'DOMESTIC', isCode: false };
+const KOREA_NAME_EN = 'KOREA';
+
+export const getRoute = (value?: string): TicketRoute => {
     const { country, region, isDomestic } = parseDestination(value);
     if (isDomestic) {
         return {
-            from: { label: '국내', sub: 'DOMESTIC', isCode: false },
-            to: { label: region?.name ?? '대한민국', sub: region?.nameEn ?? 'KOREA', isCode: false },
+            from: DOMESTIC_DEPARTURE,
+            to: { label: region?.name ?? '대한민국', sub: region?.nameEn ?? KOREA_NAME_EN, isCode: false },
         };
     }
     return {
@@ -120,10 +126,9 @@ export const getRoute = (value?: string): { from: RoutePoint; to: RoutePoint } =
     };
 };
 
-/** 영문 지명. 국내는 지역("GANGNEUNG"), 해외는 나라("JAPAN"). 모르면 빈 문자열 */
 export const getPlaceEn = (value?: string): string => {
     const { country, region, isDomestic, countryValue } = parseDestination(value);
-    if (isDomestic) return region?.nameEn ?? 'KOREA';
+    if (isDomestic) return region?.nameEn ?? KOREA_NAME_EN;
     return (country?.nameEn ?? countryValue.split('/')[2] ?? '').toUpperCase();
 };
 

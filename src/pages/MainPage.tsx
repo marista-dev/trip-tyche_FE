@@ -46,7 +46,6 @@ const MainPage = () => {
     const shouldFetchTrips = mounted && !!userInfo;
     const { data: myTrips, isLoading: isTripsLoading } = useTripTicketList(shouldFetchTrips);
 
-    // 1-Day 패스가 있으면 첫 탭이 늦지 않게 말림 효과 청크를 유휴 시간에 받아 둔다
     const hasDayPass =
         !!myTrips?.success &&
         myTrips.data.some((trip) => getTicketView(trip, { completed: !!trip.confirmed }).isDayTrip);

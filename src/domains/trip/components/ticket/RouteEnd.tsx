@@ -5,30 +5,26 @@ import { RoutePoint } from '@/domains/trip/destinations';
 interface RouteEndProps {
     point: RoutePoint;
     side: 'from' | 'to';
-    /** 공항 코드 글자 크기(px). 지명은 이보다 1px 작게 쓴다 */
-    size?: number;
+    codeFontSize?: number;
 }
 
-/** 탑승권 경로의 한쪽 끝. 해외는 공항 코드, 국내는 지명 + 영문 보조 표기. */
-const RouteEnd = ({ point, side, size = 22 }: RouteEndProps) => {
-    const isRight = side === 'to';
+const RouteEnd = ({ point, side, codeFontSize = 22 }: RouteEndProps) => {
+    const isArrival = side === 'to';
 
     if (point.isCode) {
-        return <div css={[codeStyle(size), isRight && rightText]}>{point.label}</div>;
+        return <div css={[airportCode(codeFontSize), isArrival && alignRight]}>{point.label}</div>;
     }
 
-    // 국내 출발('국내')은 도착지보다 한 톤 낮춘다
-    const muted = side === 'from';
     return (
-        <div css={[placeWrap, isRight && placeWrapRight]}>
-            <span css={[placeLabel(size - 1), muted && placeLabelMuted]}>{point.label}</span>
-            {point.sub && <span css={placeSub}>{point.sub}</span>}
+        <div css={[placeName, isArrival && placeNameRight]}>
+            <span css={[placeLabel(codeFontSize - 1), !isArrival && departureLabel]}>{point.label}</span>
+            {point.sub && <span css={placeSubLabel}>{point.sub}</span>}
         </div>
     );
 };
 
-const codeStyle = (size: number) => css`
-    font-size: ${size}px;
+const airportCode = (fontSize: number) => css`
+    font-size: ${fontSize}px;
     font-weight: 800;
     letter-spacing: -0.04em;
     line-height: 1;
@@ -36,11 +32,11 @@ const codeStyle = (size: number) => css`
     flex-shrink: 0;
 `;
 
-const rightText = css`
+const alignRight = css`
     text-align: right;
 `;
 
-const placeWrap = css`
+const placeName = css`
     display: flex;
     flex-direction: column;
     gap: 3px;
@@ -48,23 +44,23 @@ const placeWrap = css`
     color: #fff;
 `;
 
-const placeWrapRight = css`
+const placeNameRight = css`
     align-items: flex-end;
 `;
 
-const placeLabel = (size: number) => css`
-    font-size: ${size}px;
+const placeLabel = (fontSize: number) => css`
+    font-size: ${fontSize}px;
     font-weight: 800;
     letter-spacing: -0.04em;
     line-height: 1;
 `;
 
-const placeLabelMuted = css`
+const departureLabel = css`
     font-size: 15px;
     color: rgba(255, 255, 255, 0.7);
 `;
 
-const placeSub = css`
+const placeSubLabel = css`
     font-size: 9px;
     font-weight: 600;
     letter-spacing: 1.5px;
