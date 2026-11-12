@@ -2,6 +2,6 @@
 
 # [TRIP TYCHE](https://triptyche.cloud)
 
-<img src="docs/readme/gallery.gif" width="100%" alt="TRIP TYCHE">
+<img src="docs/readme/gallery.webp" width="100%" alt="TRIP TYCHE">
 
 </div>
