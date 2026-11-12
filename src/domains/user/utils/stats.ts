@@ -51,7 +51,7 @@ export interface UserStats {
 /** 날짜 정보 없음을 의미하는 기본값(1980-01-01) */
 const DATE_NONE = DEFAULT_METADATA.DATE.split('T')[0];
 
-/** "🇯🇵/일본/JAPAN" → { emoji, name } (SharedTicket의 country.split('/') 패턴과 동일) */
+/** "🇯🇵/일본/JAPAN" → { emoji, name } */
 export const splitCountry = (country: string): { emoji: string; name: string } => {
     const value = country ?? '';
     // "emoji/ko/en" 포맷이 아닌(구분자 없는) 값이면 이모지 자리에 본문이 새지 않도록 방어한다.
