@@ -22,7 +22,7 @@ const App = () => {
                 <ThemeProvider theme={theme}>
                     <GlobalStyle />
                     <AuthProvider>
-                        <RouterProvider router={router} />
+                        <RouterProvider router={router} future={{ v7_startTransition: true }} />
                     </AuthProvider>
                 </ThemeProvider>
             </MantineProvider>

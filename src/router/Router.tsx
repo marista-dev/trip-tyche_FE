@@ -36,95 +36,106 @@ const protect = (element: ReactNode) => (
     </RequireAuth>
 );
 
-const router = createBrowserRouter([
-    {
-        path: ROUTES.PATH.MAIN,
-        element: <RootLayout />,
-        errorElement: <ErrorPage />,
-        children: [
-            /* ── Public ─────────────────────────── */
-            {
-                path: ROUTES.PATH.SIGNIN,
-                element: <SigninPage />,
-            },
+const router = createBrowserRouter(
+    [
+        {
+            path: ROUTES.PATH.MAIN,
+            element: <RootLayout />,
+            errorElement: <ErrorPage />,
+            children: [
+                /* ── Public ─────────────────────────── */
+                {
+                    path: ROUTES.PATH.SIGNIN,
+                    element: <SigninPage />,
+                },
 
-            /* ── Protected (RequireAuth가 status 기반으로 가드) ── */
-            {
-                index: true,
-                element: protect(<GlobeMapPage />),
-            },
-            {
-                path: ROUTES.PATH.TICKETS,
-                element: protect(<MainPage />),
-            },
-            {
-                path: ROUTES.PATH.SETTING,
-                element: protect(<SettingPage />),
-            },
-            {
-                path: `notification/:userId`,
-                element: protect(<NotificationPage />),
-            },
-            {
-                path: 'trip/:tripKey/',
-                children: [
-                    {
-                        index: true,
-                        element: protect(<TripPages.TripRoutePage />),
-                    },
-                    {
-                        path: 'new',
-                        element: protect(<TripImageUploadPage />),
-                    },
-                    {
-                        path: 'edit/image',
-                        element: protect(<TripPages.TripImageManagePage />),
-                    },
-                    {
-                        path: 'edit/image/no-location',
-                        element: protect(<TripPages.NoLocationResolvePage />),
-                    },
-                    {
-                        path: 'edit/image/no-date',
-                        element: protect(<TripPages.NoDateResolvePage />),
-                    },
-                    {
-                        path: 'edit/image/estimate-by-time',
-                        element: protect(<TripPages.TimeBasedEstimatePage />),
-                    },
-                    {
-                        path: 'edit/image/estimate-by-location',
-                        element: protect(<TripPages.LocationBasedEstimatePage />),
-                    },
-                    {
-                        path: 'edit/image/map-pick',
-                        element: protect(<TripPages.MapPickPage />),
-                    },
-                    {
-                        path: 'edit/info',
-                        element: protect(<TripInfoEditPage />),
-                    },
-                    {
-                        path: 'image',
-                        children: [
-                            {
-                                path: 'by-pinpoint/:pinPointId',
-                                element: protect(<TripPages.ImageByPinpointPage />),
-                            },
-                            {
-                                path: 'by-date/:date',
-                                element: protect(<TripPages.ImageByDatePage />),
-                            },
-                        ],
-                    },
-                ],
-            },
-        ],
-    },
+                /* ── Protected (RequireAuth가 status 기반으로 가드) ── */
+                {
+                    index: true,
+                    element: protect(<GlobeMapPage />),
+                },
+                {
+                    path: ROUTES.PATH.TICKETS,
+                    element: protect(<MainPage />),
+                },
+                {
+                    path: ROUTES.PATH.SETTING,
+                    element: protect(<SettingPage />),
+                },
+                {
+                    path: `notification/:userId`,
+                    element: protect(<NotificationPage />),
+                },
+                {
+                    path: 'trip/:tripKey/',
+                    children: [
+                        {
+                            index: true,
+                            element: protect(<TripPages.TripRoutePage />),
+                        },
+                        {
+                            path: 'new',
+                            element: protect(<TripImageUploadPage />),
+                        },
+                        {
+                            path: 'edit/image',
+                            element: protect(<TripPages.TripImageManagePage />),
+                        },
+                        {
+                            path: 'edit/image/no-location',
+                            element: protect(<TripPages.NoLocationResolvePage />),
+                        },
+                        {
+                            path: 'edit/image/no-date',
+                            element: protect(<TripPages.NoDateResolvePage />),
+                        },
+                        {
+                            path: 'edit/image/estimate-by-time',
+                            element: protect(<TripPages.TimeBasedEstimatePage />),
+                        },
+                        {
+                            path: 'edit/image/estimate-by-location',
+                            element: protect(<TripPages.LocationBasedEstimatePage />),
+                        },
+                        {
+                            path: 'edit/image/map-pick',
+                            element: protect(<TripPages.MapPickPage />),
+                        },
+                        {
+                            path: 'edit/info',
+                            element: protect(<TripInfoEditPage />),
+                        },
+                        {
+                            path: 'image',
+                            children: [
+                                {
+                                    path: 'by-pinpoint/:pinPointId',
+                                    element: protect(<TripPages.ImageByPinpointPage />),
+                                },
+                                {
+                                    path: 'by-date/:date',
+                                    element: protect(<TripPages.ImageByDatePage />),
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            path: '/*',
+            element: <PageNotFound />,
+        },
+    ],
     {
-        path: '/*',
-        element: <PageNotFound />,
+        future: {
+            v7_relativeSplatPath: true,
+            v7_fetcherPersist: true,
+            v7_normalizeFormMethod: true,
+            v7_partialHydration: true,
+            v7_skipActionErrorRevalidation: true,
+        },
     },
-]);
+);
 
 export default router;
