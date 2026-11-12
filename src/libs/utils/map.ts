@@ -1,5 +1,9 @@
+import { isUnknownLocation, memoizeByLocation } from '@/libs/googleMaps/locationCache';
+import { reverseGeocode } from '@/libs/googleMaps/reverseGeocode';
 import { MAP } from '@/shared/constants/ui';
 import { Location } from '@/shared/types/map';
+
+export { getPreciseLocationFromCoordinate } from '@/libs/googleMaps/preciseLocation';
 
 /**
  * 포토카드 위치 변경을 위한 오프셋 계산
@@ -15,194 +19,52 @@ export const getPixelPositionOffset = (height: number) => {
     return offset;
 };
 
-const addressCache = new Map();
-/**
- * 주소 변환 성공 여부에 따라 Result 패턴 적용
- * @param latitude 위도
- * @param longitude 경도
- * @returns Result 패턴이 적용된 주소
- */
-export const getAddressFromLocation = async (location: Location): Promise<string> => {
-    const { latitude, longitude } = location;
-    const cacheKey = `${latitude}-${longitude}`;
+const toLatLng = ({ latitude, longitude }: Location) => ({ lat: latitude, lng: longitude });
 
-    if (cacheKey === '0-0') return '';
-
-    if (addressCache.has(cacheKey)) {
-        return addressCache.get(cacheKey)!;
-    }
-
-    const address = await convertLocationToAddress(latitude, longitude);
-    addressCache.set(cacheKey, address);
-    return address;
-};
-
-/**
- * 지리 좌표(latitude, longitude)를 기준으로 주소 반환
- * @param latitude 위도
- * @param longitude 경도
- * @returns 주소 (실패시 빈 문자열)
- */
-const convertLocationToAddress = async (latitude: number, longitude: number): Promise<string> => {
+const resolveCityAddress = async (location: Location): Promise<string> => {
     try {
-        const geocoder = new google.maps.Geocoder();
-
-        const result = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
-            geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (result, status) => {
-                if (status === 'OK' && result) {
-                    resolve(result);
-                } else {
-                    reject(new Error(`Geocoding failed: ${status}`));
-                }
-            });
-        });
-
-        const CITY_INDEX = result.length - 2;
-        return CITY_INDEX >= 0 ? result[CITY_INDEX].formatted_address : '주소 특정 불가 지역';
+        const results = await reverseGeocode(toLatLng(location));
+        const cityIndex = results.length - 2;
+        return cityIndex >= 0 ? results[cityIndex].formatted_address : '주소 특정 불가 지역';
     } catch (error) {
         console.error(error);
         return '위치 정보 없음';
     }
 };
 
-// 건물/POI 단위 정밀 역지오코딩
-// 1) Places nearbySearch(radius=30m) → 명명된 POI/건물 우선
-// 2) 폴백: Geocoder 결과 중 premise/subpremise/street_address 우선
-export const getPreciseLocationFromCoordinate = async (location: Location): Promise<string> => {
-    const { latitude, longitude } = location;
-    const cacheKey = `precise-${latitude}-${longitude}`;
+const resolveCityAddressCached = memoizeByLocation(resolveCityAddress);
 
-    if (latitude === 0 && longitude === 0) return '';
-    if (addressCache.has(cacheKey)) return addressCache.get(cacheKey)!;
+/**
+ * 좌표의 도시 단위 주소 (실패 시 안내 문구)
+ */
+export const getAddressFromLocation = async (location: Location): Promise<string> =>
+    isUnknownLocation(location) ? '' : resolveCityAddressCached(location);
 
-    const center = { lat: latitude, lng: longitude };
+const NEIGHBORHOOD_TYPES_BY_PRIORITY = ['sublocality_level_2', 'sublocality_level_1', 'neighborhood', 'route'];
 
-    // 1) Places API — 30m 반경 안의 명명된 장소(건물/POI) 우선
-    try {
-        const placesLib = (google.maps as unknown as { places?: typeof google.maps.places }).places;
-        if (placesLib) {
-            const service = new placesLib.PlacesService(document.createElement('div'));
-            const placeName = await new Promise<string | null>((resolve) => {
-                service.nearbySearch({ location: center, radius: 30 }, (results, status) => {
-                    if (status !== placesLib.PlacesServiceStatus.OK || !results || results.length === 0) {
-                        // ZERO_RESULTS는 정상이지만 REQUEST_DENIED/OVER_QUERY_LIMIT은 설정 문제다. 구분해서 남긴다.
-                        if (status !== placesLib.PlacesServiceStatus.ZERO_RESULTS) {
-                            console.warn(`Places nearbySearch failed: ${status}`);
-                        }
-                        resolve(null);
-                        return;
-                    }
-                    const POI_TYPES = [
-                        'tourist_attraction',
-                        'point_of_interest',
-                        'museum',
-                        'park',
-                        'place_of_worship',
-                        'church',
-                        'landmark',
-                        'establishment',
-                    ];
-                    const preferred =
-                        results.find(
-                            (r) =>
-                                r.name &&
-                                r.types?.some((t) => POI_TYPES.includes(t)) &&
-                                r.business_status !== 'CLOSED_PERMANENTLY',
-                        ) ??
-                        results.find((r) => r.name && r.business_status !== 'CLOSED_PERMANENTLY') ??
-                        results[0];
-                    resolve(preferred?.name ?? null);
-                });
-            });
+const resolveNeighborhood = async (location: Location): Promise<string> => {
+    const results = await reverseGeocode(toLatLng(location));
 
-            if (placeName) {
-                addressCache.set(cacheKey, placeName);
-                return placeName;
-            }
+    for (const neighborhoodType of NEIGHBORHOOD_TYPES_BY_PRIORITY) {
+        for (const result of results) {
+            const component = result.address_components.find((c) => c.types.includes(neighborhoodType));
+            if (component) return component.long_name;
         }
-    } catch (e) {
-        console.warn('Places API lookup failed', e);
     }
 
-    // 2) Geocoder fallback — 가장 정밀한 result.formatted_address
-    try {
-        const geocoder = new google.maps.Geocoder();
-        const results = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
-            geocoder.geocode({ location: center }, (r, s) => {
-                s === 'OK' && r ? resolve(r) : reject(new Error(`Geocoding failed: ${s}`));
-            });
-        });
-
-        const PRECISION_TYPES = [
-            'premise',
-            'subpremise',
-            'street_address',
-            'route',
-            'sublocality_level_4',
-            'sublocality_level_3',
-            'sublocality_level_2',
-            'sublocality_level_1',
-            'neighborhood',
-        ];
-        let best: google.maps.GeocoderResult | undefined;
-        for (const type of PRECISION_TYPES) {
-            best = results.find((r) => r.types.includes(type));
-            if (best) break;
-        }
-        const picked = best ?? results[0];
-        if (!picked) {
-            const fb = '주소 특정 불가';
-            addressCache.set(cacheKey, fb);
-            return fb;
-        }
-
-        const cleaned = picked.formatted_address
-            .replace(/^대한민국[\s,]*/, '')
-            .replace(/^South Korea[\s,]*/, '')
-            .replace(/^일본[\s,]*/, '')
-            .replace(/^Japan[\s,]*/, '')
-            .replace(/〒\d{3}-?\d{4}\s*/, '')
-            .replace(/,?\s*\d{5,}\s*$/, '')
-            .trim();
-
-        addressCache.set(cacheKey, cleaned);
-        return cleaned;
-    } catch (error) {
-        console.error('역지오코딩 실패: ', error);
-        return '위치 정보 없음';
-    }
+    return results[0]?.formatted_address ?? '주소 특정 불가 지역';
 };
 
-// 0.5km 단위 분간이 가능한 동네/소구역 수준 역지오코딩
-export const getNeighborhoodFromLocation = async (location: Location): Promise<string> => {
-    const { latitude, longitude } = location;
-    const cacheKey = `nbhd-${latitude}-${longitude}`;
+const resolveNeighborhoodCached = memoizeByLocation(resolveNeighborhood);
 
-    if (latitude === 0 && longitude === 0) return '';
-    if (addressCache.has(cacheKey)) return addressCache.get(cacheKey)!;
+/**
+ * 0.5km 단위 분간이 가능한 동네/소구역 수준 주소
+ */
+export const getNeighborhoodFromLocation = async (location: Location): Promise<string> => {
+    if (isUnknownLocation(location)) return '';
 
     try {
-        const geocoder = new google.maps.Geocoder();
-        const results = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
-            geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (r, s) => {
-                s === 'OK' && r ? resolve(r) : reject(new Error(`Geocoding failed: ${s}`));
-            });
-        });
-
-        // 우선순위: 소구역2 > 소구역1 > 동네 > 도로명
-        for (const type of ['sublocality_level_2', 'sublocality_level_1', 'neighborhood', 'route']) {
-            for (const result of results) {
-                const comp = result.address_components.find((c) => c.types.includes(type));
-                if (comp) {
-                    addressCache.set(cacheKey, comp.long_name);
-                    return comp.long_name;
-                }
-            }
-        }
-
-        const fallback = results[0]?.formatted_address ?? '주소 특정 불가 지역';
-        addressCache.set(cacheKey, fallback);
-        return fallback;
+        return await resolveNeighborhoodCached(location);
     } catch (error) {
         console.error('역지오코딩 실패: ', error);
         return '위치 정보 없음';

@@ -1,11 +1,10 @@
-import { useRef } from 'react';
-
 import { css } from '@emotion/react';
-import { Autocomplete } from '@react-google-maps/api';
 import { ChevronLeft } from 'lucide-react';
 
+import PlaceAutocomplete from '@/shared/components/map/PlaceAutocomplete';
 import { COLORS } from '@/shared/constants/style';
-import { PlacesAutocomplete } from '@/shared/types/map';
+import { useToastStore } from '@/shared/stores/useToastStore';
+import { Location } from '@/shared/types/map';
 
 interface SearchPlaceInputProps {
     isMapScriptLoaded: boolean;
@@ -20,20 +19,9 @@ const SearchPlaceInput = ({
     onLocationChange,
     onBack,
 }: SearchPlaceInputProps) => {
-    const autocompleteRef = useRef<PlacesAutocomplete>(null);
+    const { showToast } = useToastStore();
 
-    const handlePlaceChange = () => {
-        if (autocompleteRef.current !== null) {
-            const place = autocompleteRef.current.getPlace();
-
-            if (place.geometry && place.geometry.location) {
-                const latitude = place.geometry.location.lat();
-                const longitude = place.geometry.location.lng();
-
-                onLocationChange?.(latitude, longitude);
-            }
-        }
-    };
+    const handlePlaceSelect = ({ latitude, longitude }: Location) => onLocationChange(latitude, longitude);
 
     if (!isMapScriptLoaded) return;
 
@@ -43,13 +31,12 @@ const SearchPlaceInput = ({
                 <ChevronLeft size={24} strokeWidth={2.2} color={`${COLORS.TEXT.DESCRIPTION}`} />
             </button>
 
-            <Autocomplete
-                onLoad={(autocomplete) => (autocompleteRef.current = autocomplete)}
-                onPlaceChanged={handlePlaceChange}
-                css={inputWrapper}
-            >
-                <input type='text' placeholder='장소를 검색해주세요' css={inputStyle} />
-            </Autocomplete>
+            <PlaceAutocomplete
+                placeholder='장소를 검색해주세요'
+                css={autocompleteStyle}
+                onPlaceSelect={handlePlaceSelect}
+                onError={() => showToast('장소 검색에 실패했어요. 잠시 후 다시 시도해주세요')}
+            />
         </div>
     );
 };
@@ -66,16 +53,17 @@ const container = css`
     background-color: ${COLORS.BACKGROUND.WHITE};
     border-radius: 10px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
 `;
 
 const backButtonStyle = css`
     width: 54px;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     background-color: transparent;
     border: 0;
+    border-radius: 10px 0 0 10px;
     cursor: pointer;
 
     &:hover {
@@ -83,15 +71,20 @@ const backButtonStyle = css`
     }
 `;
 
-const inputWrapper = css`
-    width: 100%;
-`;
+const autocompleteStyle = css`
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
 
-const inputStyle = css`
-    width: 100%;
-    height: 100%;
-    padding: 0 20px 0 12px;
-    border: 0;
+    & > gmp-place-autocomplete {
+        background-color: ${COLORS.BACKGROUND.WHITE};
+        border: 0;
+        border-radius: 0 10px 10px 0;
+        color: ${COLORS.TEXT.BLACK};
+        font-family: inherit;
+        font-size: 15px;
+    }
 `;
 
 export default SearchPlaceInput;

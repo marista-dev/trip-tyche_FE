@@ -7,7 +7,6 @@ import router from '@/router/Router';
 import { FONT_FAMILY } from '@/shared/constants/style';
 import TanStackProvider from '@/shared/providers/TanStackProvider';
 import GlobalStyle from '@/shared/styles/GlobalStyle';
-import GoogleAutoCompleteStyle from '@/shared/styles/GoogleAutoCompleteStyle';
 import theme from '@/shared/styles/theme';
 
 import '@mantine/dates/styles.css';
@@ -22,7 +21,6 @@ const App = () => {
             <MantineProvider theme={mantineTheme}>
                 <ThemeProvider theme={theme}>
                     <GlobalStyle />
-                    <GoogleAutoCompleteStyle />
                     <AuthProvider>
                         <RouterProvider router={router} />
                     </AuthProvider>
