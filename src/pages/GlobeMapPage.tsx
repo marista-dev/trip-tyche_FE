@@ -33,7 +33,6 @@ import { useToastStore } from '@/shared/stores/useToastStore';
 /* ─── design tokens ─────────────────────────────────────── */
 const { ACCENT } = COLORS;
 const ACCENT_HEX = 0x0ea5e9; // COLORS.ACCENT('#0ea5e9')의 숫자 표현
-const PIN_HEX = 0x1d4ed8; // 핀 본체는 디자인대로 accent보다 짙은 파랑 (링·도트는 accent)
 
 /* ─── globe constants ───────────────────────────────────── */
 const R = 0.78;
@@ -424,7 +423,7 @@ const GlobeMapPage = () => {
 
                 const pin = new THREE.Mesh(
                     new THREE.SphereGeometry(0.028, 12, 12),
-                    new THREE.MeshBasicMaterial({ color: PIN_HEX }),
+                    new THREE.MeshBasicMaterial({ color: ACCENT_HEX }),
                 );
                 pin.position.copy(pos);
                 pin.userData = { nameEn, nameKo, emoji, trips: ct };
@@ -548,7 +547,7 @@ const GlobeMapPage = () => {
         const animate = () => {
             rafId = requestAnimationFrame(animate);
             rings.forEach((r) => {
-                r.t = (r.t + 0.012) % 1;
+                r.t = (r.t + 0.007) % 1;
                 r.mesh.scale.setScalar(1 + r.t * 2.2);
                 (r.mesh.material as THREE.MeshBasicMaterial).opacity = 0.6 * (1 - r.t);
             });
@@ -613,25 +612,11 @@ const GlobeMapPage = () => {
                 </div>
             )}
 
-            {/* Hint pill — CTA가 올라오면 페이드아웃 (empty: 지구본 바로 아래, populated: 하단) */}
-            {dotsReady && !selected && globeState !== 'loading' && (
-                <div css={hintPill(!ctaReady, globeState === 'empty')}>
-                    <div css={hintPillInner(globeState === 'empty')}>
+            {/* Hint pill */}
+            {dotsReady && !ctaReady && !selected && globeState !== 'loading' && (
+                <div css={hintPill}>
+                    <div css={hintPillInner}>
                         {globeState === 'populated' && <span css={hintDot} />}
-                        {globeState === 'empty' && (
-                            <svg
-                                width='12'
-                                height='12'
-                                viewBox='0 0 24 24'
-                                fill='none'
-                                stroke='currentColor'
-                                strokeWidth='2'
-                                strokeLinecap='round'
-                                aria-hidden='true'
-                            >
-                                <path d='M5 12h14M12 5l-7 7 7 7M19 5l-7 7 7 7' />
-                            </svg>
-                        )}
                         <span css={hintText}>
                             {globeState === 'empty' ? '지구본을 돌려보세요' : '핀을 탭하거나 지구본을 돌려보세요'}
                         </span>
@@ -921,25 +906,22 @@ const welcomeName = css`
 `;
 
 /* hint pill */
-const hintPill = (visible: boolean, empty: boolean) => css`
+const hintPill = css`
     position: absolute;
-    ${empty ? 'top: 50%; margin-top: 130px;' : 'bottom: 44px;'}
+    bottom: 44px;
     left: 0;
     right: 0;
     display: flex;
     justify-content: center;
     z-index: 10;
     pointer-events: none;
-    opacity: ${visible ? 1 : 0};
-    transition: opacity ${empty ? 400 : 300}ms ease;
-    animation: ${visible ? fadeIn : 'none'} 0.4s ease;
+    animation: ${fadeIn} 0.4s ease both;
 `;
 
-const hintPillInner = (empty: boolean) => css`
+const hintPillInner = css`
     display: inline-flex;
     align-items: center;
-    gap: ${empty ? 7 : 6}px;
-    color: #6b7280;
+    gap: 6px;
     padding: 6px 12px;
     background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(8px);
