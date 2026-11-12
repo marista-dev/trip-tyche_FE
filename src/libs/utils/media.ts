@@ -3,6 +3,6 @@ export const addStartDateAndEndDateToImageDates = (
     tripEndDate: string,
     imageDates: string[],
 ) => {
-    const filteredDates = imageDates.filter((date: string) => date > tripStartDate && date < tripEndDate);
-    return [tripStartDate, ...filteredDates, tripEndDate];
+    const datesInsideTrip = imageDates.filter((date) => date > tripStartDate && date < tripEndDate);
+    return [...new Set([tripStartDate, ...datesInsideTrip, tripEndDate])];
 };

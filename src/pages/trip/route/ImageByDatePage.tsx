@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { css } from '@emotion/react';
 import { ChevronLeft, ImageOff } from 'lucide-react';
@@ -8,6 +8,9 @@ import { useMediaByDate } from '@/domains/media/hooks/queries';
 import { MediaFile } from '@/domains/media/types';
 import DateSelector from '@/domains/trip/components/DateSelector';
 import ImageItem from '@/domains/trip/components/ImageItem';
+import TimeSelector from '@/domains/trip/components/TimeSelector';
+import { parseDestination } from '@/domains/trip/destinations';
+import { useTripInfo } from '@/domains/trip/hooks/queries';
 import { getPreciseLocationFromCoordinate } from '@/libs/utils/map';
 import Spinner from '@/shared/components/common/Spinner';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
@@ -20,12 +23,16 @@ import { useMapScript } from '@/shared/hooks/useMapScript';
 import { useToastStore } from '@/shared/stores/useToastStore';
 import { MapType } from '@/shared/types/map';
 
+const PHOTO_FOCUS_ZOOM = 17;
+const ACTIVE_SLIDE_VISIBILITY = 0.6;
+const CENTER_IN_STRIP: ScrollIntoViewOptions = { behavior: 'smooth', block: 'nearest', inline: 'center' };
+
 const ImageByDatePage = () => {
-    const [images, setImages] = useState<MediaFile[]>([]);
-    const [dates, setDates] = useState<string[]>([]);
-    const [activeIdx, setActiveIdx] = useState(0);
+    const [photos, setPhotos] = useState<MediaFile[]>([]);
+    const [tripDates, setTripDates] = useState<string[]>([]);
+    const [activeIndex, setActiveIndex] = useState(0);
     const [activePlace, setActivePlace] = useState('');
-    const [isAllImageLoad, setIsAllImageLoad] = useState(false);
+    const [areAllPhotosLoaded, setAreAllPhotosLoaded] = useState(false);
 
     const showToast = useToastStore((state) => state.showToast);
 
@@ -33,97 +40,86 @@ const ImageByDatePage = () => {
     const navigate = useNavigate();
 
     const mapRef = useRef<MapType | null>(null);
-    const loadedImagesCount = useRef<number>(0);
-    const imageRefs = useRef<(HTMLDivElement | null)[]>([]);
+    const loadedPhotoCountRef = useRef(0);
+    const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
     const carouselRef = useRef<HTMLDivElement | null>(null);
-    const thumbRefs = useRef<(HTMLButtonElement | null)[]>([]);
+    const thumbnailRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
     const { isMapScriptLoaded, isMapScriptLoadError } = useMapScript();
-    const { data: imagesResult } = useMediaByDate(tripKey || '', date || '');
+    const recordDates = useMemo(() => photos.map((photo) => photo.recordDate), [photos]);
+    const { data: tripInfoResult } = useTripInfo(tripKey || '');
+    const isDomestic = tripInfoResult?.success ? parseDestination(tripInfoResult.data.country).isDomestic : false;
+    const { data: photosResult } = useMediaByDate(tripKey || '', date || '');
+    const isDayTrip = tripDates.length === 1;
 
     useEffect(() => {
-        const ds: string[] = JSON.parse(sessionStorage.getItem(STORAGE_KEYS.IMAGE_DATES) || '[]');
-        setDates(ds);
+        setTripDates(JSON.parse(sessionStorage.getItem(STORAGE_KEYS.IMAGE_DATES) || '[]'));
     }, []);
 
-    // 날짜 전환 시 페인트 전에 캐러셀 스크롤·활성 인덱스를 동기 리셋
+    // 날짜를 바꾸면 페인트 전에 캐러셀을 처음으로 되돌린다
     useLayoutEffect(() => {
-        setActiveIdx(0);
-        if (carouselRef.current) {
-            carouselRef.current.scrollLeft = 0;
-        }
+        setActiveIndex(0);
+        if (carouselRef.current) carouselRef.current.scrollLeft = 0;
     }, [date]);
 
     useEffect(() => {
-        if (imagesResult) {
-            const imgs = imagesResult.success ? imagesResult.data : [];
-            setImages(imgs);
-            loadedImagesCount.current = 0;
-            setActiveIdx(0);
-            if (carouselRef.current) carouselRef.current.scrollLeft = 0;
-            if (imgs.length === 0) setIsAllImageLoad(true);
-        }
-    }, [imagesResult]);
+        if (!photosResult) return;
+        const nextPhotos = photosResult.success ? photosResult.data : [];
+        setPhotos(nextPhotos);
+        loadedPhotoCountRef.current = 0;
+        setActiveIndex(0);
+        if (carouselRef.current) carouselRef.current.scrollLeft = 0;
+        if (nextPhotos.length === 0) setAreAllPhotosLoaded(true);
+    }, [photosResult]);
 
-    // 가로 캐러셀 활성 인덱스 감지
     useEffect(() => {
-        if (!images.length || !isAllImageLoad) return;
-        if (!carouselRef.current) return;
-
-        const refs = imageRefs.current.filter(Boolean) as HTMLDivElement[];
-        if (!refs.length) return;
+        if (!photos.length || !areAllPhotosLoaded || !carouselRef.current) return;
+        const slides = slideRefs.current.filter(Boolean) as HTMLDivElement[];
+        if (!slides.length) return;
 
         const observer = new IntersectionObserver(
             (entries) => {
                 const mostVisible = entries
-                    .filter((e) => e.isIntersecting)
+                    .filter((entry) => entry.isIntersecting)
                     .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-                if (mostVisible) {
-                    const idx = Number((mostVisible.target as HTMLElement).dataset.index);
-                    setActiveIdx(idx);
-                }
+                if (mostVisible) setActiveIndex(Number((mostVisible.target as HTMLElement).dataset.index));
             },
-            { root: carouselRef.current, threshold: 0.6 },
+            { root: carouselRef.current, threshold: ACTIVE_SLIDE_VISIBILITY },
         );
-
-        refs.forEach((ref) => observer.observe(ref));
+        slides.forEach((slide) => observer.observe(slide));
         return () => observer.disconnect();
-    }, [images, isAllImageLoad]);
-
-    // 활성 thumb를 자동으로 중앙 정렬
-    useEffect(() => {
-        const el = thumbRefs.current[activeIdx];
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    }, [activeIdx]);
+    }, [photos, areAllPhotosLoaded]);
 
     useEffect(() => {
-        const img = images[activeIdx];
-        if (!img || !isMapScriptLoaded) return;
+        thumbnailRefs.current[activeIndex]?.scrollIntoView(CENTER_IN_STRIP);
+    }, [activeIndex]);
 
-        getPreciseLocationFromCoordinate({ latitude: img.latitude, longitude: img.longitude }).then(setActivePlace);
+    useEffect(() => {
+        const activePhoto = photos[activeIndex];
+        if (!activePhoto || !isMapScriptLoaded) return;
+
+        getPreciseLocationFromCoordinate({ latitude: activePhoto.latitude, longitude: activePhoto.longitude }).then(
+            setActivePlace,
+        );
 
         const map = mapRef.current;
         if (!map) return;
-
-        const newCenter = { lat: img.latitude, lng: img.longitude };
-        const targetZoom = 17;
-
+        const center = { lat: activePhoto.latitude, lng: activePhoto.longitude };
         if (GOOGLE_MAPS_MAP_ID) {
-            (map as google.maps.Map).moveCamera({ center: newCenter, zoom: targetZoom });
+            (map as google.maps.Map).moveCamera({ center, zoom: PHOTO_FOCUS_ZOOM });
         } else {
-            map.panTo(newCenter);
-            map.setZoom(targetZoom);
+            map.panTo(center);
+            map.setZoom(PHOTO_FOCUS_ZOOM);
         }
-    }, [activeIdx, images, isMapScriptLoaded]);
+    }, [activeIndex, photos, isMapScriptLoaded]);
 
-    const handleImageLoad = useCallback(() => {
-        loadedImagesCount.current += 1;
-        if (loadedImagesCount.current === images.length) setIsAllImageLoad(true);
-    }, [images]);
+    const handlePhotoLoad = useCallback(() => {
+        loadedPhotoCountRef.current += 1;
+        if (loadedPhotoCountRef.current === photos.length) setAreAllPhotosLoaded(true);
+    }, [photos]);
 
-    const scrollToIndex = useCallback((idx: number) => {
-        const el = imageRefs.current[idx];
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    const scrollToPhoto = useCallback((photoIndex: number) => {
+        slideRefs.current[photoIndex]?.scrollIntoView(CENTER_IN_STRIP);
     }, []);
 
     if (isMapScriptLoadError) {
@@ -132,11 +128,11 @@ const ImageByDatePage = () => {
         return null;
     }
 
-    const activeImage = images[activeIdx];
+    const activePhoto = photos[activeIndex];
 
     return (
         <div css={container}>
-            {!isAllImageLoad && <Indicator />}
+            {!areAllPhotosLoaded && <Indicator />}
 
             <button
                 css={backButtonStyle}
@@ -147,13 +143,13 @@ const ImageByDatePage = () => {
             </button>
 
             <div css={mapWrap}>
-                {isMapScriptLoaded && isAllImageLoad ? (
+                {isMapScriptLoaded && areAllPhotosLoaded ? (
                     <MultiMarkerMap
-                        positions={images.map((img) => ({
-                            latitude: img.latitude,
-                            longitude: img.longitude,
+                        positions={photos.map((photo) => ({
+                            latitude: photo.latitude,
+                            longitude: photo.longitude,
                         }))}
-                        activeIndex={activeIdx}
+                        activeIndex={activeIndex}
                         mapRef={mapRef}
                     />
                 ) : (
@@ -162,8 +158,8 @@ const ImageByDatePage = () => {
                     </div>
                 )}
 
-                {activeImage && activePlace && isAllImageLoad && (
-                    <div css={infoCard} key={`${activeImage.mediaFileId}-${activeIdx}`}>
+                {activePhoto && activePlace && areAllPhotosLoaded && (
+                    <div css={infoCard} key={`${activePhoto.mediaFileId}-${activeIndex}`}>
                         <div css={infoCardInner}>
                             <span css={infoCardDot} />
                             <span css={infoCardPlace}>{activePlace}</span>
@@ -172,9 +168,19 @@ const ImageByDatePage = () => {
                 )}
             </div>
 
-            <DateSelector selectedDate={date!} dates={dates} />
+            {isDayTrip ? (
+                photos.length > 0 && (
+                    <TimeSelector
+                        recordDates={recordDates}
+                        activeIndex={activeIndex}
+                        onSelectPhotoIndex={scrollToPhoto}
+                    />
+                )
+            ) : (
+                <DateSelector selectedDate={date!} dates={tripDates} isDomestic={isDomestic} />
+            )}
 
-            {images.length === 0 ? (
+            {photos.length === 0 ? (
                 <div css={emptyImageList}>
                     <div css={emptyIcon}>
                         <ImageOff color='white' />
@@ -185,29 +191,29 @@ const ImageByDatePage = () => {
             ) : (
                 <>
                     <main css={photoCarousel} ref={carouselRef}>
-                        {images.map((image, index) => (
+                        {photos.map((photo, index) => (
                             <div
-                                key={image.mediaFileId}
-                                ref={(el) => (imageRefs.current[index] = el)}
+                                key={photo.mediaFileId}
+                                ref={(element) => (slideRefs.current[index] = element)}
                                 data-index={index}
                                 css={photoSlotStyle}
                             >
-                                <ImageItem image={image} onImageLoad={handleImageLoad} />
+                                <ImageItem image={photo} onImageLoad={handlePhotoLoad} />
                             </div>
                         ))}
                     </main>
 
                     <div css={thumbStrip}>
-                        {images.map((img, i) => (
+                        {photos.map((photo, index) => (
                             <button
-                                key={img.mediaFileId}
+                                key={photo.mediaFileId}
                                 type='button'
-                                ref={(el) => (thumbRefs.current[i] = el)}
-                                css={thumbButton(i === activeIdx)}
-                                onClick={() => scrollToIndex(i)}
-                                aria-label={`사진 ${i + 1}`}
+                                ref={(element) => (thumbnailRefs.current[index] = element)}
+                                css={thumbButton(index === activeIndex)}
+                                onClick={() => scrollToPhoto(index)}
+                                aria-label={`사진 ${index + 1}`}
                             >
-                                <img src={img.mediaLink} alt='' css={thumbImage} />
+                                <img src={photo.mediaLink} alt='' css={thumbImage} />
                             </button>
                         ))}
                     </div>
