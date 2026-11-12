@@ -45,7 +45,7 @@ export class GlobeScene {
     private readonly ndc = new THREE.Vector2();
     private readonly focusTarget = new THREE.Vector3();
     private readonly pinWorld = new THREE.Vector3();
-    private readonly clock = new THREE.Clock();
+    private readonly timer = new THREE.Timer();
 
     private land: LandPoints | null = null;
     private dots: LandDots | null = null;
@@ -155,6 +155,7 @@ export class GlobeScene {
         canvas.removeEventListener('pointerup', this.onUp);
         canvas.removeEventListener('pointercancel', this.onCancel);
         window.removeEventListener('resize', this.onResize);
+        this.timer.dispose();
         this.ring.dispose();
         this.dots?.dispose();
         this.pins?.dispose();
@@ -175,9 +176,10 @@ export class GlobeScene {
         this.pins = createCountryPins(this.scene, this.visited);
     }
 
-    private readonly animate = () => {
+    private readonly animate = (timestamp?: number) => {
         this.rafId = requestAnimationFrame(this.animate);
-        const dt = Math.min(0.05, this.clock.getDelta());
+        this.timer.update(timestamp);
+        const dt = Math.min(0.05, this.timer.getDelta());
         this.pins?.tick();
         if (this.ring.opened && this.focusPin) {
             // 핀이 화면 위쪽에 오도록 카메라를 옮긴다(OrbitControls는 꺼 둔 상태)
@@ -188,7 +190,7 @@ export class GlobeScene {
         } else {
             this.controls.update();
         }
-        this.ring.frame(dt, this.clock.elapsedTime);
+        this.ring.frame(dt, this.timer.getElapsed());
         this.renderer.render(this.scene, this.camera);
     };
 
