@@ -1,6 +1,7 @@
 import { Dispatch, SetStateAction, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { css } from '@emotion/react';
+import { Switch } from '@mantine/core';
 import { DatePickerInput, DatesRangeValue, DateValue } from '@mantine/dates';
 import 'dayjs/locale/ko';
 import { Plane, Calendar, X } from 'lucide-react';
@@ -29,6 +30,8 @@ interface TripInfoFormProps {
     onChangeTripInfo: Dispatch<SetStateAction<Trip>>;
     /** 여행지 추정용 사진 GPS */
     photoLocations?: PhotoLocation[];
+    /** 당일여행 토글 상태 — 미리보기 티켓(AIR ↔ 1-Day 패스)을 토글에 맞춰 바꾼다 */
+    onDayTripChange?: (isDayTrip: boolean) => void;
 }
 
 const { PRIMARY } = theme.COLORS;
@@ -38,7 +41,12 @@ const HASHTAG_SUGGESTIONS = FORM.HASHTAG_MENU.slice(0, 3);
 const NO_DATES: string[] = [];
 const NO_LOCATIONS: PhotoLocation[] = [];
 
-const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = NO_LOCATIONS }: TripInfoFormProps) => {
+const TripInfoForm = ({
+    tripForm,
+    onChangeTripInfo,
+    photoLocations = NO_LOCATIONS,
+    onDayTripChange,
+}: TripInfoFormProps) => {
     const { tripTitle, country, startDate, endDate, hashtags, mediaFilesDates = NO_DATES } = tripForm;
     const [tagInput, setTagInput] = useState('');
     const labelId = useId();
@@ -58,7 +66,7 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = NO_LOCATION
     }, [mediaFilesDates]);
     const outsideDates = useMemo(() => getDatesOutside(photoDays, startDate, endDate), [photoDays, startDate, endDate]);
 
-    // 날짜가 처음 채워질 때(사진 미리 채움·저장된 여행) 하루짜리면 당일치기를 켠다.
+    // 날짜가 처음 채워질 때(사진 미리 채움·저장된 여행) 하루짜리면 당일여행을 켠다.
     const [isDayTrip, setIsDayTrip] = useState(Boolean(startDate) && startDate === endDate);
     const hasDatesRef = useRef(Boolean(startDate && endDate));
     useEffect(() => {
@@ -70,6 +78,11 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = NO_LOCATION
         hasDatesRef.current = true;
         setIsDayTrip(startDate === endDate);
     }, [startDate, endDate]);
+
+    useEffect(() => {
+        onDayTripChange?.(isDayTrip);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isDayTrip]);
 
     const setRange = (start: string, end: string) =>
         onChangeTripInfo((prev: Trip) => ({ ...prev, startDate: start, endDate: end }));
@@ -121,7 +134,12 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = NO_LOCATION
         }
         const before = rangeBeforeDayTripRef.current;
         rangeBeforeDayTripRef.current = null;
-        if (before && startDate === before.start && endDate === before.start) setRange(before.start, before.end);
+        if (before && startDate === before.start && endDate === before.start) {
+            setRange(before.start, before.end);
+            return;
+        }
+        // 되돌릴 기간이 없으면 끝나는 날을 비워 고르게 한다 — 하루짜리로 남으면 끈 토글과 티켓 모양이 어긋난다
+        if (startDate && endDate === startDate) setRange(startDate, '');
     };
 
     const fitToPhotos = () => {
@@ -189,12 +207,15 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = NO_LOCATION
                     <h2 id={ids.date} css={fieldLabel}>
                         {FORM.TITLE.DATE}
                     </h2>
-                    <button type='button' css={togglePill} onClick={toggleDayTrip} aria-pressed={isDayTrip}>
-                        <span css={toggleTrack(isDayTrip)}>
-                            <span css={toggleKnob(isDayTrip)} />
-                        </span>
-                        <span css={toggleText(isDayTrip)}>당일치기</span>
-                    </button>
+                    <Switch
+                        css={dayTripSwitch}
+                        checked={isDayTrip}
+                        onChange={toggleDayTrip}
+                        label='당일여행'
+                        labelPosition='left'
+                        size='sm'
+                        color={PRIMARY}
+                    />
                 </div>
                 {isDayTrip ? (
                     <DatePickerInput
@@ -222,7 +243,7 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = NO_LOCATION
                     />
                 )}
                 <div css={dateMetaRow}>
-                    {/* 당일치기면 토글이 이미 보여준다 */}
+                    {/* 당일여행이면 토글이 이미 보여준다 */}
                     {duration && !isDayTrip && (
                         <span css={durationBadge}>
                             <span css={durationDot} aria-hidden />
@@ -238,8 +259,8 @@ const TripInfoForm = ({ tripForm, onChangeTripInfo, photoLocations = NO_LOCATION
                         </span>
                     ) : (
                         <span css={fieldHelp}>
-                            {!isDayTrip && draftRange?.[0]
-                                ? '끝나는 날을 골라주세요 · 같은 날을 한 번 더 누르면 당일치기'
+                            {!isDayTrip && (draftRange?.[0] || (startDate && !endDate))
+                                ? '끝나는 날을 골라주세요 · 같은 날을 한 번 더 누르면 당일여행'
                                 : '사진이 있는 날짜는 파란 점으로 표시됩니다'}
                         </span>
                     )}
@@ -358,49 +379,25 @@ const titleRow = css`
     }
 `;
 
-// 터치 영역만 44px로 넓힌다.
-const togglePill = css`
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    user-select: none;
-    background: none;
-    border: none;
-    min-height: 44px;
-    padding: 0 0 0 8px;
-    margin: -12px 0;
-    -webkit-tap-highlight-color: transparent;
-`;
+// Mantine Switch에 폼 글자 규격을 맞추고, 줄 높이는 그대로 둔 채 터치 영역만 44px로 넓힌다.
+const dayTripSwitch = css`
+    .mantine-Switch-body {
+        align-items: center;
+        min-height: 44px;
+        margin: -12px 0;
+    }
 
-const toggleTrack = (on: boolean) => css`
-    width: 36px;
-    height: 20px;
-    border-radius: 100px;
-    background: ${on ? PRIMARY : theme.COLORS.SLATE[200]};
-    position: relative;
-    transition: background 0.2s;
-    flex-shrink: 0;
-`;
+    .mantine-Switch-label {
+        padding-inline-end: 8px;
+        font-size: ${FIELD.HELP_SIZE};
+        font-weight: 600;
+        color: ${theme.COLORS.SLATE[600]};
+        cursor: pointer;
+    }
 
-const toggleKnob = (on: boolean) => css`
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: ${theme.COLORS.BACKGROUND.WHITE};
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
-    transform: translateX(${on ? '15px' : '0'});
-    transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
-`;
-
-const toggleText = (on: boolean) => css`
-    font-size: ${FIELD.HELP_SIZE};
-    font-weight: 600;
-    color: ${on ? PRIMARY : theme.COLORS.SLATE[500]};
-    transition: color 0.2s;
+    .mantine-Switch-track {
+        cursor: pointer;
+    }
 `;
 
 const fitButton = css`

@@ -41,6 +41,8 @@ const TripImageUploadPage = () => {
     const [step, setStep] = useState<ImageUploadStepType>('upload');
     const [tripForm, setTripForm] = useState<TripInfo>(FORM.INITIAL);
     const [coverPhotoUrl, setCoverPhotoUrl] = useState<string | undefined>();
+    // 미리보기 티켓 모양은 날짜가 아니라 당일여행 토글을 따른다
+    const [isDayTrip, setIsDayTrip] = useState(false);
 
     const { isModalOpen, closeModal } = useBrowserCheck();
     const downloadUrl = useAppDownloadUrl(isModalOpen);
@@ -171,6 +173,7 @@ const TripImageUploadPage = () => {
                                 coverPhotoUrl={coverPhotoUrl}
                                 photoCount={images?.length}
                                 sample
+                                dayTrip={isDayTrip}
                             />
                             <p css={previewHint}>↓ 아래를 편집하면 티켓이 실시간으로 바뀌어요</p>
                         </div>
@@ -178,6 +181,7 @@ const TripImageUploadPage = () => {
                             tripForm={tripForm}
                             onChangeTripInfo={setTripForm}
                             photoLocations={images ?? undefined}
+                            onDayTripChange={setIsDayTrip}
                         />
                         <div css={buttonWrapper}>
                             <Button text='여행 등록하기' onClick={handleTripFormSubmit} disabled={!isFormComplete} />

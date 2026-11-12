@@ -11,6 +11,8 @@ interface ActionSheetTrip {
     tripTitle: string;
     country: string;
     coverPhoto?: string;
+    startDate?: string;
+    endDate?: string;
 }
 
 interface TripTicketActionSheetProps {
@@ -123,7 +125,7 @@ const TripTicketActionSheet = ({
 
     if (!mounted) return null;
 
-    const { departure, arrival } = getTicketView(trip);
+    const { routeText, isDayTrip } = getTicketView(trip, { completed: isCompletedTrip });
 
     const mode: ActionMode = isGuest ? 'guest' : isOwner ? 'owner' : 'shared';
     const actions = ACTION_BASE.map(({ id, Icon }) => ({ id, Icon, ...ACTION_COPY[mode][id] }));
@@ -247,7 +249,8 @@ const TripTicketActionSheet = ({
                                 margin-bottom: 3px;
                             `}
                         >
-                            {departure} → {arrival}
+                            {routeText}
+                            {isDayTrip && ' · 당일여행'}
                         </div>
                         <div
                             css={css`
@@ -371,7 +374,7 @@ const TripTicketActionSheet = ({
                                         </span>
                                     ) : (
                                         !isDanger && (
-                                            <ChevronRight size={16} strokeWidth={2} color='rgba(15, 23, 42, 0.25)' />
+                                            <ChevronRight size={16} strokeWidth={2.2} color='rgba(15, 23, 42, 0.25)' />
                                         )
                                     )}
                                 </button>

@@ -1,6 +1,9 @@
 import { css } from '@emotion/react';
 import { Plane } from 'lucide-react';
 
+import DayPassTicket from '@/domains/trip/components/ticket/DayPassTicket';
+import { notchMask } from '@/domains/trip/components/ticket/notchMask';
+import RouteEnd from '@/domains/trip/components/ticket/RouteEnd';
 import { getTicketView } from '@/domains/trip/ticketView';
 import { TripInfo } from '@/domains/trip/types';
 import { COLORS } from '@/shared/constants/style';
@@ -11,9 +14,9 @@ interface MiniTicketPreviewProps {
     coverPhotoUrl?: string;
     photoCount?: number;
     sample?: boolean;
+    /** 정해지면 날짜 대신 이 값으로 1-Day 패스/탑승권을 고른다 — 등록·수정 화면은 당일여행 토글을 따른다 */
+    dayTrip?: boolean;
 }
-
-const ACCENT = COLORS.PRIMARY;
 
 const MiniTicketPreview = ({
     trip,
@@ -21,75 +24,108 @@ const MiniTicketPreview = ({
     coverPhotoUrl,
     photoCount,
     sample = false,
+    dayTrip,
 }: MiniTicketPreviewProps) => {
-    const { departure, arrival: destinationIata, dateLine, duration, fallbackBg } = getTicketView(trip);
+    const { from, to, placeEn, isDayTrip, dateLine, duration, fallbackBg } = getTicketView(trip);
     const photosLabel = typeof photoCount === 'number' ? `${photoCount}장` : '—';
+    const title = trip.tripTitle || <span css={titleFaint}>여행 제목</span>;
+    const previewBadgeEl = sample && <div css={previewBadge}>미리보기</div>;
+
+    if (dayTrip ?? isDayTrip) {
+        return (
+            <DayPassTicket
+                title={title}
+                dateLine={dateLine || '여행 날짜'}
+                placeEn={placeEn}
+                hashtags={trip.hashtags}
+                photoUrl={coverPhotoUrl}
+                photoAlt={trip.tripTitle}
+                fallbackBg={fallbackBg}
+                // 등록 화면은 폼이 아래에 이어지므로 낮게. 그 외는 탑승권 미리보기(약 270px)와 맞춰 토글 때 폼이 밀리지 않게
+                height={sample ? 208 : 270}
+                action={previewBadgeEl}
+            />
+        );
+    }
 
     return (
-        <div css={card}>
-            <div css={top(fallbackBg)}>
-                {coverPhotoUrl && <img src={coverPhotoUrl} alt={trip.tripTitle} css={coverImage} />}
-                <div css={overlay} />
-                <div css={brandChip}>
-                    <span css={brandDot} />
-                    TYCHE AIR
-                </div>
-                {sample && <div css={previewBadge}>미리보기</div>}
-                <div css={topInfo}>
-                    <div css={dateText}>{dateLine || '여행 기간'}</div>
-                    <div css={titleText}>{trip.tripTitle || <span css={titleFaint}>여행 제목</span>}</div>
-                </div>
-            </div>
-            <div css={bottom}>
-                <span css={notchLeft} />
-                <span css={notchRight} />
-                <div css={routeRow}>
-                    <div css={iata}>{departure}</div>
-                    <div css={dashLine} />
-                    <Plane size={13} color='#fff' />
-                    <div css={dashLine} />
-                    <div css={iataRight}>{destinationIata}</div>
-                </div>
-                <div css={metaRow}>
-                    <div>
-                        <div css={metaLabel}>PASSENGER</div>
-                        <div css={metaValue}>{ownerNickname}</div>
+        <div css={cardShadow}>
+            <div css={card}>
+                <div css={top(fallbackBg)}>
+                    {coverPhotoUrl && <img src={coverPhotoUrl} alt={trip.tripTitle} css={coverImage} />}
+                    <div css={overlay} />
+                    <div css={brandChip}>
+                        <span css={brandDot} />
+                        TYCHE AIR
                     </div>
-                    <div>
-                        <div css={metaLabel}>DURATION</div>
-                        <div css={metaValue}>{duration}</div>
-                    </div>
-                    <div>
-                        <div css={metaLabel}>PHOTOS</div>
-                        <div css={metaValueAccent}>{photosLabel}</div>
+                    {previewBadgeEl && <div css={previewBadgePosition}>{previewBadgeEl}</div>}
+                    <div css={topInfo}>
+                        <div css={dateText}>{dateLine || '여행 기간'}</div>
+                        <div css={titleText}>{title}</div>
                     </div>
                 </div>
-                {trip.hashtags?.length > 0 && (
-                    <div css={tags}>
-                        {trip.hashtags.map((t) => (
-                            <span key={t} css={tag}>
-                                <span css={hash}>#</span>
-                                {t}
-                            </span>
-                        ))}
+                <div css={bottom}>
+                    <div css={routeRow}>
+                        <RouteEnd point={from} side='from' size={20} />
+                        <div css={dashLine} />
+                        <Plane size={13} color='#fff' />
+                        <div css={dashLine} />
+                        <RouteEnd point={to} side='to' size={20} />
                     </div>
-                )}
+                    <div css={metaRow}>
+                        <div>
+                            <div css={metaLabel}>PASSENGER</div>
+                            <div css={metaValue}>{ownerNickname}</div>
+                        </div>
+                        <div>
+                            <div css={metaLabel}>DURATION</div>
+                            <div css={metaValue}>{duration}</div>
+                        </div>
+                        <div>
+                            <div css={metaLabel}>PHOTOS</div>
+                            <div css={metaValueAccent}>{photosLabel}</div>
+                        </div>
+                    </div>
+                    {trip.hashtags?.length > 0 && (
+                        <div css={tags}>
+                            {trip.hashtags.map((t) => (
+                                <span key={t} css={tag}>
+                                    <span css={hash}>#</span>
+                                    {t}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
 };
 
+const TOP_HEIGHT = 140;
+
+// mask가 자기 box-shadow까지 자르므로 그림자는 바깥 요소에 둔다.
+// 구멍이 카드 안쪽이라 box-shadow(테두리 안쪽엔 안 그려짐)여야 구멍 속이 회색이 아니라 배경 그대로 보인다
+const cardShadow = css`
+    border-radius: 18px;
+    box-shadow: 0 14px 36px rgba(15, 23, 42, 0.18);
+`;
+
+// 사진과 띠 경계의 반원 구멍을 실제로 뚫는다 — 어느 페이지 배경 위에서도 자연스럽게
 const card = css`
     position: relative;
     border-radius: 18px;
     overflow: hidden;
-    box-shadow: 0 14px 36px rgba(15, 23, 42, 0.18);
-    background: #0f172a;
+    background: ${COLORS.TICKET_BAND};
+    ${notchMask(7, [
+        ['25px', `${TOP_HEIGHT}px`],
+        ['calc(100% - 25px)', `${TOP_HEIGHT}px`],
+    ])}
 `;
 
 const top = (fallback: string) => css`
     position: relative;
-    height: 140px;
+    height: ${TOP_HEIGHT}px;
     background: ${fallback};
     overflow: hidden;
 `;
@@ -128,14 +164,18 @@ const brandDot = css`
     width: 5px;
     height: 5px;
     border-radius: 50%;
-    background: ${ACCENT};
+    background: ${COLORS.PRIMARY};
     margin-right: 5px;
 `;
 
-const previewBadge = css`
+const previewBadgePosition = css`
     position: absolute;
     top: 11px;
     right: 13px;
+`;
+
+const previewBadge = css`
+    flex-shrink: 0;
     font-size: 9px;
     font-weight: 700;
     color: #fff;
@@ -175,29 +215,9 @@ const titleFaint = css`
 
 const bottom = css`
     position: relative;
-    background: #0f172a;
+    background: ${COLORS.TICKET_BAND};
     color: #fff;
     padding: 14px 16px;
-`;
-
-const notchLeft = css`
-    position: absolute;
-    top: -7px;
-    left: 18px;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: #f8fafc;
-`;
-
-const notchRight = css`
-    position: absolute;
-    top: -7px;
-    right: 18px;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: #f8fafc;
 `;
 
 const routeRow = css`
@@ -205,19 +225,6 @@ const routeRow = css`
     align-items: center;
     gap: 8px;
     margin-bottom: 10px;
-`;
-
-const iata = css`
-    font-size: 20px;
-    font-weight: 800;
-    letter-spacing: -0.04em;
-`;
-
-const iataRight = css`
-    font-size: 20px;
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    text-align: right;
 `;
 
 const dashLine = css`
@@ -247,7 +254,7 @@ const metaValue = css`
 const metaValueAccent = css`
     font-size: 11px;
     font-weight: 700;
-    color: ${ACCENT};
+    color: ${COLORS.PRIMARY};
 `;
 
 const tags = css`
@@ -266,7 +273,7 @@ const tag = css`
 `;
 
 const hash = css`
-    color: ${ACCENT};
+    color: ${COLORS.PRIMARY};
     font-weight: 700;
     margin-right: 2px;
 `;

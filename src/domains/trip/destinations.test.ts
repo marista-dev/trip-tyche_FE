@@ -3,10 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
     detectDestination,
     formatDestination,
-    getArrivalCode,
     getCountryKey,
-    getDepartureCode,
     getIndexLetter,
+    getPlaceEn,
+    getRoute,
     KOREA_VALUE,
     searchDestinations,
     toChosung,
@@ -21,19 +21,24 @@ describe('여행지 값', () => {
         expect(getCountryKey(JAPAN)).toBe(JAPAN);
     });
 
-    it('국내 여행은 GMP에서 지역 코드로 간다 — ICN → ICN이 찍히지 않는다', () => {
-        expect(getDepartureCode(JEJU)).toBe('GMP');
-        expect(getArrivalCode(JEJU)).toBe('CJU');
-        expect(getArrivalCode(`${KOREA_VALUE}/서울`)).toBe('SEL');
+    it('국내 여행은 공항 코드 대신 한글 지명으로 간다 — 김포·지어낸 코드가 찍히지 않는다', () => {
+        expect(getRoute(JEJU)).toEqual({
+            from: { label: '국내', sub: 'DOMESTIC', isCode: false },
+            to: { label: '제주', sub: 'JEJU', isCode: false },
+        });
         // 지역 기능 이전에 저장된 국내 여행
-        expect(getDepartureCode(KOREA_VALUE)).toBe('GMP');
-        expect(getArrivalCode(KOREA_VALUE)).toBe('KOR');
+        expect(getRoute(KOREA_VALUE).to).toEqual({ label: '대한민국', sub: 'KOREA', isCode: false });
     });
 
     it('해외 여행은 기존대로 ICN에서 나라 공항으로 간다', () => {
-        expect(getDepartureCode(JAPAN)).toBe('ICN');
-        expect(getArrivalCode(JAPAN)).toBe('NRT');
-        expect(getArrivalCode('')).toBe('TRP');
+        expect(getRoute(JAPAN)).toEqual({ from: { label: 'ICN', isCode: true }, to: { label: 'NRT', isCode: true } });
+        expect(getRoute('').to.label).toBe('TRP');
+    });
+
+    it('영문 지명 — 국내는 지역, 해외는 나라', () => {
+        expect(getPlaceEn(`${KOREA_VALUE}/강릉`)).toBe('GANGNEUNG');
+        expect(getPlaceEn(KOREA_VALUE)).toBe('KOREA');
+        expect(getPlaceEn(JAPAN)).toBe('JAPAN');
     });
 
     it('표시 이름', () => {

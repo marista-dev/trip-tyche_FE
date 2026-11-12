@@ -24,7 +24,8 @@ export const toLocalDate = (value?: string | null): Date | null => {
     const day = value.slice(0, 10);
     if (!DATE_PATTERN.test(day)) return null;
     const d = dayjs(day);
-    return d.isValid() ? d.toDate() : null;
+    // dayjs는 2025-13-45를 다음 해로 넘겨 읽으므로, 다시 써서 같을 때만 유효한 날짜로 본다
+    return d.isValid() && d.format(DATE_FORMAT) === day ? d.toDate() : null;
 };
 
 export const toDateString = (date: Date): string => dayjs(date).format(DATE_FORMAT);
@@ -50,11 +51,11 @@ export const getDatesOutside = (dates: string[], start?: string, end?: string): 
     return [...new Set(outside)].sort();
 };
 
-/** "당일치기" / "N박 N일". 기간이 비었거나 뒤집혔으면 null. */
+/** "당일여행" / "N박 N일". 기간이 비었거나 뒤집혔으면 null. */
 export const formatDuration = (start?: string, end?: string): string | null => {
     const days = getTripDays(start, end);
     if (days === 0) return null;
-    if (days === 1) return '당일치기';
+    if (days === 1) return '당일여행';
     return `${days - 1}박 ${days}일`;
 };
 
@@ -70,8 +71,19 @@ export const formatRange = (start: Date | null, end: Date | null): string => {
     return `${withWeekday(s, true)} ~ ${withWeekday(e, s.year() !== e.year())}`;
 };
 
+/** 티켓 날짜 "2025.11.11 (화)" / "2025.10.03 (금) — 10.05 (일)". 해가 바뀌면 끝에도 연도. 잘못된 값이면 빈 문자열. */
+export const formatTicketDate = (start?: string, end?: string): string => {
+    const s = toLocalDate(start);
+    if (!s) return '';
+    const e = toLocalDate(end);
+    const sd = dayjs(s);
+    if (!e || sd.isSame(e, 'day') || sd.isAfter(e, 'day')) return withWeekday(sd, true);
+    const ed = dayjs(e);
+    return `${withWeekday(sd, true)} — ${withWeekday(ed, sd.year() !== ed.year())}`;
+};
+
 /** "3월 4일" */
-export const formatMonthDay = (date: string): string => {
+const formatMonthDay = (date: string): string => {
     const d = dayjs(date.slice(0, 10));
     return `${d.month() + 1}월 ${d.date()}일`;
 };

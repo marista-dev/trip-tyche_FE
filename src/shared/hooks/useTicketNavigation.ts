@@ -23,13 +23,20 @@ export const useTicketNavigation = (tripKey: string) => {
         }
     }, [isAnimating, tripKey, navigate]);
 
-    const handleCardClick = () => {
-        setIsAnimating(true);
-        // 애니메이션 800ms 동안 route 데이터 백그라운드 프리페치
+    /**
+     * play: 비행기 대신 자체 효과를 쓰는 티켓(당일 패스). 효과가 끝나면 넘겨준 이동 함수를 부른다.
+     * 어느 쪽이든 탭하는 순간 route 데이터를 백그라운드 프리페치한다.
+     */
+    const handleCardClick = ({ play }: { play?: (go: () => void) => void } = {}) => {
         queryClient.prefetchQuery({
             queryKey: ['route', tripKey],
             queryFn: () => toResult(() => routeAPI.fetchTripRoute(tripKey)),
         });
+        if (play) {
+            play(() => navigate(ROUTES.PATH.TRIP.ROOT(tripKey)));
+            return;
+        }
+        setIsAnimating(true);
     };
 
     return {

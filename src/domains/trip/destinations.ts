@@ -12,8 +12,6 @@ export const KOREA_VALUE = '🇰🇷/대한민국/SOUTH KOREA';
 export interface Region {
     name: string;
     nameEn: string;
-    /** 티켓 도착 코드. 공항이 있으면 실제 공항 코드, 없으면 3글자 약어 */
-    code: string;
     aliases: string[];
     /** [남, 북, 서, 동] — 사진 GPS 판정용 대략 범위 */
     bounds: [number, number, number, number];
@@ -24,50 +22,43 @@ const REGIONS: Region[] = [
     {
         name: '제주',
         nameEn: 'JEJU',
-        code: 'CJU',
         aliases: ['제주도', '서귀포', 'jeju'],
         bounds: [33.1, 33.6, 126.1, 127.0],
     },
-    { name: '서울', nameEn: 'SEOUL', code: 'SEL', aliases: ['seoul'], bounds: [37.42, 37.7, 126.76, 127.19] },
-    { name: '부산', nameEn: 'BUSAN', code: 'PUS', aliases: ['해운대', 'busan'], bounds: [35.0, 35.4, 128.75, 129.3] },
-    { name: '인천', nameEn: 'INCHEON', code: 'ICN', aliases: ['incheon'], bounds: [37.3, 37.65, 126.35, 126.76] },
-    { name: '강릉', nameEn: 'GANGNEUNG', code: 'YNY', aliases: ['gangneung'], bounds: [37.6, 37.95, 128.7, 129.1] },
+    { name: '서울', nameEn: 'SEOUL', aliases: ['seoul'], bounds: [37.42, 37.7, 126.76, 127.19] },
+    { name: '부산', nameEn: 'BUSAN', aliases: ['해운대', 'busan'], bounds: [35.0, 35.4, 128.75, 129.3] },
+    { name: '인천', nameEn: 'INCHEON', aliases: ['incheon'], bounds: [37.3, 37.65, 126.35, 126.76] },
+    { name: '강릉', nameEn: 'GANGNEUNG', aliases: ['gangneung'], bounds: [37.6, 37.95, 128.7, 129.1] },
     {
         name: '속초·양양',
         nameEn: 'SOKCHO',
-        code: 'YNY',
         aliases: ['속초', '양양', 'sokcho'],
         bounds: [37.95, 38.35, 128.4, 128.75],
     },
-    { name: '경주', nameEn: 'GYEONGJU', code: 'KPO', aliases: ['gyeongju'], bounds: [35.7, 35.95, 129.0, 129.45] },
-    { name: '포항', nameEn: 'POHANG', code: 'KPO', aliases: ['pohang'], bounds: [35.95, 36.35, 129.2, 129.6] },
-    { name: '여수', nameEn: 'YEOSU', code: 'RSU', aliases: ['yeosu'], bounds: [34.55, 34.95, 127.45, 127.85] },
-    { name: '전주', nameEn: 'JEONJU', code: 'JNJ', aliases: ['jeonju'], bounds: [35.75, 35.9, 127.05, 127.2] },
+    { name: '경주', nameEn: 'GYEONGJU', aliases: ['gyeongju'], bounds: [35.7, 35.95, 129.0, 129.45] },
+    { name: '포항', nameEn: 'POHANG', aliases: ['pohang'], bounds: [35.95, 36.35, 129.2, 129.6] },
+    { name: '여수', nameEn: 'YEOSU', aliases: ['yeosu'], bounds: [34.55, 34.95, 127.45, 127.85] },
+    { name: '전주', nameEn: 'JEONJU', aliases: ['jeonju'], bounds: [35.75, 35.9, 127.05, 127.2] },
     {
         name: '통영·거제',
         nameEn: 'TONGYEONG',
-        code: 'TYG',
         aliases: ['통영', '거제', 'tongyeong'],
         bounds: [34.7, 35.05, 128.25, 128.75],
     },
-    { name: '대구', nameEn: 'DAEGU', code: 'TAE', aliases: ['daegu'], bounds: [35.75, 36.0, 128.45, 128.75] },
-    { name: '대전', nameEn: 'DAEJEON', code: 'DJN', aliases: ['daejeon'], bounds: [36.2, 36.5, 127.25, 127.55] },
-    { name: '광주', nameEn: 'GWANGJU', code: 'KWJ', aliases: ['gwangju'], bounds: [35.05, 35.25, 126.7, 127.0] },
-    { name: '울산', nameEn: 'ULSAN', code: 'USN', aliases: ['ulsan'], bounds: [35.35, 35.7, 129.0, 129.45] },
-    { name: '안동', nameEn: 'ANDONG', code: 'ADG', aliases: ['andong'], bounds: [36.45, 36.7, 128.55, 128.9] },
-    { name: '청주', nameEn: 'CHEONGJU', code: 'CJJ', aliases: ['cheongju'], bounds: [36.5, 36.75, 127.35, 127.6] },
+    { name: '대구', nameEn: 'DAEGU', aliases: ['daegu'], bounds: [35.75, 36.0, 128.45, 128.75] },
+    { name: '대전', nameEn: 'DAEJEON', aliases: ['daejeon'], bounds: [36.2, 36.5, 127.25, 127.55] },
+    { name: '광주', nameEn: 'GWANGJU', aliases: ['gwangju'], bounds: [35.05, 35.25, 126.7, 127.0] },
+    { name: '울산', nameEn: 'ULSAN', aliases: ['ulsan'], bounds: [35.35, 35.7, 129.0, 129.45] },
+    { name: '안동', nameEn: 'ANDONG', aliases: ['andong'], bounds: [36.45, 36.7, 128.55, 128.9] },
+    { name: '청주', nameEn: 'CHEONGJU', aliases: ['cheongju'], bounds: [36.5, 36.75, 127.35, 127.6] },
     {
         name: '춘천·가평',
         nameEn: 'CHUNCHEON',
-        code: 'CNC',
         aliases: ['춘천', '가평', 'chuncheon'],
         bounds: [37.7, 38.0, 127.35, 127.85],
     },
 ];
 
-/** 지역 없는 국내 여행의 도착 코드 */
-const KOREA_FALLBACK_CODE = 'KOR';
-const DOMESTIC_DEPARTURE = 'GMP';
 const INTERNATIONAL_DEPARTURE = 'ICN';
 const FALLBACK_IATA = 'TRP';
 
@@ -107,15 +98,34 @@ export const formatDestination = (value?: string): { emoji: string; name: string
     return { emoji: country?.emoji ?? emoji, name: country?.nameKo ?? nameKo };
 };
 
-export const getArrivalCode = (value?: string): string => {
-    if (!value) return FALLBACK_IATA;
+/** 티켓 경로의 한쪽 끝. 해외는 공항 코드, 국내는 한글 지명 + 영문 보조 표기 */
+export interface RoutePoint {
+    label: string;
+    sub?: string;
+    isCode: boolean;
+}
+
+/** 국내: "국내 → 제주"(공항 코드를 지어내지 않는다), 해외: "ICN → NRT" */
+export const getRoute = (value?: string): { from: RoutePoint; to: RoutePoint } => {
     const { country, region, isDomestic } = parseDestination(value);
-    if (isDomestic) return region?.code ?? KOREA_FALLBACK_CODE;
-    return country?.iata ?? FALLBACK_IATA;
+    if (isDomestic) {
+        return {
+            from: { label: '국내', sub: 'DOMESTIC', isCode: false },
+            to: { label: region?.name ?? '대한민국', sub: region?.nameEn ?? 'KOREA', isCode: false },
+        };
+    }
+    return {
+        from: { label: INTERNATIONAL_DEPARTURE, isCode: true },
+        to: { label: (value && country?.iata) || FALLBACK_IATA, isCode: true },
+    };
 };
 
-export const getDepartureCode = (value?: string): string =>
-    parseDestination(value).isDomestic ? DOMESTIC_DEPARTURE : INTERNATIONAL_DEPARTURE;
+/** 영문 지명. 국내는 지역("GANGNEUNG"), 해외는 나라("JAPAN"). 모르면 빈 문자열 */
+export const getPlaceEn = (value?: string): string => {
+    const { country, region, isDomestic, countryValue } = parseDestination(value);
+    if (isDomestic) return region?.nameEn ?? 'KOREA';
+    return (country?.nameEn ?? countryValue.split('/')[2] ?? '').toUpperCase();
+};
 
 const CHOSUNG = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
 

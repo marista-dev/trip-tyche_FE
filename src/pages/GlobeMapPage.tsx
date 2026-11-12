@@ -7,7 +7,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { css, keyframes } from '@emotion/react';
 import { useQueryClient } from '@tanstack/react-query';
-import dayjs from 'dayjs';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import * as THREE from 'three';
@@ -15,6 +14,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 import { useTripImages } from '@/domains/media/hooks/queries';
 import { useTripSummaryList } from '@/domains/trip/hooks/queries';
+import { getTicketView } from '@/domains/trip/ticketView';
 import { TripSummary } from '@/domains/trip/types';
 import { NICKNAME_FORM } from '@/domains/user/constants';
 import { useSummary } from '@/domains/user/hooks/queries';
@@ -196,9 +196,7 @@ const TicketCard = ({ trip, country, onPress }: { trip: TripSummary; country: Se
                 </div>
                 <div css={ticketInfoArea}>
                     <div css={ticketInfoTitle}>{trip.tripTitle}</div>
-                    <div css={ticketInfoDate}>
-                        {dayjs(trip.startDate).format('YY.MM.DD')} → {dayjs(trip.endDate).format('YY.MM.DD')}
-                    </div>
+                    <div css={ticketInfoDate}>{getTicketView(trip).dateLine}</div>
                 </div>
             </div>
 

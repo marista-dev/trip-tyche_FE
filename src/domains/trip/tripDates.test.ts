@@ -38,8 +38,8 @@ describe('tripDates', () => {
         expect(getDatesOutside(dates, '', '')).toEqual([]);
     });
 
-    it('기간을 당일치기 / N박 N일로 표기한다', () => {
-        expect(formatDuration('2025-03-05', '2025-03-05')).toBe('당일치기');
+    it('기간을 당일여행 / N박 N일로 표기한다', () => {
+        expect(formatDuration('2025-03-05', '2025-03-05')).toBe('당일여행');
         expect(formatDuration('2025-03-05', '2025-03-09')).toBe('4박 5일');
         expect(formatDuration('2025-03-09', '2025-03-05')).toBeNull();
         expect(formatDuration('', '')).toBeNull();
@@ -55,7 +55,7 @@ describe('validateFormComplete', () => {
         hashtags: ['벚꽃'],
     };
 
-    it('필수값이 모두 있으면 완료 — 당일치기 포함', () => {
+    it('필수값이 모두 있으면 완료 — 당일여행 포함', () => {
         expect(validateFormComplete(base)).toBe(true);
     });
 

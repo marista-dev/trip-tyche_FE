@@ -4,8 +4,10 @@ import { css, keyframes } from '@emotion/react';
 import { Globe, MessageCircleMore, Settings, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+import { prefetchStubCurl } from '@/domains/trip/components/ticket/stubCurl/loadStubCurl';
 import TripTicket from '@/domains/trip/components/TripTicket';
 import { useTripTicketList } from '@/domains/trip/hooks/queries';
+import { getTicketView } from '@/domains/trip/ticketView';
 import { Trip } from '@/domains/trip/types';
 import { useSummary } from '@/domains/user/hooks/queries';
 import { useMemberOnly } from '@/domains/user/hooks/useMemberOnly';
@@ -43,6 +45,14 @@ const MainPage = () => {
     // RequireAuth가 authenticated 상태에서만 렌더하므로 userInfo는 항상 truthy.
     const shouldFetchTrips = mounted && !!userInfo;
     const { data: myTrips, isLoading: isTripsLoading } = useTripTicketList(shouldFetchTrips);
+
+    // 1-Day 패스가 있으면 첫 탭이 늦지 않게 말림 효과 청크를 유휴 시간에 받아 둔다
+    const hasDayPass =
+        !!myTrips?.success &&
+        myTrips.data.some((trip) => getTicketView(trip, { completed: !!trip.confirmed }).isDayTrip);
+    useEffect(() => {
+        if (hasDayPass) return prefetchStubCurl();
+    }, [hasDayPass]);
 
     const [pendingCheckDone, setPendingCheckDone] = useState(false);
     const navigate = useNavigate();

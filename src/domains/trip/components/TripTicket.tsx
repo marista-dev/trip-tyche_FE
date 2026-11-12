@@ -5,6 +5,10 @@ import { Plus, Trash } from 'lucide-react';
 
 import { useTripImages } from '@/domains/media/hooks/queries';
 import ShareModal from '@/domains/share/components/ShareModal';
+import DayPassTicket from '@/domains/trip/components/ticket/DayPassTicket';
+import { notchMask } from '@/domains/trip/components/ticket/notchMask';
+import RouteEnd from '@/domains/trip/components/ticket/RouteEnd';
+import { useStubCurl } from '@/domains/trip/components/ticket/stubCurl/useStubCurl';
 import TripTicketActionSheet from '@/domains/trip/components/TripTicketActionSheet';
 import { getTicketView } from '@/domains/trip/ticketView';
 import { Trip } from '@/domains/trip/types';
@@ -48,6 +52,8 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
         },
     );
     const { isAnimating, handleCardClick } = useTicketNavigation(tripKey!);
+    // 1-Day 패스는 옆면이 말려 떨어진 뒤 이동한다(탑승권은 비행기 애니메이션 그대로)
+    const { stubRef, play: playStubCurl } = useStubCurl();
 
     const { data: imagesData } = useTripImages(tripKey ?? '');
     const mediaFiles = imagesData?.success ? imagesData.data : undefined;
@@ -58,14 +64,44 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
 
     const isOwner = userInfo?.nickname === ownerNickname;
     const {
-        departure: departureIata,
-        arrival: destinationIata,
+        from,
+        to,
+        placeEn,
+        isDayTrip,
+        dateLine,
         startText: formattedStartDate,
         endText: formattedEndDate,
         duration: durationLabel,
         fallbackBg,
     } = getTicketView({ tripTitle, country, startDate, endDate }, { completed: !!isCompletedTrip });
     const sharedPeople = [ownerNickname || '', ...(sharedUsersNicknames || [])];
+
+    const sharedLabel = !isOwner && <span css={sharedLabelStyle}>공유받은 티켓</span>;
+    const moreButton = (variant: 'band' | 'photo') => (
+        <button
+            aria-label='옵션 더보기'
+            onClick={(e) => {
+                e.stopPropagation();
+                setIsSheetOpen(true);
+            }}
+            css={[moreButtonStyle, variant === 'photo' && moreButtonOnPhotoStyle]}
+        >
+            <svg
+                width='16'
+                height='16'
+                viewBox='0 0 24 24'
+                fill='none'
+                stroke='currentColor'
+                strokeWidth='2.2'
+                strokeLinecap='round'
+                strokeLinejoin='round'
+            >
+                <circle cx='5' cy='12' r='1.5' />
+                <circle cx='12' cy='12' r='1.5' />
+                <circle cx='19' cy='12' r='1.5' />
+            </svg>
+        </button>
+    );
 
     return (
         <div css={containerStyle}>
@@ -94,142 +130,115 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
                 </div>
             )}
 
-            <div onClick={handleCardClick} css={cardClickableStyle}>
-                {/* Photo Hero */}
-                <div css={photoHeroStyle(fallbackBg)}>
-                    {coverPhoto && <img src={coverPhoto} alt={tripTitle} css={coverPhotoStyle} />}
-                    <div css={gradientTopStyle} />
-                    <div css={gradientBottomStyle} />
-
-                    {/* TYCHE AIR badge */}
-                    <div css={badgeContainerStyle}>
-                        <span css={badgeStyle}>
-                            <span css={badgeDotStyle} />
-                            TYCHE AIR
-                        </span>
-                        {!isOwner && <span css={sharedLabelStyle}>공유받은 티켓</span>}
-                    </div>
-
-                    {/* Date + Title overlay */}
-                    <div css={heroOverlayStyle}>
-                        <div css={heroDateStyle}>
-                            {formattedStartDate} — {formattedEndDate}
-                        </div>
-                        <div css={heroTitleStyle}>{tripTitle}</div>
-                    </div>
+            {isDayTrip ? (
+                <div
+                    onClick={() => handleCardClick({ play: playStubCurl })}
+                    css={[cardClickableStyle, dayPassClickableStyle]}
+                >
+                    <DayPassTicket
+                        stubRef={stubRef}
+                        title={tripTitle}
+                        dateLine={dateLine}
+                        placeEn={placeEn}
+                        hashtags={hashtags}
+                        photoUrl={coverPhoto}
+                        photoAlt={tripTitle}
+                        fallbackBg={fallbackBg}
+                        height={268}
+                        badge={sharedLabel}
+                        action={moreButton('photo')}
+                    />
                 </div>
+            ) : (
+                <div css={boardingShadowStyle}>
+                    <div onClick={() => handleCardClick()} css={[cardClickableStyle, boardingCardStyle]}>
+                        {/* Photo Hero */}
+                        <div css={photoHeroStyle(fallbackBg)}>
+                            {coverPhoto && <img src={coverPhoto} alt={tripTitle} css={coverPhotoStyle} />}
+                            <div css={gradientTopStyle} />
+                            <div css={gradientBottomStyle} />
 
-                {/* Boarding-pass band */}
-                <div css={bandStyle}>
-                    <div css={perfLeftStyle} />
-                    <div css={perfRightStyle} />
+                            {/* TYCHE AIR badge */}
+                            <div css={badgeContainerStyle}>
+                                <span css={badgeStyle}>
+                                    <span css={badgeDotStyle} />
+                                    TYCHE AIR
+                                </span>
+                                {sharedLabel}
+                            </div>
 
-                    {/* Route row */}
-                    <div css={routeRowStyle}>
-                        <div css={routeCodeStyle}>{departureIata}</div>
-                        <div css={routeLineStyle}>
-                            <div css={dashedLineStyle} />
-                            <div css={dashedLineStyle} />
-                            {isAnimating && (
-                                <svg
-                                    width='14'
-                                    height='14'
-                                    viewBox='0 0 24 24'
-                                    fill='#fff'
-                                    css={planeTraverseStyle}
-                                    aria-hidden='true'
-                                >
-                                    <path d='M21 16v-2l-8-5V3.5a1.5 1.5 0 00-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5L21 16z' />
-                                </svg>
-                            )}
+                            {/* Date + Title overlay */}
+                            <div css={heroOverlayStyle}>
+                                <div css={heroDateStyle}>
+                                    {dateLine || `${formattedStartDate} — ${formattedEndDate}`}
+                                </div>
+                                <div css={heroTitleStyle}>{tripTitle}</div>
+                            </div>
                         </div>
-                        <div
-                            css={[
-                                routeCodeStyle,
-                                css`
-                                    text-align: right;
-                                `,
-                            ]}
-                        >
-                            {destinationIata}
-                        </div>
-                    </div>
 
-                    {/* Meta row */}
-                    <div css={metaRowStyle}>
-                        <div>
-                            <div css={metaLabelStyle}>PASSENGER</div>
-                            <div css={metaValueStyle}>{ownerNickname || '—'}</div>
-                        </div>
-                        <div>
-                            <div css={metaLabelStyle}>DURATION</div>
-                            <div css={metaValueStyle}>{durationLabel}</div>
-                        </div>
-                        <div>
-                            <div css={metaLabelStyle}>PHOTOS</div>
-                            <div
-                                css={[
-                                    metaValueStyle,
-                                    css`
-                                        color: ${COLORS.PRIMARY};
-                                    `,
-                                ]}
-                            >
-                                {photosCount}
+                        {/* Boarding-pass band */}
+                        <div css={bandStyle}>
+                            {/* Route row */}
+                            <div css={routeRowStyle}>
+                                <RouteEnd point={from} side='from' />
+                                <div css={routeLineStyle}>
+                                    <div css={dashedLineStyle} />
+                                    <div css={dashedLineStyle} />
+                                    {isAnimating && (
+                                        <svg
+                                            width='14'
+                                            height='14'
+                                            viewBox='0 0 24 24'
+                                            fill='#fff'
+                                            css={planeTraverseStyle}
+                                            aria-hidden='true'
+                                        >
+                                            <path d='M21 16v-2l-8-5V3.5a1.5 1.5 0 00-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5L21 16z' />
+                                        </svg>
+                                    )}
+                                </div>
+                                <RouteEnd point={to} side='to' />
+                            </div>
+
+                            {/* Meta row */}
+                            <div css={metaRowStyle}>
+                                <div>
+                                    <div css={metaLabelStyle}>PASSENGER</div>
+                                    <div css={metaValueStyle}>{ownerNickname || '—'}</div>
+                                </div>
+                                <div>
+                                    <div css={metaLabelStyle}>DURATION</div>
+                                    <div css={metaValueStyle}>{durationLabel}</div>
+                                </div>
+                                <div>
+                                    <div css={metaLabelStyle}>PHOTOS</div>
+                                    <div css={[metaValueStyle, metaValueAccentStyle]}>{photosCount}</div>
+                                </div>
+                            </div>
+
+                            {/* Hashtags + ⋯ button */}
+                            <div css={tagRowStyle}>
+                                <div css={tagGroupStyle}>
+                                    {hashtags
+                                        .filter((tag) => tag !== '')
+                                        .map((tag, i) => (
+                                            <span key={i} css={tagChipStyle}>
+                                                <span css={hashStyle}>#</span>
+                                                {tag}
+                                            </span>
+                                        ))}
+                                </div>
+                                {moreButton('band')}
                             </div>
                         </div>
                     </div>
-
-                    {/* Hashtags + ⋯ button */}
-                    <div css={tagRowStyle}>
-                        <div css={tagGroupStyle}>
-                            {hashtags
-                                .filter((tag) => tag !== '')
-                                .map((tag, i) => (
-                                    <span key={i} css={tagChipStyle}>
-                                        <span
-                                            css={css`
-                                                color: ${COLORS.PRIMARY};
-                                                font-weight: 700;
-                                            `}
-                                        >
-                                            #
-                                        </span>
-                                        {tag}
-                                    </span>
-                                ))}
-                        </div>
-                        <button
-                            aria-label='옵션 더보기'
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setIsSheetOpen(true);
-                            }}
-                            css={moreButtonStyle}
-                        >
-                            <svg
-                                width='16'
-                                height='16'
-                                viewBox='0 0 24 24'
-                                fill='none'
-                                stroke='currentColor'
-                                strokeWidth='2.2'
-                                strokeLinecap='round'
-                                strokeLinejoin='round'
-                            >
-                                <circle cx='5' cy='12' r='1.5' />
-                                <circle cx='12' cy='12' r='1.5' />
-                                <circle cx='19' cy='12' r='1.5' />
-                            </svg>
-                        </button>
-                    </div>
                 </div>
-            </div>
+            )}
 
             <TripTicketActionSheet
                 open={isSheetOpen}
                 onClose={() => setIsSheetOpen(false)}
-                trip={{ tripTitle, country, coverPhoto }}
+                trip={{ tripTitle, country, coverPhoto, startDate, endDate }}
                 isOwner={isOwner}
                 isGuest={isGuest}
                 isCompletedTrip={!!isCompletedTrip}
@@ -259,8 +268,7 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
                     tripTitle={tripTitle}
                     isOwner={isOwner}
                     sharedPeople={sharedPeople}
-                    startDate={formattedStartDate}
-                    endDate={formattedEndDate}
+                    dateLine={dateLine}
                     onClose={() => setIsShareModalOpen(false)}
                 />
             )}
@@ -270,24 +278,48 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
 
 /* ── Styles ────────────────────────────────────────────────────────── */
 
+// 티켓 모양·그림자는 안쪽 카드가 가진다. 여기에 mask·filter를 걸면 안에 든 fixed 요소(Indicator·모달)까지 잘린다
 const containerStyle = css`
     width: 100%;
     margin-bottom: 8px;
     position: relative;
+    user-select: none;
+`;
+
+const HERO_HEIGHT = 200;
+
+// mask가 자기 box-shadow까지 자르므로 그림자는 바깥 요소에 둔다.
+// 구멍이 티켓 안쪽이라 drop-shadow면 구멍 속이 그림자로 회색이 된다 → box-shadow(테두리 안쪽엔 안 그려짐)로 배경이 그대로 보이게
+const boardingShadowStyle = css`
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+`;
+
+// 사진과 띠 경계의 반원 구멍을 실제로 뚫는다 — 어느 페이지 배경 위에서도 자연스럽게
+const boardingNotches = notchMask(8, [
+    ['28px', `${HERO_HEIGHT}px`],
+    ['calc(100% - 28px)', `${HERO_HEIGHT}px`],
+]);
+
+const boardingCardStyle = css`
     border-radius: 20px;
     overflow: hidden;
-    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
     background: ${COLORS.TICKET_BAND};
-    user-select: none;
+    ${boardingNotches}
 `;
 
 const cardClickableStyle = css`
     cursor: pointer;
 `;
 
+// 안드로이드 기본 탭 하이라이트가 말림 효과 위에 파란 사각형으로 덮이지 않게
+const dayPassClickableStyle = css`
+    -webkit-tap-highlight-color: transparent;
+`;
+
 const photoHeroStyle = (fallbackBg: string) => css`
     position: relative;
-    height: 200px;
+    height: ${HERO_HEIGHT}px;
     background: ${fallbackBg};
     overflow: hidden;
 `;
@@ -390,40 +422,11 @@ const bandStyle = css`
     padding: 16px 18px;
 `;
 
-const perfLeftStyle = css`
-    position: absolute;
-    top: -8px;
-    left: 20px;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: ${COLORS.BACKGROUND.PRIMARY};
-`;
-
-const perfRightStyle = css`
-    position: absolute;
-    top: -8px;
-    right: 20px;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: ${COLORS.BACKGROUND.PRIMARY};
-`;
-
 const routeRowStyle = css`
     display: flex;
     align-items: center;
     gap: 10px;
     margin-bottom: 10px;
-`;
-
-const routeCodeStyle = css`
-    font-size: 22px;
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    line-height: 1;
-    color: #fff;
-    flex-shrink: 0;
 `;
 
 const routeLineStyle = css`
@@ -463,6 +466,10 @@ const metaValueStyle = css`
     color: #fff;
 `;
 
+const metaValueAccentStyle = css`
+    color: ${COLORS.PRIMARY};
+`;
+
 const tagRowStyle = css`
     display: flex;
     align-items: flex-end;
@@ -489,6 +496,11 @@ const tagChipStyle = css`
     gap: 2px;
 `;
 
+const hashStyle = css`
+    color: ${COLORS.PRIMARY};
+    font-weight: 700;
+`;
+
 const moreButtonStyle = css`
     flex-shrink: 0;
     width: 32px;
@@ -509,6 +521,18 @@ const moreButtonStyle = css`
     }
 `;
 
+const moreButtonOnPhotoStyle = css`
+    width: 28px;
+    height: 28px;
+    background: rgba(15, 23, 42, 0.35);
+    color: #fff;
+    backdrop-filter: blur(8px);
+
+    &:hover {
+        background: rgba(15, 23, 42, 0.5);
+    }
+`;
+
 const uncompletedOverlayStyle = css`
     width: 100%;
     height: 100%;
@@ -519,6 +543,9 @@ const uncompletedOverlayStyle = css`
     justify-content: center;
     align-items: center;
     background-color: rgba(0, 0, 0, 0.48);
+    /* 컨테이너가 더는 라운드로 자르지 않으므로 직접 둥글리고, 반원 구멍도 함께 뚫는다 */
+    border-radius: 20px;
+    ${boardingNotches}
     z-index: 9;
     cursor: pointer;
 `;
@@ -527,12 +554,12 @@ const uncompletedButtonsStyle = css`
     display: flex;
     align-items: center;
     gap: 6px;
-    color: #1d1d1f;
-    background-color: #ffffff;
+    color: ${COLORS.TEXT.TITLE};
+    background-color: ${COLORS.BACKGROUND.WHITE};
     border: none;
     border-radius: 24px;
     cursor: pointer;
-    box-shadow: rgba(0, 0, 0, 0.22) 3px 5px 30px 0px;
+    box-shadow: ${COLORS.BOX_SHADOW.PHOTO_CARD};
     font-size: 14px;
     font-weight: 500;
     letter-spacing: -0.224px;

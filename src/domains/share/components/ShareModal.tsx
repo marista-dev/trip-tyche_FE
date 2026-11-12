@@ -16,12 +16,12 @@ export interface ShareModalProps {
     tripTitle: string;
     isOwner: boolean;
     sharedPeople: string[];
-    startDate: string;
-    endDate: string;
+    /** 티켓과 같은 날짜 표기("2025.11.11 (화)" / "2025.10.03 (금) — 10.05 (일)") */
+    dateLine: string;
     onClose: () => void;
 }
 
-const ShareModal = ({ tripKey, tripTitle, isOwner, sharedPeople, onClose, startDate, endDate }: ShareModalProps) => {
+const ShareModal = ({ tripKey, tripTitle, isOwner, sharedPeople, onClose, dateLine }: ShareModalProps) => {
     const [inputValue, setInputValue] = useState('');
     const [isValid, setIsValid] = useState(true);
     const [errorMessage, setErrorMessage] = useState('');
@@ -127,7 +127,7 @@ const ShareModal = ({ tripKey, tripTitle, isOwner, sharedPeople, onClose, startD
                 <Avatar />
                 <div css={ticketContentStyle}>
                     <p css={ticketTitleStyle}>{tripTitle}</p>
-                    <p css={ticketDatesStyle}>{`${startDate} ~ ${endDate}`}</p>
+                    <p css={ticketDatesStyle}>{dateLine}</p>
                 </div>
             </div>
 
