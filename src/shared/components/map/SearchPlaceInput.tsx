@@ -40,7 +40,7 @@ const SearchPlaceInput = ({
     return (
         <div css={container}>
             <button css={backButtonStyle} onClick={onBack} disabled={isBackButtonDisable}>
-                <ChevronLeft size={24} color={`${COLORS.TEXT.DESCRIPTION}`} />
+                <ChevronLeft size={24} strokeWidth={2.2} color={`${COLORS.TEXT.DESCRIPTION}`} />
             </button>
 
             <Autocomplete

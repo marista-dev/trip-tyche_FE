@@ -67,7 +67,7 @@ const MapControlButtons = ({
             {/* 일시정지 중에만 — 이전 핀 */}
             {showNav && (
                 <button css={navBtnStyle} onClick={handler.handlePrevPin} disabled={isFirst} aria-label='이전 핀'>
-                    <ChevronLeft size={16} />
+                    <ChevronLeft size={16} strokeWidth={2.2} />
                 </button>
             )}
 
@@ -83,7 +83,7 @@ const MapControlButtons = ({
             {/* 일시정지 중에만 — 다음 핀 */}
             {showNav && (
                 <button css={navBtnStyle} onClick={handler.handleNextPin} disabled={isLast} aria-label='다음 핀'>
-                    <ChevronRight size={16} />
+                    <ChevronRight size={16} strokeWidth={2.2} />
                 </button>
             )}
 

@@ -80,7 +80,7 @@ const DestinationField = ({ value, onChange, suggestion, labelledBy }: Destinati
                         어디로 다녀왔나요?
                     </span>
                 )}
-                <ChevronDown size={16} css={triggerIcon} />
+                <ChevronDown size={16} strokeWidth={2.2} css={triggerIcon} />
             </button>
 
             {/* 해외 추정은 자동 선택하지 않고 제안만 한다 */}

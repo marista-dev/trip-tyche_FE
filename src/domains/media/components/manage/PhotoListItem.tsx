@@ -54,7 +54,7 @@ const PhotoListItem = ({ photo, tone, selected, isFirst, onToggle, primaryLabel,
                 </p>
             </div>
 
-            <ChevronRight size={14} strokeWidth={2} color='#ccc' />
+            <ChevronRight size={14} strokeWidth={2.2} color='#ccc' />
         </div>
     );
 };

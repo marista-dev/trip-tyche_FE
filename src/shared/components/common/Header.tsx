@@ -21,7 +21,7 @@ const Header = ({ title, isBackButton, children, onBack }: HeaderProps) => {
             <div css={defaultStyle}>
                 {isBackButton && (
                     <button css={backButtonStyle} onClick={navigateBeforePage} aria-label='뒤로 가기'>
-                        <ChevronLeft size={20} strokeWidth={1.5} aria-hidden='true' />
+                        <ChevronLeft size={20} strokeWidth={2.2} aria-hidden='true' />
                     </button>
                 )}
                 <h1 css={titleStyle}>{title}</h1>
