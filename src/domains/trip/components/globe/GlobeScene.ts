@@ -168,6 +168,10 @@ export class GlobeScene {
         this.ring.dispose();
         this.dots?.dispose();
         this.pins?.dispose();
+        // OrbitControls는 canvas.getRootNode()(= document)에 keydown 리스너를 걸고, dispose 때도 그 시점의 getRootNode()에서 뗀다.
+        // React는 DOM을 먼저 떼고 effect 정리를 돌리므로 여기서는 root가 document가 아니어서 리스너가 document에 남는다.
+        // 그 리스너가 controls·카메라·링·canvas를 통째로 붙잡아 지구본에 들어올 때마다 하나씩 쌓였다. 잠깐 다시 붙여 정확히 뗀다
+        if (!canvas.isConnected) document.body.appendChild(canvas);
         this.controls.dispose();
         this.renderer.dispose();
         // 페이지를 오갈 때마다 WebGL 컨텍스트가 쌓이지 않게 바로 반납한다
