@@ -154,7 +154,8 @@ export const markCoversResolved = (
 ) => {
     const s = session;
     if (!s || s.apiDoneAt !== null) return;
-    if (settled.length === 0 || settled.some((done) => !done)) return;
+    // 개수가 다르면 직전 링의 결과다(새 링의 조회 결과가 아직 반영되지 않은 렌더)
+    if (settled.length !== s.tripCount || settled.some((done) => !done)) return;
     s.apiDoneAt = perfNow();
     s.apiFailedCount = photoCounts.filter((c) => c === null).length;
     s.expectedCovers = coverUrls.filter(Boolean).length;

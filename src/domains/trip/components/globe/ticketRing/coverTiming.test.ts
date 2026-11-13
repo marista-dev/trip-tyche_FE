@@ -37,6 +37,15 @@ afterEach(() => {
 });
 
 describe('coverTiming', () => {
+    it('조회 결과 개수가 세션의 여행 수와 다르면(직전 링의 결과) 무시한다', () => {
+        beginCoverTiming(2);
+        markRingBuilt();
+        markCoversResolved(['old'], [1], [true]);
+        expect(trackMock).not.toHaveBeenCalled();
+        markCoversResolved([undefined, undefined], [0, 0], [true, true]);
+        expect(lastProps()).toMatchObject({ end_reason: 'complete', expected_covers: 0 });
+    });
+
     it('카드 생성·API 완료·모든 커버 렌더가 끝나면 ticket_cover_timing으로 단계별 시각을 보낸다', () => {
         beginCoverTiming(2);
         vi.advanceTimersByTime(100);

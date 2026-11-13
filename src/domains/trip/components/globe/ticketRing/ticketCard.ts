@@ -91,6 +91,8 @@ export const createTicketCard = (ticket: RingTicket, width: number, textureScale
     let disposed = false;
     /** 이 카드가 속한 측정 세션. 이전 링 카드의 늦은 사진이 새 링 측정에 섞이지 않게 만들 때 고정한다 */
     const timingId = currentCoverTimingId();
+    /** 커버 URL이 바뀌어 다시 그려도 렌더 완료는 카드당 한 번만 센다 */
+    let coverTimed = false;
     drawTicketFront(canvas, current, cover, textureScale);
     const frontTexture = toTexture(canvas);
 
@@ -140,8 +142,11 @@ export const createTicketCard = (ticket: RingTicket, width: number, textureScale
                 cover = img;
                 const drawStart = perfNow();
                 redraw();
-                const onRendered = markCoverDrawn(timingId, nextCoverUrl, img, perfNow() - drawStart);
+                const onRendered = coverTimed
+                    ? null
+                    : markCoverDrawn(timingId, nextCoverUrl, img, perfNow() - drawStart);
                 if (onRendered) {
+                    coverTimed = true;
                     // 텍스처는 이 면이 실제로 그려질 때 GPU로 올라간다(입장 지연 동안은 보이지 않아 그려지지 않는다)
                     front.onAfterRender = () => {
                         front.onAfterRender = noop;
