@@ -11,6 +11,8 @@ import Indicator from '@/shared/components/common/Spinner/Indicator';
 import { ROUTES } from '@/shared/constants/route';
 
 const GlobeMapPage = lazy(() => import('@/pages/GlobeMapPage'));
+// 진단 전용(test/ios-picker-accept 브랜치 프리뷰). main에 머지하지 않는다
+const PickerTestPage = lazy(() => import('@/pages/dev/PickerTestPage'));
 const MainPage = lazy(() => import('@/pages/MainPage'));
 const SettingPage = lazy(() => import('@/pages/SettingPage'));
 const NotificationPage = lazy(() => import('@/pages/NotificationPage'));
@@ -47,6 +49,14 @@ const router = createBrowserRouter(
                 {
                     path: ROUTES.PATH.SIGNIN,
                     element: <SigninPage />,
+                },
+                {
+                    path: '/dev/picker-test',
+                    element: (
+                        <Suspense fallback={<Indicator />}>
+                            <PickerTestPage />
+                        </Suspense>
+                    ),
                 },
 
                 /* ── Protected (RequireAuth가 status 기반으로 가드) ── */

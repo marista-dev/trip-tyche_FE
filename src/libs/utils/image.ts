@@ -89,7 +89,7 @@ export const convertHeicToJpg = async (images: FileList | File[]) => {
 };
 
 // 이미지 실제 타입 반환
-const getActualFileType = async (file: File): Promise<string> => {
+export const getActualFileType = async (file: File): Promise<string> => {
     const buffer = await file.slice(0, 12).arrayBuffer();
     const bytes = new Uint8Array(buffer);
 
