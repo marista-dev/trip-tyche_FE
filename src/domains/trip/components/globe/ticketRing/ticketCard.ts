@@ -23,6 +23,8 @@ import { perfNow } from '@/libs/perf';
 const COVER_DECODE_WIDTH = TICKET_W * MAX_TEXTURE_SCALE;
 /** 줄인 비트맵 장당 약 1.7MB(750×560×4). 링 한 번에 쓰는 카드 수보다 넉넉하게 둔다 */
 const COVER_CACHE_LIMIT = 12;
+/** 응답이 멈춘 요청이 커버를 영영 막지 않게 한다. 넘기면 <img> 경로로 다시 시도한다 */
+const COVER_FETCH_TIMEOUT_MS = 10_000;
 
 export interface LoadedCover {
     image: CoverImage;
@@ -43,7 +45,8 @@ const loadWithImageElement = (url: string) =>
     });
 
 const loadAsBitmap = async (url: string): Promise<LoadedCover> => {
-    const response = await fetch(url, { mode: 'cors', credentials: 'omit' });
+    const signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(COVER_FETCH_TIMEOUT_MS) : undefined;
+    const response = await fetch(url, { mode: 'cors', credentials: 'omit', signal });
     if (!response.ok) throw new Error(`cover ${response.status}`);
     const blob = await response.blob();
     const image = await createImageBitmap(blob, { resizeWidth: COVER_DECODE_WIDTH, resizeQuality: 'high' });
@@ -59,6 +62,10 @@ const loadCover = (url: string): Promise<LoadedCover | null> => {
             ? loadAsBitmap(url).catch(() => loadWithImageElement(url))
             : loadWithImageElement(url);
     coverCache.set(url, promise);
+    // 끝내 못 받았으면 캐시에서 지워 다음에 링을 열 때 다시 시도한다
+    promise.then((loaded) => {
+        if (!loaded && coverCache.get(url) === promise) coverCache.delete(url);
+    });
     if (coverCache.size > COVER_CACHE_LIMIT) {
         // 비트맵은 close()하지 않는다. 아직 이 사진을 쓰는 카드가 다시 그릴 수 있고, 참조가 끊기면 GC가 회수한다
         const oldest = coverCache.keys().next().value;
