@@ -9,8 +9,10 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { createCountryPins, CountryPins } from './countryPins';
 import { COUNTRY_CENTROIDS } from './globeGeo';
 import { createLandDots, LandDots, LandPoints, loadLandPoints } from './landDots';
+import { beginCoverTiming, endCoverTiming } from './ticketRing/coverTiming';
 import { getFocusCameraPosition, TicketRing } from './ticketRing/TicketRing';
 import { RingTicket } from './ticketRing/ticketTexture';
+import { watchWebGLContext } from '@/libs/perf';
 
 export interface GlobeSceneEvents {
     /** 육지 점·핀을 처음 그렸을 때 */
@@ -57,6 +59,7 @@ export class GlobeScene {
     private reducedMotion = false;
     private rafId = 0;
     private disposed = false;
+    private readonly unwatchContext: () => void;
 
     /* 포인터 상태 */
     private activePointers = 0;
@@ -82,6 +85,7 @@ export class GlobeScene {
         this.renderer.setSize(W, H);
         this.renderer.setClearColor(0x000000, 0);
         container.appendChild(this.renderer.domElement);
+        this.unwatchContext = watchWebGLContext(this.renderer.domElement, 'globe');
 
         const controls = new OrbitControls(this.camera, this.renderer.domElement);
         controls.enableDamping = true;
@@ -129,6 +133,7 @@ export class GlobeScene {
     openRing(nameEn: string, tickets: RingTicket[]) {
         const pin = this.pins?.pinOf(nameEn);
         if (!pin) return;
+        beginCoverTiming(tickets.length);
         this.focusPin = pin;
         this.reducedMotion = prefersReducedMotion();
         this.controls.autoRotate = false;
@@ -140,6 +145,7 @@ export class GlobeScene {
     }
 
     closeRing() {
+        endCoverTiming();
         this.ring.close();
         this.focusPin = null;
         this.controls.enabled = true;
@@ -148,6 +154,9 @@ export class GlobeScene {
 
     dispose() {
         this.disposed = true;
+        // 아래 forceContextLoss가 손실 이벤트를 일으키므로 감지를 먼저 뗀다
+        this.unwatchContext();
+        endCoverTiming();
         cancelAnimationFrame(this.rafId);
         const canvas = this.renderer.domElement;
         canvas.removeEventListener('pointerdown', this.onDown);

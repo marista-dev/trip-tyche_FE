@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { EmptyTripCta, TicketEntryButton } from '@/domains/trip/components/globe/GlobeBottomCard';
 import { groupTripsByCountry } from '@/domains/trip/components/globe/globeGeo';
 import { GlobeHeader, GlobeHint, GlobeLoading } from '@/domains/trip/components/globe/GlobeHud';
+import { markCoversResolved } from '@/domains/trip/components/globe/ticketRing/coverTiming';
 import { sortLatestFirst, toRingTickets } from '@/domains/trip/components/globe/ticketRing/ringTickets';
 import TicketRingCaption from '@/domains/trip/components/globe/ticketRing/TicketRingCaption';
 import { useHistoryBackClose } from '@/domains/trip/components/globe/ticketRing/useHistoryBackClose';
@@ -136,8 +137,10 @@ const GlobeMapPage = () => {
 
     // 사진 수·커버가 도착하면 링 카드 텍스처를 갈아 끼운다(카드를 만들기 전이면 만들 때 반영)
     useEffect(() => {
-        if (ringTrips) sceneRef.current?.ring.updateTickets(ringTickets, coverUrls);
-    }, [ringTrips, ringTickets, coverUrls, sceneRef]);
+        if (!ringTrips) return;
+        markCoversResolved(coverUrls, photoCounts);
+        sceneRef.current?.ring.updateTickets(ringTickets, coverUrls);
+    }, [ringTrips, ringTickets, coverUrls, photoCounts, sceneRef]);
 
     const handleCreateFirst = async () => {
         const result = await toResult(() => tripAPI.createNewTrip());

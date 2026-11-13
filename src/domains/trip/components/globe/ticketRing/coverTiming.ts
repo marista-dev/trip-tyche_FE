@@ -1,0 +1,169 @@
+import { ANALYTICS_EVENTS, track } from '@/libs/analytics';
+import { perfLog, perfMark, perfNow } from '@/libs/perf';
+
+/*
+ * 핀 탭 → 티켓 링 커버 사진이 다 보일 때까지의 구간 측정.
+ * 링을 한 번 열 때마다 세션 하나를 만들고, 단계마다 시각을 남겼다가 끝나면 콘솔(perfLog)과 PostHog로 보낸다.
+ *
+ *   pin-tap ─ ring-built(폰트 대기 후 카드 생성) ─ covers-api(사진 목록 응답) ─ cover-drawn(사진을 앞면에 그림) ─ cover-on-gpu(다음 프레임)
+ *
+ * 동작에는 관여하지 않는다. 세션이 없으면(링이 닫혔거나 이미 끝났으면) 모든 함수가 아무것도 하지 않는다.
+ */
+
+/** 이보다 오래 걸리면 끝까지 기다리지 않고 timeout으로 보낸다 */
+const SESSION_TIMEOUT_MS = 15_000;
+/** 이 이상이면 느린 것으로 보고 항상 보낸다. 그보다 빠르면 표본만 보낸다 */
+const SLOW_MS = 1500;
+const FAST_SAMPLE_RATE = 0.1;
+
+interface CoverSample {
+    /** 핀 탭부터 앞면에 그릴 때까지 */
+    drawn_at_ms: number;
+    /** 핀 탭부터 그린 뒤 첫 프레임까지(텍스처 업로드 포함) */
+    on_gpu_at_ms: number | null;
+    /** drawImage 포함 앞면 캔버스 그리기(첫 그리기면 이미지 디코딩 포함) */
+    draw_ms: number;
+    width: number;
+    height: number;
+    /** Resource Timing의 다운로드 시간. 캐시 적중이면 0에 가깝다 */
+    download_ms: number | null;
+    /** 교차 출처에 Timing-Allow-Origin이 없으면 0으로 나온다 */
+    encoded_bytes: number | null;
+}
+
+interface Session {
+    id: number;
+    startedAt: number;
+    tripCount: number;
+    ringBuiltAt: number | null;
+    apiDoneAt: number | null;
+    /** 그려야 할 커버 URL. API 응답 전이면 null */
+    pending: Set<string> | null;
+    covers: CoverSample[];
+    /** API 완료 판정 전에 이미 GPU까지 올라간 커버(캐시된 사진으로 카드가 먼저 만들어진 경우) */
+    drawnEarly: Set<string>;
+    timer: ReturnType<typeof setTimeout>;
+}
+
+type EndReason = 'complete' | 'closed' | 'timeout';
+
+let session: Session | null = null;
+let nextId = 1;
+
+const since = (s: Session, at: number | null) => (at === null ? null : Math.round(at - s.startedAt));
+
+const resourceTiming = (url: string) => {
+    const entry = performance.getEntriesByName(url, 'resource').at(-1) as PerformanceResourceTiming | undefined;
+    if (!entry) return { download_ms: null, encoded_bytes: null };
+    return { download_ms: Math.round(entry.duration), encoded_bytes: entry.encodedBodySize };
+};
+
+const finish = (reason: EndReason) => {
+    const s = session;
+    if (!s) return;
+    session = null;
+    clearTimeout(s.timer);
+
+    const totalMs = Math.round(perfNow() - s.startedAt);
+    const { covers } = s;
+    const max = (pick: (c: CoverSample) => number | null) =>
+        covers.reduce<number | null>((m, c) => {
+            const v = pick(c);
+            return v === null ? m : Math.max(m ?? 0, v);
+        }, null);
+
+    const props = {
+        end_reason: reason,
+        trip_count: s.tripCount,
+        cover_count: covers.length,
+        pending_count: s.pending?.size ?? null,
+        total_ms: totalMs,
+        ring_built_ms: since(s, s.ringBuiltAt),
+        api_ms: since(s, s.apiDoneAt),
+        first_cover_ms: covers.length ? Math.min(...covers.map((c) => c.drawn_at_ms)) : null,
+        last_cover_on_gpu_ms: max((c) => c.on_gpu_at_ms),
+        max_draw_ms: max((c) => c.draw_ms),
+        max_download_ms: max((c) => c.download_ms),
+        max_width: max((c) => c.width),
+        max_height: max((c) => c.height),
+        total_encoded_bytes: covers.reduce((sum, c) => sum + (c.encoded_bytes ?? 0), 0),
+    };
+
+    perfMark(`ring:${s.id}:end`);
+    perfLog(`ticket cover timing #${s.id} (${reason})`, props);
+    if (covers.length) perfLog(`ticket covers #${s.id}`, covers as unknown as Record<string, unknown>[]);
+
+    const slow = reason === 'timeout' || totalMs >= SLOW_MS;
+    if (slow || Math.random() < FAST_SAMPLE_RATE) {
+        track(ANALYTICS_EVENTS.TICKET_COVER_TIMING, { ...props, sampled: !slow });
+    }
+};
+
+/** 핀을 탭해 링을 열 때. 이전 세션이 남아 있으면 closed로 끝낸다 */
+export const beginCoverTiming = (tripCount: number) => {
+    if (session) finish('closed');
+    const id = nextId++;
+    perfMark(`ring:${id}:pin-tap`);
+    session = {
+        id,
+        startedAt: perfNow(),
+        tripCount,
+        ringBuiltAt: null,
+        apiDoneAt: null,
+        pending: null,
+        covers: [],
+        drawnEarly: new Set(),
+        timer: setTimeout(() => finish('timeout'), SESSION_TIMEOUT_MS),
+    };
+};
+
+/** 폰트를 기다린 뒤 카드를 만들었을 때 */
+export const markRingBuilt = () => {
+    if (!session || session.ringBuiltAt !== null) return;
+    session.ringBuiltAt = perfNow();
+    perfMark(`ring:${session.id}:built`);
+};
+
+/**
+ * 커버 조회 결과가 바뀔 때마다 부른다. 모든 여행의 사진 수가 나왔을 때 한 번만 API 완료로 본다.
+ * 그 시점에 이미 그린 커버(캐시 적중)는 빼고 남은 것만 기다린다.
+ */
+export const markCoversResolved = (coverUrls: (string | undefined)[], photoCounts: (number | null)[]) => {
+    const s = session;
+    if (!s || s.apiDoneAt !== null) return;
+    if (photoCounts.length === 0 || photoCounts.some((c) => c === null)) return;
+    s.apiDoneAt = perfNow();
+    perfMark(`ring:${s.id}:covers-api`);
+    s.pending = new Set(coverUrls.filter((u): u is string => !!u && !s.drawnEarly.has(u)));
+    if (s.pending.size === 0) finish('complete');
+};
+
+/** 커버 사진을 티켓 앞면에 그린 직후. 다음 프레임(렌더러가 텍스처를 올린 뒤)까지 기다려 마무리한다 */
+export const markCoverDrawn = (url: string, img: HTMLImageElement, drawMs: number) => {
+    const s = session;
+    if (!s) return;
+    const sample: CoverSample = {
+        drawn_at_ms: Math.round(perfNow() - s.startedAt),
+        on_gpu_at_ms: null,
+        draw_ms: Math.round(drawMs * 10) / 10,
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+        ...resourceTiming(url),
+    };
+    s.covers.push(sample);
+    perfMark(`ring:${s.id}:cover-drawn`);
+
+    requestAnimationFrame(() => {
+        if (session !== s) return;
+        sample.on_gpu_at_ms = Math.round(perfNow() - s.startedAt);
+        if (s.pending === null) {
+            s.drawnEarly.add(url);
+            return;
+        }
+        s.pending.delete(url);
+        if (s.pending.size === 0) finish('complete');
+    });
+};
+
+/** 링이 닫히거나 지구본을 떠날 때 */
+export const endCoverTiming = () => finish('closed');

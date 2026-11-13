@@ -5,6 +5,7 @@ import { useGoogleMap } from '@react-google-maps/api';
 import { easeInOutCubic, easeOutQuad } from '@/domains/route/easing';
 import { PinPoint } from '@/domains/route/types';
 import { bearing as calcBearing, calculateDistance } from '@/domains/route/utils';
+import { watchWebGLContext } from '@/libs/perf';
 import { GOOGLE_MAPS_MAP_ID } from '@/shared/constants/map';
 import { COLORS } from '@/shared/constants/style';
 
@@ -130,6 +131,11 @@ const CinematicDroneMap = ({
     useEffect(() => {
         pausedRef.current = isPaused;
     }, [isPaused]);
+    // 검은 화면 진단: Vector 지도의 WebGL 컨텍스트 손실을 기록한다(내부 canvas 대신 지도 div에서 capture로 감지)
+    useEffect(() => {
+        if (!map) return;
+        return watchWebGLContext(map.getDiv(), 'map');
+    }, [map]);
     useEffect(() => {
         callbacksRef.current = {
             onFlightStart,

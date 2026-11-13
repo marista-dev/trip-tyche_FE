@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+import { markCoverDrawn } from './coverTiming';
 import {
     createShadowCanvas,
     createTicketBackCanvas,
@@ -8,6 +9,7 @@ import {
     TICKET_H,
     TICKET_W,
 } from './ticketTexture';
+import { perfNow } from '@/libs/perf';
 
 /* ─── 커버 사진 로더 ───────────────────────────────────────
  * OCI Object Storage가 Access-Control-Allow-Origin: * 를 주므로 crossOrigin으로 받으면
@@ -132,7 +134,9 @@ export const createTicketCard = (ticket: RingTicket, width: number, textureScale
             loadCoverImage(nextCoverUrl).then((img) => {
                 if (!img || disposed || coverUrl !== nextCoverUrl) return;
                 cover = img;
+                const drawStart = perfNow();
                 redraw();
+                markCoverDrawn(nextCoverUrl, img, perfNow() - drawStart);
             });
         },
         dispose() {
