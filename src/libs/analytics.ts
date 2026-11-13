@@ -7,7 +7,10 @@ import { APP_VERSION_NAME } from '@/platform/native/appVersion';
 /*
  * PostHog 연동의 유일한 창구. 호출부는 posthog-js를 직접 import하지 않고 이 모듈만 쓴다.
  *
- * 개인정보 원칙: PostHog에는 userId·role·가입 시각만 보낸다. 이메일·이름·닉네임은 보내지 않는다.
+ * 개인정보 원칙: 사용자 식별 정보는 userId·role·가입 시각만 보낸다. 이메일·이름·닉네임은 보내지 않는다.
+ * 성능 진단 이벤트(webgl_context_*, ticket_cover_timing — src/libs/perf.ts, ticketRing/coverTiming.ts)는
+ * 측정값과 기기 환경(장면 이름, 화면 가시성, deviceMemory, CPU 코어 수, DPR, 뷰포트 크기, 사진 해상도·소요 시간)만 싣는다.
+ * URL·여행 이름 같은 콘텐츠는 싣지 않는다.
  * autocapture와 세션 녹화를 끈 이유도 같다. 켜 두면 화면 텍스트(닉네임)가 그대로 수집된다.
  *
  * platform/native/auth.ts에서도 import되므로 apiClient 같은 무거운 모듈을 끌어오면 순환 의존이 생긴다.
