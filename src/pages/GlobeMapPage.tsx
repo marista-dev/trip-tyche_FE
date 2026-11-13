@@ -90,7 +90,7 @@ const GlobeMapPage = () => {
     const [ringTrips, setRingTrips] = useState<TripSummary[] | null>(null);
     const [activeTicket, setActiveTicket] = useState(0);
     const ringTripKeys = useMemo(() => (ringTrips ?? EMPTY_TRIPS).map((t) => t.tripKey), [ringTrips]);
-    const { coverUrls, photoCounts } = useTicketRingCovers(ringTripKeys);
+    const { coverUrls, photoCounts, settled: coversSettled } = useTicketRingCovers(ringTripKeys);
     const ringTickets = useMemo(
         () => toRingTickets(ringTrips ?? EMPTY_TRIPS, nickname, photoCounts),
         [ringTrips, nickname, photoCounts],
@@ -138,9 +138,9 @@ const GlobeMapPage = () => {
     // 사진 수·커버가 도착하면 링 카드 텍스처를 갈아 끼운다(카드를 만들기 전이면 만들 때 반영)
     useEffect(() => {
         if (!ringTrips) return;
-        markCoversResolved(coverUrls, photoCounts);
+        markCoversResolved(coverUrls, photoCounts, coversSettled);
         sceneRef.current?.ring.updateTickets(ringTickets, coverUrls);
-    }, [ringTrips, ringTickets, coverUrls, photoCounts, sceneRef]);
+    }, [ringTrips, ringTickets, coverUrls, photoCounts, coversSettled, sceneRef]);
 
     const handleCreateFirst = async () => {
         const result = await toResult(() => tripAPI.createNewTrip());

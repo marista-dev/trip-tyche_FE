@@ -30,6 +30,18 @@ export const perfMark = (name: string) => {
     }
 };
 
+/** 조건에 맞는 표시를 지운다. 링을 반복해서 열어도 타임라인 버퍼가 계속 커지지 않게 한다 */
+export const perfClearMarks = (match: (name: string) => boolean) => {
+    try {
+        performance
+            .getEntriesByType('mark')
+            .filter((entry) => match(entry.name))
+            .forEach((entry) => performance.clearMarks(entry.name));
+    } catch {
+        // User Timing을 못 쓰는 환경이면 지울 것도 없다.
+    }
+};
+
 export const perfLog = (label: string, data: Record<string, unknown> | Record<string, unknown>[]) => {
     if (!logEnabled) return;
     /* eslint-disable no-console -- 진단 출력이 이 함수의 목적이다. 개발 서버나 플래그가 켜졌을 때만 나간다 */

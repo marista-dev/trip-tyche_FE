@@ -7,11 +7,13 @@ import { toResult } from '@/libs/apis/shared/utils';
 export interface TicketRingCovers {
     /** 첫 사진 URL. 사진이 없거나 아직 모르면 undefined */
     coverUrls: (string | undefined)[];
-    /** 사진 수. 아직 모르면 null */
+    /** 사진 수. 아직 모르거나 조회가 실패하면 null */
     photoCounts: (number | null)[];
+    /** 조회가 끝났는지(성공·실패 무관). 성능 측정에서 API 완료와 실패를 가르는 데 쓴다 */
+    settled: boolean[];
 }
 
-const EMPTY: TicketRingCovers = { coverUrls: [], photoCounts: [] };
+const EMPTY: TicketRingCovers = { coverUrls: [], photoCounts: [], settled: [] };
 
 const fetchImages = (tripKey: string) => toResult(() => mediaAPI.getTripImages(tripKey));
 
@@ -20,12 +22,13 @@ const fetchImages = (tripKey: string) => toResult(() => mediaAPI.getTripImages(t
 const selectMediaFiles = (result: Awaited<ReturnType<typeof fetchImages>>): MediaFile[] | null =>
     result.success ? result.data.mediaFiles : null;
 
-const combineCovers = (results: { data?: MediaFile[] | null }[]): TicketRingCovers =>
+const combineCovers = (results: { data?: MediaFile[] | null; status: string }[]): TicketRingCovers =>
     results.length === 0
         ? EMPTY
         : {
               coverUrls: results.map((r) => r.data?.[0]?.mediaLink),
               photoCounts: results.map((r) => (r.data ? r.data.length : null)),
+              settled: results.map((r) => r.status !== 'pending'),
           };
 
 /**
