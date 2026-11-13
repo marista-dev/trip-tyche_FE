@@ -32,6 +32,11 @@ interface Result {
     withGps: number;
     withDate: number;
     exifMs: number;
+    /** 파일 이름 확장자별 개수(원본 JPG/HEIC인지, 변환된 jpeg인지 가늠) */
+    extensions: Record<string, number>;
+    /** 해상도(메가픽셀)별 개수 */
+    resolutions: Record<string, number>;
+    software: Record<string, number>;
 }
 
 const readExif = async (file: File) => {
@@ -39,14 +44,27 @@ const readExif = async (file: File) => {
         // GPS·촬영 시각만, 파일 앞부분만 읽는다(HEIC·JPEG 모두)
         // latitude/longitude는 exifr가 원본 GPS 태그로 계산하는 값이라, pick에는 원본 태그를 넣어야 한다
         const data = await parseExif(file, {
-            pick: ['DateTimeOriginal', 'GPSLatitude', 'GPSLatitudeRef', 'GPSLongitude', 'GPSLongitudeRef'],
+            pick: [
+                'DateTimeOriginal',
+                'GPSLatitude',
+                'GPSLatitudeRef',
+                'GPSLongitude',
+                'GPSLongitudeRef',
+                'ExifImageWidth',
+                'ExifImageHeight',
+                'Software',
+            ],
         });
+        const w = data?.ExifImageWidth;
+        const h = data?.ExifImageHeight;
         return {
             gps: typeof data?.latitude === 'number' && typeof data?.longitude === 'number',
             date: !!data?.DateTimeOriginal,
+            megapixels: typeof w === 'number' && typeof h === 'number' ? Math.round((w * h) / 1e5) / 10 : null,
+            software: typeof data?.Software === 'string' ? data.Software : null,
         };
     } catch {
-        return { gps: false, date: false };
+        return { gps: false, date: false, megapixels: null, software: null };
     }
 };
 
@@ -65,6 +83,10 @@ const PickerTestPage = () => {
         const types: Record<string, number> = {};
         let withGps = 0;
         let withDate = 0;
+        const extensions: Record<string, number> = {};
+        const resolutions: Record<string, number> = {};
+        const software: Record<string, number> = {};
+        const bump = (map: Record<string, number>, key: string) => (map[key] = (map[key] ?? 0) + 1);
         const exifStart = performance.now();
         for (const file of files) {
             const actual = await getActualFileType(file);
@@ -73,6 +95,9 @@ const PickerTestPage = () => {
             const exif = await readExif(file);
             if (exif.gps) withGps++;
             if (exif.date) withDate++;
+            bump(extensions, file.name.includes('.') ? (file.name.split('.').pop() ?? '') : '(없음)');
+            bump(resolutions, exif.megapixels === null ? '?' : `${exif.megapixels}MP`);
+            bump(software, exif.software ?? '?');
         }
         const sizes = files.map((f) => f.size / 1e6);
         setResults((prev) => [
@@ -88,10 +113,18 @@ const PickerTestPage = () => {
                 withGps,
                 withDate,
                 exifMs: Math.round(performance.now() - exifStart),
+                extensions,
+                resolutions,
+                software,
             },
         ]);
         setBusy(null);
     };
+
+    const fmt = (map: Record<string, number>) =>
+        Object.entries(map)
+            .map(([k, v]) => `${k}×${v}`)
+            .join(', ');
 
     const summary = results
         .map(
@@ -99,7 +132,9 @@ const PickerTestPage = () => {
                 `[${r.variant}] accept=${r.accept} | ${r.count}장 | 탭→수신 ${(r.pickMs / 1000).toFixed(1)}초 | ` +
                 `형식 ${Object.entries(r.types)
                     .map(([k, v]) => `${k}×${v}`)
-                    .join(', ')} | 합계 ${r.totalMB}MB(최대 ${r.maxMB}MB) | GPS ${r.withGps}/${r.count} | ` +
+                    .join(
+                        ', ',
+                    )} | 확장자 ${fmt(r.extensions)} | 해상도 ${fmt(r.resolutions)} | Software ${fmt(r.software)} | 합계 ${r.totalMB}MB(최대 ${r.maxMB}MB) | GPS ${r.withGps}/${r.count} | ` +
                 `촬영시각 ${r.withDate}/${r.count} | EXIF 읽기 ${r.exifMs}ms`,
         )
         .join('\n');
@@ -108,8 +143,8 @@ const PickerTestPage = () => {
         <div css={page}>
             <h1 css={title}>사진 선택 창 진단</h1>
             <p css={desc}>
-                같은 사진들(예: 30~50장)을 A와 B로 한 번씩 골라 주세요. 고르는 방식(앨범, 순서)도 똑같이 해 주세요. ✓를
-                누른 뒤 선택 창이 닫힐 때까지 기다리면 결과가 아래에 나옵니다.
+                오늘 찍지 않은 같은 사진들(예: 30장)을 B → A 순서로 한 번씩 골라 주세요. 고르는 방식(앨범, 순서)도
+                똑같이 해 주세요. ✓를 누른 뒤 선택 창이 닫힐 때까지 기다리면 결과가 아래에 나옵니다.
             </p>
             {(Object.keys(VARIANTS) as Variant[]).map((v) => (
                 <label key={v} css={button} onClick={() => (startedAt.current[v] = performance.now())}>
