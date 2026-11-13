@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+import { markRingBuilt } from './coverTiming';
 import { activeIndexOf, getRingLayout, nearestTurnTo, RingLayout, snapTurn } from './ringLayout';
 import { Spring } from './spring';
 import { createTicketCard, disposeSharedTicketTextures, TicketCard } from './ticketCard';
@@ -122,6 +123,8 @@ export class TicketRing {
             if (reducedMotion) progress.snap(1);
             return { card, progress, delay: reducedMotion ? 0 : 0.2 + i * 0.06 };
         });
+
+        markRingBuilt();
 
         // 반 바퀴 돌며 펼쳐진다
         this.rotation.snap(tickets.length > 1 && !reducedMotion ? -Math.PI * 0.8 : 0);

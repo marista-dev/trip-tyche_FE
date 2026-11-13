@@ -24,6 +24,10 @@ export const ANALYTICS_EVENTS = {
     GUEST_STARTED: 'guest_started',
     TRIP_CREATED: 'trip_created',
     PHOTOS_UPLOADED: 'photos_uploaded',
+    // 성능 진단용(src/libs/perf.ts). 화면 텍스트·URL은 싣지 않고 수치만 보낸다.
+    WEBGL_CONTEXT_LOST: 'webgl_context_lost',
+    WEBGL_CONTEXT_RESTORED: 'webgl_context_restored',
+    TICKET_COVER_TIMING: 'ticket_cover_timing',
 } as const;
 
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[keyof typeof ANALYTICS_EVENTS];
