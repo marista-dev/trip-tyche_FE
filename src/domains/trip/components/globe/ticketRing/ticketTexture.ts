@@ -8,6 +8,11 @@ import { COLORS } from '@/shared/constants/style';
 
 export const TICKET_W = 300;
 export const TICKET_H = 240;
+/** 카드 텍스처 배율 상한. 실제 배율은 정면 카드가 화면에서 차지하는 픽셀에 맞춘다(TicketRing) */
+export const MAX_TEXTURE_SCALE = 2.5;
+
+/** 앞면에 그리는 커버 사진. ImageBitmap(줄여서 디코딩) 또는 <img>(대체 경로) */
+export type CoverImage = CanvasImageSource & { width: number; height: number };
 const HERO_H = 150;
 const RADIUS = 18;
 const DAY_STUB_W = 66;
@@ -155,7 +160,7 @@ const punch = (x: Ctx, holes: [number, number, number][]) => {
     x.globalCompositeOperation = 'source-over';
 };
 
-const drawBoardingPass = (x: Ctx, t: RingTicket, cover: HTMLImageElement | null) => {
+const drawBoardingPass = (x: Ctx, t: RingTicket, cover: CoverImage | null) => {
     const { view } = t;
     x.save();
     roundRect(x, 0, 0, TICKET_W, TICKET_H, RADIUS);
@@ -254,7 +259,7 @@ const drawBoardingPass = (x: Ctx, t: RingTicket, cover: HTMLImageElement | null)
 };
 
 /** DayPassTicket과 같은 구성: 사진 전체 + 아래쪽 어둡게 + 오른쪽 네이비 유리 옆면 */
-const drawDayPass = (x: Ctx, t: RingTicket, cover: HTMLImageElement | null) => {
+const drawDayPass = (x: Ctx, t: RingTicket, cover: CoverImage | null) => {
     const { view } = t;
     const stubX = TICKET_W - DAY_STUB_W;
     // 사진 중심을 옆면 왼쪽(보이는 영역) 가운데에 맞추고, 옆면 폭만큼 왼쪽으로 넓혀 카드 전체를 채운다
@@ -334,7 +339,7 @@ const drawDayPass = (x: Ctx, t: RingTicket, cover: HTMLImageElement | null) => {
 export const drawTicketFront = (
     canvas: HTMLCanvasElement,
     ticket: RingTicket,
-    cover: HTMLImageElement | null,
+    cover: CoverImage | null,
     scale: number,
 ) => {
     const x = canvas.getContext('2d');
