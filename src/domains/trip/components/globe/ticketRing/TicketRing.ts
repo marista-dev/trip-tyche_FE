@@ -4,7 +4,7 @@ import { markRingBuilt } from './coverTiming';
 import { activeIndexOf, getRingLayout, nearestTurnTo, RingLayout, snapTurn } from './ringLayout';
 import { Spring } from './spring';
 import { createTicketCard, disposeSharedTicketTextures, TicketCard } from './ticketCard';
-import { RingTicket, TICKET_W, waitForTicketFonts } from './ticketTexture';
+import { MAX_TEXTURE_SCALE, RingTicket, TICKET_W, waitForTicketFonts } from './ticketTexture';
 
 /** 링 중심을 카메라에서 얼마나 앞에 둘지(정면 카드까지 거리 = 이 값) */
 const FRONT_DISTANCE = 2.05;
@@ -13,8 +13,6 @@ const RAD_PER_PX = 0.0085;
 /** 핀이 화면 중앙보다 이만큼(rad) 위에 보이도록 카메라를 내린다 */
 export const FOCUS_ELEVATION = 0.78;
 export const FOCUS_DISTANCE = 3.55;
-/** 카드 텍스처 배율 상한. 실제 배율은 정면 카드가 화면에서 차지하는 픽셀에 맞춘다 */
-const MAX_TEXTURE_SCALE = 2.5;
 
 interface RingCard {
     card: TicketCard;

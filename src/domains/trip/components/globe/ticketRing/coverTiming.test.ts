@@ -15,7 +15,10 @@ vi.mock('@/libs/perf', () => ({
 const { beginCoverTiming, currentCoverTimingId, endCoverTiming, markCoverDrawn, markCoversResolved, markRingBuilt } =
     await import('./coverTiming');
 
-const img = (w = 4000, h = 3000) => ({ naturalWidth: w, naturalHeight: h }) as HTMLImageElement;
+const img = (w = 4000, h = 3000, bytes: number | null = 350_000) => ({
+    image: { width: w, height: h } as ImageBitmap,
+    bytes,
+});
 
 /** 카드가 커버를 그리고 렌더 콜백을 받는 과정을 흉내 낸다 */
 const draw = (url: string, drawMs = 1, image = img()) => markCoverDrawn(currentCoverTimingId(), url, image, drawMs);
@@ -54,7 +57,7 @@ describe('coverTiming', () => {
         markCoversResolved(['a', 'b'], [3, 5], [true, true]);
         vi.advanceTimersByTime(300);
         const renderA = draw('a', 12);
-        const renderB = draw('b', 40, img(1200, 900));
+        const renderB = draw('b', 40, img(1200, 900, null));
         vi.advanceTimersByTime(16);
         renderA?.();
         expect(trackMock).not.toHaveBeenCalled();
@@ -74,6 +77,8 @@ describe('coverTiming', () => {
             last_cover_rendered_ms: 816,
             max_draw_ms: 40,
             max_width: 4000,
+            max_bytes: 350_000,
+            fallback_count: 1,
             sampled: true,
         });
     });

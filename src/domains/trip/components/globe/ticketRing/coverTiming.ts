@@ -1,3 +1,4 @@
+import type { LoadedCover } from './ticketCard';
 import { ANALYTICS_EVENTS, track } from '@/libs/analytics';
 import { perfClearMarks, perfLog, perfMark, perfNow } from '@/libs/perf';
 
@@ -24,14 +25,17 @@ interface CoverSample {
     drawn_at_ms: number;
     /** 핀 탭부터 그 카드가 실제로 렌더될 때까지(텍스처 업로드 포함) */
     rendered_at_ms: number | null;
-    /** drawImage 포함 앞면 캔버스 그리기(첫 그리기면 이미지 디코딩 포함) */
+    /** drawImage 포함 앞면 캔버스 그리기(<img> 대체 경로면 동기 디코딩 포함) */
     draw_ms: number;
+    /** 앞면에 그린 이미지 크기. 비트맵 경로면 줄인 뒤 크기다 */
     width: number;
     height: number;
     /** Resource Timing의 다운로드 시간. 캐시 적중이면 0에 가깝다 */
     download_ms: number | null;
-    /** 교차 출처에 Timing-Allow-Origin이 없으면 0으로 나온다 */
-    encoded_bytes: number | null;
+    /** 받은 파일 크기(blob.size). <img> 대체 경로면 null */
+    bytes: number | null;
+    /** <img> 대체 경로로 받았는지 */
+    fallback: boolean;
 }
 
 interface Session {
@@ -58,8 +62,7 @@ const since = (s: Session, at: number | null) => (at === null ? null : Math.roun
 
 const resourceTiming = (url: string) => {
     const entry = performance.getEntriesByName(url, 'resource').at(-1) as PerformanceResourceTiming | undefined;
-    if (!entry) return { download_ms: null, encoded_bytes: null };
-    return { download_ms: Math.round(entry.duration), encoded_bytes: entry.encodedBodySize };
+    return { download_ms: entry ? Math.round(entry.duration) : null };
 };
 
 const finish = (reason: EndReason) => {
@@ -91,7 +94,8 @@ const finish = (reason: EndReason) => {
         max_download_ms: max((c) => c.download_ms),
         max_width: max((c) => c.width),
         max_height: max((c) => c.height),
-        total_encoded_bytes: covers.reduce((sum, c) => sum + (c.encoded_bytes ?? 0), 0),
+        max_bytes: max((c) => c.bytes),
+        fallback_count: covers.filter((c) => c.fallback).length,
     };
 
     perfMark(`ring:${s.id}:end`);
@@ -171,7 +175,7 @@ export const markCoversResolved = (
 export const markCoverDrawn = (
     timingId: number,
     url: string,
-    img: HTMLImageElement,
+    cover: LoadedCover,
     drawMs: number,
 ): (() => void) | null => {
     const s = session;
@@ -180,8 +184,10 @@ export const markCoverDrawn = (
         drawn_at_ms: Math.round(perfNow() - s.startedAt),
         rendered_at_ms: null,
         draw_ms: Math.round(drawMs * 10) / 10,
-        width: img.naturalWidth,
-        height: img.naturalHeight,
+        width: cover.image.width,
+        height: cover.image.height,
+        bytes: cover.bytes,
+        fallback: cover.bytes === null,
         ...resourceTiming(url),
     };
     s.covers.push(sample);
