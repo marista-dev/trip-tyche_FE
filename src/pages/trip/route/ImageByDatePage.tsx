@@ -20,7 +20,7 @@ import { ROUTES } from '@/shared/constants/route';
 import { STORAGE_KEYS } from '@/shared/constants/storage';
 import { COLORS } from '@/shared/constants/style';
 import { useMapScript } from '@/shared/hooks/useMapScript';
-import { useNearbyLoad } from '@/shared/hooks/useNearbyLoad';
+import { photoListKey, useNearbyLoad } from '@/shared/hooks/useNearbyLoad';
 import { useToastStore } from '@/shared/stores/useToastStore';
 import { MapType } from '@/shared/types/map';
 
@@ -50,7 +50,7 @@ const ImageByDatePage = () => {
     const isDomestic = tripInfoResult?.success ? parseDestination(tripInfoResult.data.country).isDomestic : false;
     const { data: photosResult } = useMediaByDate(tripKey || '', date || '');
     const isDayTrip = tripDates.length === 1;
-    const shouldLoad = useNearbyLoad(activeIndex, `${tripKey}/${date}`);
+    const shouldLoad = useNearbyLoad(activeIndex, photos.length, photoListKey(photos));
 
     useEffect(() => {
         setTripDates(JSON.parse(sessionStorage.getItem(STORAGE_KEYS.IMAGE_DATES) || '[]'));
@@ -96,19 +96,27 @@ const ImageByDatePage = () => {
         const activePhoto = photos[activeIndex];
         if (!activePhoto || !isMapScriptLoaded) return;
 
+        // 빨리 넘기면 앞 사진의 늦은 조회 결과가 지금 사진의 장소를 덮어쓰지 않게 한다
+        let stale = false;
         getPreciseLocationFromCoordinate({ latitude: activePhoto.latitude, longitude: activePhoto.longitude }).then(
-            setActivePlace,
+            (place) => {
+                if (!stale) setActivePlace(place);
+            },
         );
 
         const map = mapRef.current;
-        if (!map) return;
-        const center = { lat: activePhoto.latitude, lng: activePhoto.longitude };
-        if (GOOGLE_MAPS_MAP_ID) {
-            (map as google.maps.Map).moveCamera({ center, zoom: PHOTO_FOCUS_ZOOM });
-        } else {
-            map.panTo(center);
-            map.setZoom(PHOTO_FOCUS_ZOOM);
+        if (map) {
+            const center = { lat: activePhoto.latitude, lng: activePhoto.longitude };
+            if (GOOGLE_MAPS_MAP_ID) {
+                (map as google.maps.Map).moveCamera({ center, zoom: PHOTO_FOCUS_ZOOM });
+            } else {
+                map.panTo(center);
+                map.setZoom(PHOTO_FOCUS_ZOOM);
+            }
         }
+        return () => {
+            stale = true;
+        };
     }, [activeIndex, photos, isMapScriptLoaded]);
 
     const scrollToPhoto = useCallback((photoIndex: number) => {
@@ -128,6 +136,8 @@ const ImageByDatePage = () => {
      * 슬라이드는 크기가 고정이라 사진을 기다릴 이유가 없다.
      */
     const isReady = photosResult !== undefined;
+    // 조회 실패를 '사진 없음'과 구분한다
+    const loadFailed = photosResult?.success === false;
 
     return (
         <div css={container}>
@@ -184,8 +194,14 @@ const ImageByDatePage = () => {
                     <div css={emptyIcon}>
                         <ImageOff color='white' />
                     </div>
-                    <h3 css={emptyImageListHeading}>등록된 사진이 없어요</h3>
-                    <p css={emptyImageListDescription}>{`티켓 속 사진 관리에서\n새로운 사진을 등록해주세요`}</p>
+                    <h3 css={emptyImageListHeading}>
+                        {loadFailed ? '사진을 불러오지 못했어요' : '등록된 사진이 없어요'}
+                    </h3>
+                    <p css={emptyImageListDescription}>
+                        {loadFailed
+                            ? `잠시 후 다시 들어와 주세요`
+                            : `티켓 속 사진 관리에서\n새로운 사진을 등록해주세요`}
+                    </p>
                 </div>
             ) : (
                 <>

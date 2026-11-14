@@ -12,7 +12,7 @@ import { getPreciseLocationFromCoordinate } from '@/libs/utils/map';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import { ROUTES } from '@/shared/constants/route';
 import { useMapScript } from '@/shared/hooks/useMapScript';
-import { useNearbyLoad } from '@/shared/hooks/useNearbyLoad';
+import { photoListKey, useNearbyLoad } from '@/shared/hooks/useNearbyLoad';
 
 const PER_PHOTO_MS = 5000;
 const ZOOM_OUT = 1;
@@ -38,7 +38,7 @@ const ImageByPinpointPage = () => {
 
     const advance = useAutoAdvance(count, PER_PHOTO_MS);
     // 자동 넘김이 다음 사진에 닿기 전에 받아 두도록 현재 ±2장만 받는다
-    const shouldLoad = useNearbyLoad(advance.index, `${tripKey}/${pinPointId}`);
+    const shouldLoad = useNearbyLoad(advance.index, count, photoListKey(images));
     const { goTo: advanceGoTo } = advance;
     const [zoom, setZoom] = useState<number>(ZOOM_OUT);
     const [isPinching, setIsPinching] = useState<boolean>(false);
