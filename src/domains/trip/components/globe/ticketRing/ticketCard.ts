@@ -7,6 +7,9 @@ import {
     createTicketBackCanvas,
     drawTicketFront,
     MAX_TEXTURE_SCALE,
+    SHADOW_BASE_H,
+    SHADOW_BASE_W,
+    SHADOW_PAD,
     RingTicket,
     TICKET_H,
     TICKET_W,
@@ -166,7 +169,11 @@ export const createTicketCard = (ticket: RingTicket, width: number, textureScale
     const backMat = faceMaterial(shared.back);
     const shadowMat = faceMaterial(shared.shadow);
     const faceGeo = new THREE.PlaneGeometry(width, height);
-    const shadowGeo = new THREE.PlaneGeometry(width * 1.3, height * 1.45);
+    // 텍스처 여백(SHADOW_PAD)만큼 평면도 넓혀 그림자 위치·크기는 그대로 두고 흐림만 끝까지 보이게 한다
+    const shadowGeo = new THREE.PlaneGeometry(
+        width * 1.3 * ((SHADOW_BASE_W + SHADOW_PAD * 2) / SHADOW_BASE_W),
+        height * 1.45 * ((SHADOW_BASE_H + SHADOW_PAD * 2) / SHADOW_BASE_H),
+    );
 
     const front = new THREE.Mesh(faceGeo, frontMat);
     const back = new THREE.Mesh(faceGeo, backMat);

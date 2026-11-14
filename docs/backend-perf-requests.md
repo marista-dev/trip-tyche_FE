@@ -149,7 +149,8 @@ B1과 B3은 서로 독립적이다. 먼저 해도 되고 PR을 따로 올려도 
 
 ### 바꿀 것
 
-1. 워커의 모든 `put_object`(B2의 썸네일 포함)에 `CacheControl="public, max-age=31536000, immutable"`를 넣는다.
+1. 워커의 모든 `put_object`(B2의 썸네일 포함)에 `CacheControl="private, max-age=31536000, immutable"`를 넣는다.
+   - `public`이 아니라 `private`로 한다. `public`이면 CDN·프록시 같은 공유 캐시도 1년간 보관할 수 있다. 그러면 사진을 지우거나 공유를 해제해도 그 캐시에서 계속 나갈 수 있다. `private`는 이미 그 사진을 본 사용자의 브라우저에만 남긴다.
 2. 기존 객체에 적용할 일회성 스크립트를 만든다.
    - `processed/`와 `images/` 아래 객체를 자기 자신에게 복사한다(`copy_object` + `MetadataDirective="REPLACE"`).
    - 이때 `ContentType="image/webp"`를 반드시 다시 지정한다. REPLACE를 쓰면 기존 메타데이터가 사라진다.
@@ -161,7 +162,7 @@ B1과 B3은 서로 독립적이다. 먼저 해도 되고 PR을 따로 올려도 
 
 ### 완료 조건
 
-- 새로 업로드한 사진의 GET 응답 헤더에 `Cache-Control: public, max-age=31536000, immutable`가 있어야 한다.
+- 새로 업로드한 사진의 GET 응답 헤더에 `Cache-Control: private, max-age=31536000, immutable`가 있어야 한다.
 - 스크립트를 돌린 기존 사진도 같은 헤더가 있고, `Content-Type: image/webp`가 유지돼야 한다.
 - 프론트 사진 화면이 정상으로 떠야 한다(CORS 회귀 없음).
 

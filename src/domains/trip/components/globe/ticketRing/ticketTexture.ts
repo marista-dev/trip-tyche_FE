@@ -306,7 +306,18 @@ const drawDayPass = (x: Ctx, t: RingTicket, cover: CoverImage | null) => {
             fillFallback(s, view.fallbackBg, TICKET_W, TICKET_H);
             if (cover) drawCover(s, cover, TICKET_W + DAY_STUB_W, TICKET_H, -DAY_STUB_W);
             x.imageSmoothingQuality = 'high';
-            x.drawImage(small, 0, 0, TICKET_W, TICKET_H);
+            // 작은 캔버스는 정수로 올림돼 내용(TICKET_W/배율)보다 조금 넓다. 내용 영역만 잘라 늘려야 오른쪽에 빈 띠가 안 생긴다
+            x.drawImage(
+                small,
+                0,
+                0,
+                TICKET_W / SOFT_BLUR_DOWNSCALE,
+                TICKET_H / SOFT_BLUR_DOWNSCALE,
+                0,
+                0,
+                TICKET_W,
+                TICKET_H,
+            );
         } else {
             paintPhoto();
         }
@@ -407,10 +418,16 @@ export const createTicketBackCanvas = (scale: number) => {
 };
 
 /** 카드 아래 깔리는 흐린 그림자 */
+/** 그림자 텍스처의 기준 크기. 카드 그림자 평면(폭 1.3배, 높이 1.45배)이 이 크기에 대응한다 */
+export const SHADOW_BASE_W = 340;
+export const SHADOW_BASE_H = 280;
+/** 흐림이 캔버스 가장자리에서 잘리지 않게 사방에 더하는 투명 여백. shadowBlur 32(σ≈16)는 약 48px까지 번진다 */
+export const SHADOW_PAD = 24;
+
 export const createShadowCanvas = () => {
     const c = document.createElement('canvas');
-    c.width = 340;
-    c.height = 280;
+    c.width = SHADOW_BASE_W + SHADOW_PAD * 2;
+    c.height = SHADOW_BASE_H + SHADOW_PAD * 2;
     const x = c.getContext('2d');
     if (!x) return c;
     /*
@@ -423,7 +440,7 @@ export const createShadowCanvas = () => {
     x.shadowBlur = 32;
     x.shadowOffsetX = offscreen;
     x.fillStyle = '#000';
-    roundRect(x, 40 - offscreen, 45, 260, 190, 20);
+    roundRect(x, SHADOW_PAD + 40 - offscreen, SHADOW_PAD + 45, 260, 190, 20);
     x.fill();
     return c;
 };
