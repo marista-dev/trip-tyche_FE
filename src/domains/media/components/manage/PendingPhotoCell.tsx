@@ -8,7 +8,15 @@ interface PendingPhotoCellProps {
 
 const PendingPhotoCell = ({ previewUrl }: PendingPhotoCellProps) => (
     <div css={cellStyle} aria-label='업로드 중인 사진'>
-        <img src={previewUrl} alt='' css={imgStyle} />
+        {/* HEIC는 Safari 밖에서는 미리보기를 못 그린다. 깨진 아이콘 대신 빈 칸(스피너)으로 두고, 처리 후 WebP로 바뀐다 */}
+        <img
+            src={previewUrl}
+            alt=''
+            css={imgStyle}
+            onError={(e) => {
+                e.currentTarget.style.visibility = 'hidden';
+            }}
+        />
         <div css={cornerBadgeStyle}>
             <div css={spinnerStyle} />
         </div>

@@ -20,7 +20,9 @@ import useUserStore from '@/domains/user/stores/useUserStore';
 import { ANALYTICS_EVENTS, track } from '@/libs/analytics';
 import { mediaAPI, tripAPI } from '@/libs/apis';
 import { toResult } from '@/libs/apis/shared/utils';
+import { summarizeUploadFormats } from '@/libs/utils/image';
 import { validateFormComplete } from '@/libs/utils/validate';
+import { isIOSWeb } from '@/platform';
 import { pickImagesFromGallery } from '@/platform/native/gallery';
 import Button from '@/shared/components/common/Button';
 import Header from '@/shared/components/common/Header';
@@ -59,7 +61,7 @@ const TripImageUploadPage = () => {
     const submittedTripFormRef = useRef<TripInfo | null>(null);
 
     // photos_uploaded 퍼널 이벤트용. 이 페이지는 usePhotoUpload를 거치지 않아 여기서 직접 센다.
-    const uploadBatchSizeRef = useRef(0);
+    const uploadSummaryRef = useRef<ReturnType<typeof summarizeUploadFormats> | null>(null);
     const photosTrackedRef = useRef(false);
 
     const { tripKey } = useParams();
@@ -92,8 +94,8 @@ const TripImageUploadPage = () => {
         await waitForBackgroundUpload();
         if (photosTrackedRef.current) return;
         photosTrackedRef.current = true;
-        // 장수만 보낸다. 파일명·tripKey는 식별 정보라 속성에 넣지 않는다.
-        track(ANALYTICS_EVENTS.PHOTOS_UPLOADED, { count: uploadBatchSizeRef.current });
+        // 장수·형식·용량만 보낸다. 파일명·tripKey는 식별 정보라 속성에 넣지 않는다.
+        track(ANALYTICS_EVENTS.PHOTOS_UPLOADED, { ...uploadSummaryRef.current, ios_web: isIOSWeb() });
     }, [waitForBackgroundUpload]);
 
     const handleFinalize = useMemo(
@@ -135,7 +137,7 @@ const TripImageUploadPage = () => {
     const processSelectedImages = async (selectedImages: File[]) => {
         setStep('processing');
         const uniqueFiles = await prepareUploadFiles(selectedImages);
-        uploadBatchSizeRef.current = uniqueFiles.length;
+        uploadSummaryRef.current = summarizeUploadFormats(uniqueFiles);
         // S3 업로드는 백그라운드로 진행되며, 정보 입력 화면 진입을 막지 않는다.
         // 실제 업로드 완료는 Step3에서 waitForBackgroundUpload로 추적된다.
         // 신규 등록일 때는 status 전환도 같은 체인에 묶어 실패 시 step3 retry 화면에 surface되도록 한다.

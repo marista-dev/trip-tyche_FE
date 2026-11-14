@@ -8,7 +8,7 @@ import { PresignedUrlResponse, ClientImageFile, MediaFileCategories } from '@/do
 import { filterWithoutDateMediaFile, filterWithoutLocationMediaFile } from '@/domains/media/utils';
 import { mediaAPI } from '@/libs/apis';
 import { runWithPool } from '@/libs/utils/async';
-import { convertHeicToJpg, extractMetadataFromImage, removeDuplicateImages } from '@/libs/utils/image';
+import { extractMetadataFromImage, removeDuplicateImages } from '@/libs/utils/image';
 
 // HTTP/2 엔드포인트(OCI compat S3 포함)는 단일 TCP 위에서 100+ stream을 동시 처리 가능 →
 // 사실상 "한 번에 다 시작"이 throughput 최대. HTTP/1.1로 떨어지는 환경에선 브라우저가 6개씩
@@ -77,9 +77,9 @@ export const useImageUpload = () => {
     const { tripKey } = useParams();
 
     const prepareUploadFiles = useCallback(async (images: FileList | File[]): Promise<File[]> => {
-        const imagesWithoutHeic = await convertHeicToJpg(images);
-        const uniqueImages = removeDuplicateImages(imagesWithoutHeic);
-        return uniqueImages;
+        // HEIC는 원본 그대로 올린다. 이미지 워커(pillow-heif)가 WebP로 바꾼다.
+        // 예전에는 여기서 heic2any로 JPEG 변환을 했는데, 메인 스레드를 오래 막고 EXIF(GPS)까지 지웠다.
+        return removeDuplicateImages(Array.from(images));
     }, []);
 
     const submitMetadata = useCallback(

@@ -174,14 +174,7 @@ const TripImageManagePage = () => {
                 </div>
             )}
 
-            <input
-                ref={fileInputRef}
-                type='file'
-                accept='image/*,image/heic,image/heif'
-                multiple
-                hidden
-                onChange={handleFileSelected}
-            />
+            <input ref={fileInputRef} type='file' accept='image/*' multiple hidden onChange={handleFileSelected} />
 
             <ManageHeader
                 title='사진 관리'
