@@ -42,6 +42,11 @@ export interface RingTicket {
 
 type Ctx = CanvasRenderingContext2D;
 
+/** Safari(iOS 포함)는 CanvasRenderingContext2D.filter가 없다. 값을 넣어도 무시되고 흐림 없이 그려진다 */
+const CANVAS_FILTER = typeof CanvasRenderingContext2D !== 'undefined' && 'filter' in CanvasRenderingContext2D.prototype;
+/** 대체 흐림: 이 배율로 줄였다 늘린다. Chrome에서 비교해 blur(10px)와 가장 비슷했다(8은 너무 또렷함) */
+const SOFT_BLUR_DOWNSCALE = 16;
+
 const roundRect = (x: Ctx, left: number, top: number, w: number, h: number, r: number) => {
     x.beginPath();
     x.roundRect(left, top, w, h, r);
@@ -286,9 +291,26 @@ const drawDayPass = (x: Ctx, t: RingTicket, cover: CoverImage | null) => {
     x.beginPath();
     x.rect(stubX, 0, DAY_STUB_W, TICKET_H);
     x.clip();
-    x.filter = 'blur(10px) saturate(1.4)';
-    paintPhoto();
-    x.filter = 'none';
+    if (CANVAS_FILTER) {
+        x.filter = 'blur(10px) saturate(1.4)';
+        paintPhoto();
+        x.filter = 'none';
+    } else {
+        // Safari는 ctx.filter가 없다. 작게 그렸다가 늘려 그려 흐림을 흉내 낸다(bakeStub의 대체 경로와 같은 방식, 채도 보정은 생략)
+        const small = document.createElement('canvas');
+        small.width = Math.ceil(TICKET_W / SOFT_BLUR_DOWNSCALE);
+        small.height = Math.ceil(TICKET_H / SOFT_BLUR_DOWNSCALE);
+        const s = small.getContext('2d');
+        if (s) {
+            s.scale(1 / SOFT_BLUR_DOWNSCALE, 1 / SOFT_BLUR_DOWNSCALE);
+            fillFallback(s, view.fallbackBg, TICKET_W, TICKET_H);
+            if (cover) drawCover(s, cover, TICKET_W + DAY_STUB_W, TICKET_H, -DAY_STUB_W);
+            x.imageSmoothingQuality = 'high';
+            x.drawImage(small, 0, 0, TICKET_W, TICKET_H);
+        } else {
+            paintPhoto();
+        }
+    }
     x.fillStyle = 'rgba(15,23,42,.58)';
     x.fillRect(stubX, 0, DAY_STUB_W, TICKET_H);
     x.fillStyle = 'rgba(255,255,255,.08)';
@@ -391,9 +413,17 @@ export const createShadowCanvas = () => {
     c.height = 280;
     const x = c.getContext('2d');
     if (!x) return c;
-    x.filter = 'blur(16px)';
-    x.fillStyle = 'rgba(15,23,42,.75)';
-    roundRect(x, 40, 45, 260, 190, 20);
+    /*
+     * Safari(iOS 포함)는 ctx.filter를 지원하지 않는다. filter = 'blur()'는 무시되고 테두리가 또렷한 사각형이 그려져
+     * 카드 아래로 짙은 띠가 보였다. 모든 브라우저가 지원하는 shadowBlur로 흐림을 만든다.
+     * 도형은 캔버스 밖에 그리고 그림자만 제자리로 옮겨, 흐린 그림자만 남긴다(blur(16px) ≈ shadowBlur 32).
+     */
+    const offscreen = c.width * 2;
+    x.shadowColor = 'rgba(15,23,42,.75)';
+    x.shadowBlur = 32;
+    x.shadowOffsetX = offscreen;
+    x.fillStyle = '#000';
+    roundRect(x, 40 - offscreen, 45, 260, 190, 20);
     x.fill();
     return c;
 };
