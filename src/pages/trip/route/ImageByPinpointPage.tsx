@@ -12,6 +12,7 @@ import { getPreciseLocationFromCoordinate } from '@/libs/utils/map';
 import Indicator from '@/shared/components/common/Spinner/Indicator';
 import { ROUTES } from '@/shared/constants/route';
 import { useMapScript } from '@/shared/hooks/useMapScript';
+import { photoListKey, useNearbyLoad } from '@/shared/hooks/useNearbyLoad';
 
 const PER_PHOTO_MS = 5000;
 const ZOOM_OUT = 1;
@@ -36,6 +37,8 @@ const ImageByPinpointPage = () => {
     const count = images.length;
 
     const advance = useAutoAdvance(count, PER_PHOTO_MS);
+    // 자동 넘김이 다음 사진에 닿기 전에 받아 두도록 현재 ±2장만 받는다
+    const shouldLoad = useNearbyLoad(advance.index, count, photoListKey(images));
     const { goTo: advanceGoTo } = advance;
     const [zoom, setZoom] = useState<number>(ZOOM_OUT);
     const [isPinching, setIsPinching] = useState<boolean>(false);
@@ -322,8 +325,9 @@ const ImageByPinpointPage = () => {
                 {images.map((img, i) => (
                     <div key={img.mediaFileId} ref={(el) => (imageRefs.current[i] = el)} data-index={i} css={slotStyle}>
                         <img
-                            src={img.mediaLink}
+                            src={shouldLoad(i) ? img.mediaLink : undefined}
                             alt=''
+                            decoding='async'
                             css={photoImage}
                             style={{
                                 transform:
@@ -381,7 +385,7 @@ const ImageByPinpointPage = () => {
                             aria-label={`사진 ${i + 1}로 이동`}
                             aria-current={i === advance.index}
                         >
-                            <img src={img.mediaLink} alt='' css={thumbImage} />
+                            <img src={img.mediaLink} alt='' css={thumbImage} loading='lazy' decoding='async' />
                         </button>
                     ))}
                 </div>

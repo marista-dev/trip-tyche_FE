@@ -73,5 +73,7 @@ export const useMediaByDate = (tripKey: string, date: string) => {
                 : result;
         },
         enabled: Boolean(tripKey && date),
+        // queryFn이 실패도 값(success: false)으로 돌려주므로, 전역 staleTime(5분)이면 실패가 5분간 그대로 남는다
+        staleTime: (query) => (query.state.data?.success ? 5 * 60 * 1000 : 0),
     });
 };

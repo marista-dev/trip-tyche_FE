@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { css, keyframes } from '@emotion/react';
 import { ChevronRight, Clock, FileText, Info, Lock, MessageCircle, Pencil } from 'lucide-react';
@@ -36,16 +36,6 @@ const SettingPage = () => {
 
     const navigate = useNavigate();
     const { stats, isLoading, isError } = useUserStats();
-
-    useEffect(() => {
-        if (!document.getElementById('outfit-font')) {
-            const link = document.createElement('link');
-            link.id = 'outfit-font';
-            link.rel = 'stylesheet';
-            link.href = 'https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap';
-            document.head.appendChild(link);
-        }
-    }, []);
 
     const confirmLogout = () => {
         setIsLogoutOpen(false);

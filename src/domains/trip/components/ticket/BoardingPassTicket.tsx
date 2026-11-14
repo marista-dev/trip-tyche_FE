@@ -43,7 +43,7 @@ const BoardingPassTicket = ({
     <div css={shadowWrapStyle}>
         <div css={cardStyle}>
             <div css={photoHeroStyle(fallbackBg)}>
-                {photoUrl && <img src={photoUrl} alt={title} css={ticketPhoto} />}
+                {photoUrl && <img src={photoUrl} alt={title} css={ticketPhoto} loading='lazy' decoding='async' />}
                 <div css={gradientTopStyle} />
                 <div css={gradientBottomStyle} />
 

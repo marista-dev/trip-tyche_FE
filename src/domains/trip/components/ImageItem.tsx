@@ -6,10 +6,12 @@ import { MediaFile } from '@/domains/media/types';
 
 interface ImageItemProps {
     image: MediaFile;
+    /** false면 src를 주지 않아 받지 않는다(캐러셀에서 현재 위치 근처만 받기) */
+    load?: boolean;
     onImageLoad?: () => void;
 }
 
-const ImageItem = ({ image, onImageLoad }: ImageItemProps) => {
+const ImageItem = ({ image, load = true, onImageLoad }: ImageItemProps) => {
     const [isLoading, setIsLoading] = useState(true);
 
     const handleImageLoad = useCallback(() => {
@@ -21,7 +23,15 @@ const ImageItem = ({ image, onImageLoad }: ImageItemProps) => {
 
     return (
         <div css={imageItemStyle}>
-            <img src={image.mediaLink} alt={`이미지 ${image.mediaFileId}`} onLoad={handleImageLoad} css={imageStyle} />
+            {load && (
+                <img
+                    src={image.mediaLink}
+                    alt={`이미지 ${image.mediaFileId}`}
+                    onLoad={handleImageLoad}
+                    css={imageStyle}
+                    decoding='async'
+                />
+            )}
             {!isLoading && (
                 <div css={timeStampWrap}>
                     <span css={timeStampStyle}>{time}</span>
