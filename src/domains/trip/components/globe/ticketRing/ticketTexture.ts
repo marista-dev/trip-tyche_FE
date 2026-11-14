@@ -42,6 +42,11 @@ export interface RingTicket {
 
 type Ctx = CanvasRenderingContext2D;
 
+/** Safari(iOS 포함)는 CanvasRenderingContext2D.filter가 없다. 값을 넣어도 무시되고 흐림 없이 그려진다 */
+const CANVAS_FILTER = typeof CanvasRenderingContext2D !== 'undefined' && 'filter' in CanvasRenderingContext2D.prototype;
+/** 대체 흐림: 이 배율로 줄였다 늘린다. Chrome에서 비교해 blur(10px)와 가장 비슷했다(8은 너무 또렷함) */
+const SOFT_BLUR_DOWNSCALE = 16;
+
 const roundRect = (x: Ctx, left: number, top: number, w: number, h: number, r: number) => {
     x.beginPath();
     x.roundRect(left, top, w, h, r);
@@ -286,9 +291,37 @@ const drawDayPass = (x: Ctx, t: RingTicket, cover: CoverImage | null) => {
     x.beginPath();
     x.rect(stubX, 0, DAY_STUB_W, TICKET_H);
     x.clip();
-    x.filter = 'blur(10px) saturate(1.4)';
-    paintPhoto();
-    x.filter = 'none';
+    if (CANVAS_FILTER) {
+        x.filter = 'blur(10px) saturate(1.4)';
+        paintPhoto();
+        x.filter = 'none';
+    } else {
+        // Safari는 ctx.filter가 없다. 작게 그렸다가 늘려 그려 흐림을 흉내 낸다(bakeStub의 대체 경로와 같은 방식, 채도 보정은 생략)
+        const small = document.createElement('canvas');
+        small.width = Math.ceil(TICKET_W / SOFT_BLUR_DOWNSCALE);
+        small.height = Math.ceil(TICKET_H / SOFT_BLUR_DOWNSCALE);
+        const s = small.getContext('2d');
+        if (s) {
+            s.scale(1 / SOFT_BLUR_DOWNSCALE, 1 / SOFT_BLUR_DOWNSCALE);
+            fillFallback(s, view.fallbackBg, TICKET_W, TICKET_H);
+            if (cover) drawCover(s, cover, TICKET_W + DAY_STUB_W, TICKET_H, -DAY_STUB_W);
+            x.imageSmoothingQuality = 'high';
+            // 작은 캔버스는 정수로 올림돼 내용(TICKET_W/배율)보다 조금 넓다. 내용 영역만 잘라 늘려야 오른쪽에 빈 띠가 안 생긴다
+            x.drawImage(
+                small,
+                0,
+                0,
+                TICKET_W / SOFT_BLUR_DOWNSCALE,
+                TICKET_H / SOFT_BLUR_DOWNSCALE,
+                0,
+                0,
+                TICKET_W,
+                TICKET_H,
+            );
+        } else {
+            paintPhoto();
+        }
+    }
     x.fillStyle = 'rgba(15,23,42,.58)';
     x.fillRect(stubX, 0, DAY_STUB_W, TICKET_H);
     x.fillStyle = 'rgba(255,255,255,.08)';
@@ -385,15 +418,29 @@ export const createTicketBackCanvas = (scale: number) => {
 };
 
 /** 카드 아래 깔리는 흐린 그림자 */
+/** 그림자 텍스처의 기준 크기. 카드 그림자 평면(폭 1.3배, 높이 1.45배)이 이 크기에 대응한다 */
+export const SHADOW_BASE_W = 340;
+export const SHADOW_BASE_H = 280;
+/** 흐림이 캔버스 가장자리에서 잘리지 않게 사방에 더하는 투명 여백. shadowBlur 32(σ≈16)는 약 48px까지 번진다 */
+export const SHADOW_PAD = 24;
+
 export const createShadowCanvas = () => {
     const c = document.createElement('canvas');
-    c.width = 340;
-    c.height = 280;
+    c.width = SHADOW_BASE_W + SHADOW_PAD * 2;
+    c.height = SHADOW_BASE_H + SHADOW_PAD * 2;
     const x = c.getContext('2d');
     if (!x) return c;
-    x.filter = 'blur(16px)';
-    x.fillStyle = 'rgba(15,23,42,.75)';
-    roundRect(x, 40, 45, 260, 190, 20);
+    /*
+     * Safari(iOS 포함)는 ctx.filter를 지원하지 않는다. filter = 'blur()'는 무시되고 테두리가 또렷한 사각형이 그려져
+     * 카드 아래로 짙은 띠가 보였다. 모든 브라우저가 지원하는 shadowBlur로 흐림을 만든다.
+     * 도형은 캔버스 밖에 그리고 그림자만 제자리로 옮겨, 흐린 그림자만 남긴다(blur(16px) ≈ shadowBlur 32).
+     */
+    const offscreen = c.width * 2;
+    x.shadowColor = 'rgba(15,23,42,.75)';
+    x.shadowBlur = 32;
+    x.shadowOffsetX = offscreen;
+    x.fillStyle = '#000';
+    roundRect(x, SHADOW_PAD + 40 - offscreen, SHADOW_PAD + 45, 260, 190, 20);
     x.fill();
     return c;
 };
