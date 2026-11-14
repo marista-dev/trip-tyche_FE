@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react';
 
+import { useQueryClient } from '@tanstack/react-query';
+
+import { SUMMARY_QUERY_KEY } from '@/domains/user/queryKeys';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import {
     ANALYTICS_EVENTS,
@@ -28,6 +31,7 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const login = useUserStore((s) => s.login);
     const setUnauthenticated = useUserStore((s) => s.setUnauthenticated);
     const bootstrappedRef = useRef(false);
+    const queryClient = useQueryClient();
 
     useEffect(() => {
         if (bootstrappedRef.current) return;
@@ -39,6 +43,8 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             if (cancelled) return;
 
             if (result.success) {
+                // 페이지의 useSummary가 같은 요청을 다시 보내지 않게 부팅 결과를 캐시에 넣는다
+                queryClient.setQueryData(SUMMARY_QUERY_KEY, result);
                 login(result.data);
                 /*
                  * 디바이스 등록은 인증이 필요하다. 여기가 앱에서 인증이 확정되는 유일한 지점이다.
@@ -74,7 +80,7 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return () => {
             cancelled = true;
         };
-    }, [login, setUnauthenticated]);
+    }, [login, setUnauthenticated, queryClient]);
 
     if (status === 'unknown') {
         return <Indicator />;

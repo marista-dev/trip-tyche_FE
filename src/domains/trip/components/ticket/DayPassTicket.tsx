@@ -40,7 +40,7 @@ const DayPassTicket = ({
     return (
         <div css={shadowWrap} {...DAY_PASS_ROOT_PROPS}>
             <div css={passBody(fallbackBg, height)}>
-                {photoUrl && <img src={photoUrl} alt={photoAlt} css={ticketPhoto} />}
+                {photoUrl && <img src={photoUrl} alt={photoAlt} css={ticketPhoto} loading='lazy' decoding='async' />}
 
                 <div css={topRow}>
                     <div css={badgeGroup}>

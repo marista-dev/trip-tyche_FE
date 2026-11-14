@@ -20,6 +20,7 @@ import { ROUTES } from '@/shared/constants/route';
 import { STORAGE_KEYS } from '@/shared/constants/storage';
 import { COLORS } from '@/shared/constants/style';
 import { useMapScript } from '@/shared/hooks/useMapScript';
+import { useNearbyLoad } from '@/shared/hooks/useNearbyLoad';
 import { useToastStore } from '@/shared/stores/useToastStore';
 import { MapType } from '@/shared/types/map';
 
@@ -32,7 +33,6 @@ const ImageByDatePage = () => {
     const [tripDates, setTripDates] = useState<string[]>([]);
     const [activeIndex, setActiveIndex] = useState(0);
     const [activePlace, setActivePlace] = useState('');
-    const [areAllPhotosLoaded, setAreAllPhotosLoaded] = useState(false);
 
     const showToast = useToastStore((state) => state.showToast);
 
@@ -40,7 +40,6 @@ const ImageByDatePage = () => {
     const navigate = useNavigate();
 
     const mapRef = useRef<MapType | null>(null);
-    const loadedPhotoCountRef = useRef(0);
     const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
     const carouselRef = useRef<HTMLDivElement | null>(null);
     const thumbnailRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -51,6 +50,7 @@ const ImageByDatePage = () => {
     const isDomestic = tripInfoResult?.success ? parseDestination(tripInfoResult.data.country).isDomestic : false;
     const { data: photosResult } = useMediaByDate(tripKey || '', date || '');
     const isDayTrip = tripDates.length === 1;
+    const shouldLoad = useNearbyLoad(activeIndex, `${tripKey}/${date}`);
 
     useEffect(() => {
         setTripDates(JSON.parse(sessionStorage.getItem(STORAGE_KEYS.IMAGE_DATES) || '[]'));
@@ -66,14 +66,12 @@ const ImageByDatePage = () => {
         if (!photosResult) return;
         const nextPhotos = photosResult.success ? photosResult.data : [];
         setPhotos(nextPhotos);
-        loadedPhotoCountRef.current = 0;
         setActiveIndex(0);
         if (carouselRef.current) carouselRef.current.scrollLeft = 0;
-        if (nextPhotos.length === 0) setAreAllPhotosLoaded(true);
     }, [photosResult]);
 
     useEffect(() => {
-        if (!photos.length || !areAllPhotosLoaded || !carouselRef.current) return;
+        if (!photos.length || !carouselRef.current) return;
         const slides = slideRefs.current.filter(Boolean) as HTMLDivElement[];
         if (!slides.length) return;
 
@@ -88,7 +86,7 @@ const ImageByDatePage = () => {
         );
         slides.forEach((slide) => observer.observe(slide));
         return () => observer.disconnect();
-    }, [photos, areAllPhotosLoaded]);
+    }, [photos]);
 
     useEffect(() => {
         thumbnailRefs.current[activeIndex]?.scrollIntoView(CENTER_IN_STRIP);
@@ -113,11 +111,6 @@ const ImageByDatePage = () => {
         }
     }, [activeIndex, photos, isMapScriptLoaded]);
 
-    const handlePhotoLoad = useCallback(() => {
-        loadedPhotoCountRef.current += 1;
-        if (loadedPhotoCountRef.current === photos.length) setAreAllPhotosLoaded(true);
-    }, [photos]);
-
     const scrollToPhoto = useCallback((photoIndex: number) => {
         slideRefs.current[photoIndex]?.scrollIntoView(CENTER_IN_STRIP);
     }, []);
@@ -129,10 +122,16 @@ const ImageByDatePage = () => {
     }
 
     const activePhoto = photos[activeIndex];
+    /*
+     * 사진 목록만 오면 화면을 연다. 예전에는 그날 사진이 전부 로드될 때까지 스피너로 막았다.
+     * 30장 실측(Fast 4G, CPU 4x): 목록 4.6초 → 화면 12.0초. 사진 하나라도 실패하면 영영 열리지 않았다.
+     * 슬라이드는 크기가 고정이라 사진을 기다릴 이유가 없다.
+     */
+    const isReady = photosResult !== undefined;
 
     return (
         <div css={container}>
-            {!areAllPhotosLoaded && <Indicator />}
+            {!isReady && <Indicator />}
 
             <button
                 css={backButtonStyle}
@@ -143,7 +142,7 @@ const ImageByDatePage = () => {
             </button>
 
             <div css={mapWrap}>
-                {isMapScriptLoaded && areAllPhotosLoaded ? (
+                {isMapScriptLoaded && isReady ? (
                     <MultiMarkerMap
                         positions={photos.map((photo) => ({
                             latitude: photo.latitude,
@@ -158,7 +157,7 @@ const ImageByDatePage = () => {
                     </div>
                 )}
 
-                {activePhoto && activePlace && areAllPhotosLoaded && (
+                {activePhoto && activePlace && (
                     <div css={infoCard} key={`${activePhoto.mediaFileId}-${activeIndex}`}>
                         <div css={infoCardInner}>
                             <span css={infoCardDot} />
@@ -198,7 +197,7 @@ const ImageByDatePage = () => {
                                 data-index={index}
                                 css={photoSlotStyle}
                             >
-                                <ImageItem image={photo} onImageLoad={handlePhotoLoad} />
+                                <ImageItem image={photo} load={shouldLoad(index)} />
                             </div>
                         ))}
                     </main>
@@ -213,7 +212,7 @@ const ImageByDatePage = () => {
                                 onClick={() => scrollToPhoto(index)}
                                 aria-label={`사진 ${index + 1}`}
                             >
-                                <img src={photo.mediaLink} alt='' css={thumbImage} />
+                                <img src={photo.mediaLink} alt='' css={thumbImage} loading='lazy' decoding='async' />
                             </button>
                         ))}
                     </div>
