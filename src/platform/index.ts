@@ -11,3 +11,13 @@ export const isNative = (): boolean => Capacitor.isNativePlatform();
 export const isAndroid = (): boolean => Capacitor.getPlatform() === 'android';
 
 export const isIOS = (): boolean => Capacitor.getPlatform() === 'ios';
+
+/**
+ * iPhone·iPad의 브라우저(Safari 등)인지. 네이티브 앱이면 false.
+ * iPadOS는 데스크톱 UA(Macintosh)를 보내므로 터치 지점 수로 가린다.
+ */
+export const isIOSWeb = (): boolean => {
+    if (isNative() || typeof navigator === 'undefined') return false;
+    if (/iPhone|iPad|iPod/.test(navigator.userAgent)) return true;
+    return /Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1;
+};

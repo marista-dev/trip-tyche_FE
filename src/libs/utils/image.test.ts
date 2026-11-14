@@ -1,52 +1,27 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { extractMetadataFromImage } from './image';
+import { extractMetadataFromImage, summarizeUploadFormats } from './image';
 
-// piexifjs 실물은 실제 JPEG 바이너리가 필요해 테스트에서 재현하기 번거로우므로 목으로 대체한다.
-// FileReader 목이 만들어내는 "data:fake;filename=..." 문자열에서 파일명을 읽어,
-// 테스트가 미리 등록해둔 exifFixtures를 그대로 반환하도록 한다.
+// exifr 실물은 실제 이미지 바이너리가 필요하므로 목으로 대체한다.
+// 파일명으로 테스트가 미리 등록해 둔 fixture('0th'/'Exif'/'GPS' 구조)를 찾아 exifr 출력 모양(ifd0/exif/gps)으로 돌려준다.
 const exifFixtures = new Map<string, Record<string, unknown>>();
+let parseCallCounts: Map<File, number>;
 
 // vi.mock 팩토리는 파일 최상단으로 호이스팅되므로, 팩토리 안에서 참조하는 상수는
 // vi.hoisted로 함께 끌어올려야 "before initialization" 에러 없이 공유할 수 있다.
-const { GPSIFD, ExifIFD, ImageIFD } = vi.hoisted(() => ({
+const { GPSIFD, ExifIFD } = vi.hoisted(() => ({
     GPSIFD: { GPSLatitudeRef: 1, GPSLatitude: 2, GPSLongitudeRef: 3, GPSLongitude: 4 },
     ExifIFD: { DateTimeOriginal: 36867, DateTimeDigitized: 36868 },
-    ImageIFD: { DateTime: 306 },
 }));
 
-vi.mock('piexifjs', () => {
-    const load = (data: string) => {
-        const filename = data.match(/filename=([^;]+)/)?.[1];
-        const fixture = filename ? exifFixtures.get(filename) : undefined;
-        if (!fixture) {
-            throw new Error(`no exif fixture registered for "${filename}"`);
-        }
-        return fixture;
-    };
-
-    const api = { GPSIFD, ExifIFD, ImageIFD, load };
-    return { default: api, ...api };
-});
-
-// 실제 FileReader 대신, readAsDataURL 호출 횟수를 파일 단위로 세는 목.
-// 파일명을 결과 문자열에 그대로 실어 보내 piexifjs 목이 그 파일의 fixture를 찾을 수 있게 한다.
-let readAsDataURLCallCounts: Map<File, number>;
-
-class FakeFileReader {
-    result: string | null = null;
-    onload: ((ev: { target: { result: string | null } }) => void) | null = null;
-    onerror: ((ev: unknown) => void) | null = null;
-
-    readAsDataURL(file: File) {
-        readAsDataURLCallCounts.set(file, (readAsDataURLCallCounts.get(file) ?? 0) + 1);
-
-        queueMicrotask(() => {
-            this.result = `data:fake;filename=${file.name}`;
-            this.onload?.({ target: { result: this.result } });
-        });
-    }
-}
+vi.mock('exifr', () => ({
+    parse: async (file: File) => {
+        parseCallCounts.set(file, (parseCallCounts.get(file) ?? 0) + 1);
+        const fixture = exifFixtures.get(file.name);
+        if (!fixture) throw new Error(`no exif fixture registered for "${file.name}"`);
+        return { ifd0: fixture['0th'], exif: fixture.Exif, gps: fixture.GPS };
+    },
+}));
 
 function makeGpsFixture(lat: number, latRef: 'N' | 'S', lon: number, lonRef: 'E' | 'W') {
     return {
@@ -76,23 +51,18 @@ function makeDateFixture(exifDateTime: string) {
 }
 
 beforeEach(() => {
-    readAsDataURLCallCounts = new Map();
+    parseCallCounts = new Map();
     exifFixtures.clear();
-    vi.stubGlobal('FileReader', FakeFileReader);
-});
-
-afterEach(() => {
-    vi.unstubAllGlobals();
 });
 
 describe('extractMetadataFromImage', () => {
-    it('파일당 readAsDataURL 호출 횟수가 1회다 (03 이전에는 2회였다)', async () => {
+    it('파일당 EXIF를 1회만 읽는다', async () => {
         const file = new File(['x'], 'single.jpg', { type: 'image/jpeg' });
         exifFixtures.set('single.jpg', {});
 
         await extractMetadataFromImage([file]);
 
-        expect(readAsDataURLCallCounts.get(file)).toBe(1);
+        expect(parseCallCounts.get(file)).toBe(1);
     });
 
     it('반환 배열의 각 원소가 입력 File과 순서대로 올바르게 짝지어진다', async () => {
@@ -194,8 +164,62 @@ describe('extractMetadataFromImage', () => {
         expect(result.recordDate).toBe('');
     });
 
+    it('exifr가 주는 숫자 유리수(HEIC 포함)도 GPS로 읽는다', async () => {
+        const file = new File(['x'], 'IMG_0001.HEIC', { type: 'image/heic' });
+        exifFixtures.set('IMG_0001.HEIC', {
+            GPS: {
+                [GPSIFD.GPSLatitude]: [48, 51, 38.16],
+                [GPSIFD.GPSLatitudeRef]: 'N',
+                [GPSIFD.GPSLongitude]: [2, 17, 40.2],
+                [GPSIFD.GPSLongitudeRef]: 'W',
+            },
+            ...makeDateFixture('2024:07:15 10:30:00'),
+        });
+
+        const [result] = await extractMetadataFromImage([file]);
+
+        expect(result.latitude).toBeCloseTo(48.8606, 4);
+        expect(result.longitude).toBeCloseTo(-2.2945, 4);
+        expect(result.recordDate).toBe('2024-07-15T10:30:00');
+    });
+
+    it('EXIF 읽기가 실패해도 미지정으로 분류된다', async () => {
+        const file = new File(['x'], 'unregistered.jpg', { type: 'image/jpeg' });
+
+        const [result] = await extractMetadataFromImage([file]);
+
+        expect(result.latitude).toBe(0);
+        expect(result.recordDate).toBe('');
+    });
+
     it('빈 배열이면 빈 배열을 반환한다', async () => {
         const result = await extractMetadataFromImage([]);
         expect(result).toEqual([]);
+    });
+});
+
+describe('summarizeUploadFormats', () => {
+    it('HEIC(type 또는 확장자)·JPEG·기타 개수와 총 용량(MB)을 센다', () => {
+        const mb = (n: number) => new Uint8Array(n * 1e6);
+        const files = [
+            new File([mb(2)], 'IMG_1.HEIC', { type: 'image/heic' }),
+            new File([mb(1)], 'IMG_2.heif', { type: '' }),
+            new File([mb(3)], 'IMG_3.jpeg', { type: 'image/jpeg' }),
+            new File([mb(1)], 'shot.png', { type: 'image/png' }),
+        ];
+        expect(summarizeUploadFormats(files)).toEqual({
+            count: 4,
+            heic_count: 2,
+            jpeg_count: 1,
+            other_count: 1,
+            total_mb: 7,
+        });
+    });
+});
+
+describe('summarizeUploadFormats 중복 집계', () => {
+    it('확장자는 HEIC인데 type이 image/jpeg면 HEIC로만 센다', () => {
+        const file = new File(['x'], 'IMG_9.HEIC', { type: 'image/jpeg' });
+        expect(summarizeUploadFormats([file])).toMatchObject({ heic_count: 1, jpeg_count: 0, other_count: 0 });
     });
 });

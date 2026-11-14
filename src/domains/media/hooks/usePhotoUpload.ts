@@ -6,7 +6,8 @@ import { PendingPhoto } from '@/domains/media/components/manage/DateGroupSection
 import { useImageUpload } from '@/domains/media/hooks/useImageUpload';
 import { getDateBounds, getDatesOutside, toDateString, toPhotoDays, TripRange } from '@/domains/trip/tripDates';
 import { ANALYTICS_EVENTS, track } from '@/libs/analytics';
-import { isNative } from '@/platform';
+import { summarizeUploadFormats } from '@/libs/utils/image';
+import { isIOSWeb, isNative } from '@/platform';
 import { pickImagesFromGallery } from '@/platform/native/gallery';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
@@ -165,8 +166,8 @@ export const usePhotoUpload = (tripKey: string, { tripRange, onExtendRange }: Us
             await waitForBackgroundUpload();
 
             await queryClient.invalidateQueries({ queryKey: ['trip-images', tripKey] });
-            // 장수만 보낸다. 파일명·tripKey는 식별 정보라 속성에 넣지 않는다.
-            track(ANALYTICS_EVENTS.PHOTOS_UPLOADED, { count: uniqueFiles.length });
+            // 장수·형식·용량만 보낸다. 파일명·tripKey는 식별 정보라 속성에 넣지 않는다.
+            track(ANALYTICS_EVENTS.PHOTOS_UPLOADED, { ...summarizeUploadFormats(uniqueFiles), ios_web: isIOSWeb() });
             showToast(`${uniqueFiles.length}장의 사진이 추가되었어요`);
         } catch {
             showToast('사진 추가 중 문제가 발생했어요. 다시 시도해주세요.');

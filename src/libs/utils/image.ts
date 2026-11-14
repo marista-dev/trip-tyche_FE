@@ -1,6 +1,5 @@
 import { Dispatch, SetStateAction } from 'react';
 
-import { MEDIA_FORMAT } from '@/domains/media/constants';
 import { ClientImageFile } from '@/domains/media/types';
 import { runWithPool } from '@/libs/utils/async';
 import { formatToISOLocal } from '@/libs/utils/date';
@@ -60,52 +59,22 @@ export const extractMetadataFromImage = async (
     });
 };
 
-// Heic -> jpeg 확장자 변경
-export const convertHeicToJpg = async (images: FileList | File[]) => {
-    const convertedImages = await Promise.all(
-        Array.from(images).map(async (image) => {
-            const actualType = await getActualFileType(image);
-            if (actualType === 'image/heic') {
-                const { default: heic2any } = await import('heic2any');
+const HEIC_EXTENSION = /\.(heic|heif)$/i;
 
-                const convertedBlob = await heic2any({
-                    blob: image,
-                    toType: 'image/jpeg',
-                });
-
-                const convertedFile = new File(
-                    [convertedBlob as Blob],
-                    image.name.replace(MEDIA_FORMAT.CURRENT_MEDIA_FORMAT, MEDIA_FORMAT.JPG_FORMAT),
-                    { type: 'image/jpeg' },
-                );
-                return convertedFile;
-            } else {
-                return image;
-            }
-        }),
-    );
-
-    return convertedImages;
-};
-
-// 이미지 실제 타입 반환
-const getActualFileType = async (file: File): Promise<string> => {
-    const buffer = await file.slice(0, 12).arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-
-    if (bytes.length >= 12) {
-        const ftyp = String.fromCharCode(...bytes.slice(4, 8));
-        if (ftyp === 'ftyp') {
-            const brand = String.fromCharCode(...bytes.slice(8, 12));
-            if (brand === 'heic' || brand === 'mif1' || brand === 'msf1') {
-                return 'image/heic';
-            }
-        }
-    }
-
-    if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-        return 'image/jpeg';
-    }
-
-    return file.type;
+/**
+ * 업로드 분석용 형식 집계. 파일 내용은 읽지 않고 type·이름·크기만 본다.
+ * iPhone 사진 선택 창에서 형식을 '현재'로 고른 사용자는 HEIC를, 기본값('자동')이면 JPEG를 보낸다.
+ */
+export const summarizeUploadFormats = (files: File[]) => {
+    // 한 파일은 한 형식으로만 센다. HEIC 판정(type 또는 확장자)이 JPEG보다 우선한다
+    const isHeic = (f: File) => /image\/hei[cf]/.test(f.type) || HEIC_EXTENSION.test(f.name);
+    const heic = files.filter(isHeic).length;
+    const jpeg = files.filter((f) => !isHeic(f) && f.type === 'image/jpeg').length;
+    return {
+        count: files.length,
+        heic_count: heic,
+        jpeg_count: jpeg,
+        other_count: files.length - heic - jpeg,
+        total_mb: Math.round(files.reduce((sum, f) => sum + f.size, 0) / 1e5) / 10,
+    };
 };

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { css } from '@emotion/react';
 import { Upload } from 'lucide-react';
 
+import IosPickerTip from '@/domains/media/components/upload/IosPickerTip';
 import { isNative } from '@/platform';
 import { COLORS } from '@/shared/constants/style';
 
@@ -43,15 +44,7 @@ const UploadStep = ({ onImageSelect, onNativePick }: UploadStepProps) => {
                 onClick={native ? onNativePick : undefined}
                 css={uploadCard(hover)}
             >
-                {!native && (
-                    <input
-                        type='file'
-                        accept='image/*,image/heic,image/heif'
-                        multiple
-                        css={hiddenInput}
-                        onChange={onImageSelect}
-                    />
-                )}
+                {!native && <input type='file' accept='image/*' multiple css={hiddenInput} onChange={onImageSelect} />}
                 <div css={iconBox(hover)}>
                     <Upload size={26} color={hover ? '#fff' : ACCENT} strokeWidth={1.8} />
                 </div>
@@ -68,6 +61,8 @@ const UploadStep = ({ onImageSelect, onNativePick }: UploadStepProps) => {
                     </div>
                 ))}
             </div>
+
+            <IosPickerTip />
         </div>
     );
 };

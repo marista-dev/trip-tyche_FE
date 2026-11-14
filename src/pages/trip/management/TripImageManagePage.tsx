@@ -13,6 +13,7 @@ import SelectionActionFAB from '@/domains/media/components/manage/SelectionActio
 import { managePageContainerStyle } from '@/domains/media/components/manage/styles';
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
 import { FailedImageCard } from '@/domains/media/components/upload/FailedImageCard';
+import IosPickerTip from '@/domains/media/components/upload/IosPickerTip';
 import { useMediaDelete } from '@/domains/media/hooks/mutations';
 import { useTripPhotos } from '@/domains/media/hooks/queries';
 import { usePhotoSelection } from '@/domains/media/hooks/usePhotoSelection';
@@ -174,14 +175,7 @@ const TripImageManagePage = () => {
                 </div>
             )}
 
-            <input
-                ref={fileInputRef}
-                type='file'
-                accept='image/*,image/heic,image/heif'
-                multiple
-                hidden
-                onChange={handleFileSelected}
-            />
+            <input ref={fileInputRef} type='file' accept='image/*' multiple hidden onChange={handleFileSelected} />
 
             <ManageHeader
                 title='사진 관리'
@@ -247,6 +241,8 @@ const TripImageManagePage = () => {
                         </div>
                     </section>
                 )}
+
+                {!selectMode && <IosPickerTip />}
 
                 <h3 css={sectionLabelStyle}>{selectMode ? '탭으로 추가 선택 / 해제' : '모든 사진'}</h3>
 

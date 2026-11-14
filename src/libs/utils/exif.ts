@@ -1,35 +1,53 @@
-import piexif from 'piexifjs';
+import { parse as parseExif } from 'exifr';
 
 import { Exif } from '@/shared/types/exif';
 import { Location } from '@/shared/types/map';
 
-// 이미지 파일에서 EXIF 데이터 추출
-const readExifData = (file: File): Promise<Exif | null> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e: ProgressEvent<FileReader>) => {
-            const result = e.target?.result;
+/* EXIF 태그 번호 (TIFF/EXIF 표준) */
+const TAG = {
+    DateTime: 306, // IFD0
+    DateTimeOriginal: 36867, // Exif IFD
+    DateTimeDigitized: 36868, // Exif IFD
+    GPSLatitudeRef: 1,
+    GPSLatitude: 2,
+    GPSLongitudeRef: 3,
+    GPSLongitude: 4,
+} as const;
 
-            if (typeof result === 'string') {
-                try {
-                    const exif = piexif.load(result) as Exif;
-                    resolve(exif);
-                } catch (error) {
-                    resolve(null);
-                }
-            } else {
-                reject(new Error('Failed to read image file as string'));
-            }
-        };
-
-        reader.readAsDataURL(file);
-        reader.onerror = (error) => reject(error);
-    });
+/*
+ * exifr로 필요한 IFD만, 파일 앞부분만 읽는다. JPEG·HEIC 모두 지원한다.
+ * 예전 방식(파일 전체를 base64로 읽어 JPEG만 해석)은 장당 수 MB 문자열을 만들었고,
+ * HEIC는 먼저 JPEG로 바꿔야 했는데 그 변환이 EXIF를 지워 GPS를 잃었다.
+ *
+ * 키·값 변환을 끄면 태그 번호 그대로, 날짜는 'YYYY:MM:DD HH:mm:ss' 문자열 그대로 온다.
+ * 이를 Exif 구조('0th'/'Exif'/'GPS')로 옮겨 아래 날짜·GPS 로직을 그대로 쓴다.
+ * 유리수는 [분자, 분모] 대신 숫자로 온다(GPS를 읽을 때 두 형식을 모두 받는다).
+ */
+const readExifData = async (file: File): Promise<Exif | null> => {
+    const raw = (await parseExif(file, {
+        tiff: true,
+        exif: true,
+        gps: true,
+        ifd1: false,
+        interop: false,
+        xmp: false,
+        icc: false,
+        iptc: false,
+        jfif: false,
+        ihdr: false,
+        makerNote: false,
+        userComment: false,
+        mergeOutput: false,
+        translateKeys: false,
+        translateValues: false,
+        reviveValues: false,
+    })) as { ifd0?: Exif['0th']; exif?: Exif['Exif']; gps?: Exif['GPS'] } | undefined;
+    if (!raw) return null;
+    return { '0th': raw.ifd0, Exif: raw.exif, GPS: raw.gps };
 };
 
 // DMS(도, 분, 초) 형식의 GPS 데이터를 DD(십진수) 형식으로 변환
 const convertDMSToDD = (degrees: number, minutes: number, seconds: number, direction: string): number => {
-    // DMS 형식을 DD 형식으로 변환
     let dd = degrees + minutes / 60 + seconds / 3600;
     if (direction === 'S' || direction === 'W') {
         dd = dd * -1;
@@ -37,52 +55,44 @@ const convertDMSToDD = (degrees: number, minutes: number, seconds: number, direc
     return dd;
 };
 
+/** 유리수 하나: 숫자 또는 [분자, 분모] */
+const toNumber = (value: unknown): number =>
+    Array.isArray(value) ? Number(value[0]) / Number(value[1]) : Number(value);
+
+/** [도, 분, 초] → 숫자 3개. 형식이 다르면 null */
+const toDMS = (value: unknown): [number, number, number] | null => {
+    if (!Array.isArray(value) || value.length < 3) return null;
+    const dms = value.slice(0, 3).map(toNumber) as [number, number, number];
+    return dms.every(Number.isFinite) ? dms : null;
+};
+
 // EXIF 데이터에서 GPS 좌표 추출
 const extractGpsFromExifData = (exifObj: Exif): Location | null => {
-    if (!exifObj || !exifObj['GPS']) return null;
-    const gps = exifObj['GPS'];
+    const gps = exifObj?.GPS;
+    if (!gps) return null;
 
-    /*
-     * GPSLatitude, GPSLatitudeRef: 위도 정보와 그에 해당하는 참조(방향)
-     * GPSLongitude, GPSLongitudeRef: 경도 정보와 그에 해당하는 참조(방향)
-     */
-    const latData = gps[piexif.GPSIFD.GPSLatitude] as [number, number][] | undefined;
-    const latRef = gps[piexif.GPSIFD.GPSLatitudeRef] as string | undefined;
-    const lonData = gps[piexif.GPSIFD.GPSLongitude] as [number, number][] | undefined;
-    const lonRef = gps[piexif.GPSIFD.GPSLongitudeRef] as string | undefined;
+    const lat = toDMS(gps[TAG.GPSLatitude]);
+    const latRef = gps[TAG.GPSLatitudeRef];
+    const lon = toDMS(gps[TAG.GPSLongitude]);
+    const lonRef = gps[TAG.GPSLongitudeRef];
 
-    if (!latData || !latRef || !lonData || !lonRef) {
+    if (!lat || !lon || typeof latRef !== 'string' || typeof lonRef !== 'string') {
         return null;
     }
 
-    try {
-        const latitude = convertDMSToDD(
-            latData[0][0] / latData[0][1],
-            latData[1][0] / latData[1][1],
-            latData[2][0] / latData[2][1],
-            latRef,
-        );
-        const longitude = convertDMSToDD(
-            lonData[0][0] / lonData[0][1],
-            lonData[1][0] / lonData[1][1],
-            lonData[2][0] / lonData[2][1],
-            lonRef,
-        );
-
-        return { latitude, longitude };
-    } catch (error) {
-        console.error('EXIF 데이터에서 GPS 좌표 추출 실패: ', error);
-        return null;
-    }
+    return {
+        latitude: convertDMSToDD(...lat, latRef),
+        longitude: convertDMSToDD(...lon, lonRef),
+    };
 };
 
 // 촬영시각 후보 태그 — 우선순위 순
 // DateTimeOriginal(셔터를 누른 시각) → DateTimeDigitized(디지털화 시각) → 0th.DateTime(파일 기록/수정 시각).
 // 편집·재저장되거나 메신저를 거친 사진은 0th.DateTime만 덮어써지므로 촬영시각 태그를 우선한다.
 const DATETIME_TAG_CANDIDATES = [
-    ['Exif', piexif.ExifIFD.DateTimeOriginal],
-    ['Exif', piexif.ExifIFD.DateTimeDigitized],
-    ['0th', piexif.ImageIFD.DateTime],
+    ['Exif', TAG.DateTimeOriginal],
+    ['Exif', TAG.DateTimeDigitized],
+    ['0th', TAG.DateTime],
 ] as const;
 
 // 우선순위 순으로 촬영시각 후보를 모두 반환한다.
@@ -146,8 +156,7 @@ export const extractDateFromExif = (exifData: Exif | null): Date | null => {
 };
 
 // 파일에서 EXIF를 정확히 1회만 읽어 위치·날짜를 함께 추출한다.
-// extractLocationFromImage/extractDateFromImage를 따로 호출하면 같은 파일을 base64로 두 번
-// 읽게 되므로(각각 readExifData 호출), 대량 업로드 시 메모리 낭비가 크다.
+// extractLocationFromImage/extractDateFromImage를 따로 호출하면 같은 파일을 두 번 읽는다.
 export const extractMetadataFromExif = async (
     file: File,
 ): Promise<{ location: Location | null; date: Date | null }> => {
