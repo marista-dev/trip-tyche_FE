@@ -54,7 +54,17 @@ const MiniTicketPreview = ({
         <div css={cardShadow}>
             <div css={card}>
                 <div css={hero(fallbackBg)}>
-                    {coverPhotoUrl && <img src={coverPhotoUrl} alt={trip.tripTitle} css={ticketPhoto} />}
+                    {coverPhotoUrl && (
+                        <img
+                            src={coverPhotoUrl}
+                            alt={trip.tripTitle}
+                            css={ticketPhoto}
+                            // HEIC를 못 그리는 브라우저에서는 깨진 아이콘 대신 배경색만 보인다
+                            onError={(e) => {
+                                e.currentTarget.style.visibility = 'hidden';
+                            }}
+                        />
+                    )}
                     <div css={overlay} />
                     <div css={brandChip}>
                         <span css={brandDot} />

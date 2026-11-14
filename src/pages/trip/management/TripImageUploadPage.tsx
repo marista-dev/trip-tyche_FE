@@ -137,12 +137,14 @@ const TripImageUploadPage = () => {
     const processSelectedImages = async (selectedImages: File[]) => {
         setStep('processing');
         const uniqueFiles = await prepareUploadFiles(selectedImages);
-        uploadSummaryRef.current = summarizeUploadFormats(uniqueFiles);
+        const summary = summarizeUploadFormats(uniqueFiles);
         // S3 업로드는 백그라운드로 진행되며, 정보 입력 화면 진입을 막지 않는다.
         // 실제 업로드 완료는 Step3에서 waitForBackgroundUpload로 추적된다.
         // 신규 등록일 때는 status 전환도 같은 체인에 묶어 실패 시 step3 retry 화면에 surface되도록 한다.
         const postUploadTask = !isEdit ? () => mediaAPI.updateTripStatusToImagesUploaded(tripKey!) : undefined;
         await uploadImagesToS3(uniqueFiles, postUploadTask);
+        // 업로드가 실제로 시작된 배치만 기록한다(진행 중이면 위에서 던져 이전 배치의 집계를 덮어쓰지 않는다)
+        uploadSummaryRef.current = summary;
         setStep('info');
     };
 

@@ -216,3 +216,10 @@ describe('summarizeUploadFormats', () => {
         });
     });
 });
+
+describe('summarizeUploadFormats 중복 집계', () => {
+    it('확장자는 HEIC인데 type이 image/jpeg면 HEIC로만 센다', () => {
+        const file = new File(['x'], 'IMG_9.HEIC', { type: 'image/jpeg' });
+        expect(summarizeUploadFormats([file])).toMatchObject({ heic_count: 1, jpeg_count: 0, other_count: 0 });
+    });
+});

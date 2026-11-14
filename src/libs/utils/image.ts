@@ -66,8 +66,10 @@ const HEIC_EXTENSION = /\.(heic|heif)$/i;
  * iPhone 사진 선택 창에서 형식을 '현재'로 고른 사용자는 HEIC를, 기본값('자동')이면 JPEG를 보낸다.
  */
 export const summarizeUploadFormats = (files: File[]) => {
-    const heic = files.filter((f) => /image\/hei[cf]/.test(f.type) || HEIC_EXTENSION.test(f.name)).length;
-    const jpeg = files.filter((f) => f.type === 'image/jpeg').length;
+    // 한 파일은 한 형식으로만 센다. HEIC 판정(type 또는 확장자)이 JPEG보다 우선한다
+    const isHeic = (f: File) => /image\/hei[cf]/.test(f.type) || HEIC_EXTENSION.test(f.name);
+    const heic = files.filter(isHeic).length;
+    const jpeg = files.filter((f) => !isHeic(f) && f.type === 'image/jpeg').length;
     return {
         count: files.length,
         heic_count: heic,
