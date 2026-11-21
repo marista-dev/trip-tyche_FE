@@ -9,7 +9,12 @@ import type {
     PresignRenewResponse,
     ReprocessItem,
 } from '@/domains/media/types';
-import { UploadAbortError, UploadHttpError, type UploadAbortReason } from '@/domains/media/utils/uploadTelemetry';
+import {
+    FileReadError,
+    UploadAbortError,
+    UploadHttpError,
+    type UploadAbortReason,
+} from '@/domains/media/utils/uploadTelemetry';
 import { apiClient } from '@/libs/apis/shared/client';
 import { ApiResponse, MediaByDate, MediaByPinPoint, Result } from '@/libs/apis/shared/types';
 import { toResult } from '@/libs/apis/shared/utils';
@@ -102,6 +107,22 @@ const putWithWebXhr = (
         webXhr.send.call(xhr, file);
     });
 
+/*
+ * 웹은 고른 파일을 메모리로 읽은 뒤 보낸다.
+ * Android 13+ Chrome은 사진 선택 창의 프록시 URI를 받는데, 이 URI는 조회할 때마다 수정 시각이 달라질 수 있다.
+ * Chrome은 업로드 직전에 파일이 바뀌었는지 검사해 다르면 ERR_UPLOAD_FILE_CHANGED로 끊고,
+ * JS에는 응답 없는 network 오류로만 보여 재시도해도 같은 파일은 계속 실패한다. 메모리 Blob은 이 검사를 받지 않는다.
+ * 앱은 이미 fetch로 읽은 Blob을 쓰므로 그대로 보낸다. 동시 전송 수만큼만 메모리에 올라간다.
+ */
+const toUploadBody = async (file: File): Promise<Blob> => {
+    if (isNative()) return file;
+    try {
+        return new Blob([await file.arrayBuffer()], { type: file.type });
+    } catch (error) {
+        throw new FileReadError({ cause: error });
+    }
+};
+
 export const mediaAPI = {
     // 핀포인트별 미디어 파일 조회
     fetchMediaByPinPoint: async (tripKey: string, pinPointId: string): Promise<ApiResponse<MediaByPinPoint>> =>
@@ -177,7 +198,7 @@ export const mediaAPI = {
             if (webXhr) {
                 await putWithWebXhr(webXhr, presignedUrl, file, contentType, controller.signal, onProgress);
             } else {
-                await axios.put(presignedUrl, file, {
+                await axios.put(presignedUrl, await toUploadBody(file), {
                     headers: {
                         'Content-Type': contentType,
                     },

@@ -26,6 +26,7 @@ export type UploadFailureKind =
     | 'network'
     | 'http_4xx'
     | 'http_5xx'
+    | 'file_unreadable'
     | 'unknown';
 
 /** uploadToS3가 스스로 끊은 이유. 외부(오프라인·재시도) 취소는 'external'이다. */
@@ -39,6 +40,14 @@ export class UploadAbortError extends Error {
         super(`upload aborted: ${reason}`);
         this.name = 'UploadAbortError';
         this.reason = reason;
+    }
+}
+
+/** 전송 전에 파일을 메모리로 읽지 못했다. 선택 뒤 원본이 지워졌거나 접근 권한이 사라진 경우다. */
+export class FileReadError extends Error {
+    constructor(options?: { cause?: unknown }) {
+        super('file read failed', options);
+        this.name = 'FileReadError';
     }
 }
 
@@ -65,6 +74,7 @@ export const classifyUploadError = (error: unknown): UploadFailureKind => {
         if (error.reason === 'wall_clock') return 'wall_clock_timeout';
         return 'aborted';
     }
+    if (error instanceof FileReadError) return 'file_unreadable';
     if (error instanceof UploadHttpError) return classifyStatus(error.status) ?? 'network';
     if (isAxiosError(error)) {
         if (error.code === 'ERR_CANCELED') return 'aborted';
@@ -85,6 +95,7 @@ export const emptyFailureCounts = (): FailureCounts => ({
     network: 0,
     http_4xx: 0,
     http_5xx: 0,
+    file_unreadable: 0,
     unknown: 0,
 });
 
