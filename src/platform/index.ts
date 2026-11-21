@@ -21,3 +21,7 @@ export const isIOSWeb = (): boolean => {
     if (/iPhone|iPad|iPod/.test(navigator.userAgent)) return true;
     return /Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1;
 };
+
+/** Android의 브라우저(Chrome·삼성 인터넷 등)인지. 네이티브 앱이면 false. */
+export const isAndroidWeb = (): boolean =>
+    !isNative() && typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('android');

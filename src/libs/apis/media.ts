@@ -9,12 +9,17 @@ import type {
     PresignRenewResponse,
     ReprocessItem,
 } from '@/domains/media/types';
-import { UploadAbortError, UploadHttpError, type UploadAbortReason } from '@/domains/media/utils/uploadTelemetry';
+import {
+    FileReadError,
+    UploadAbortError,
+    UploadHttpError,
+    type UploadAbortReason,
+} from '@/domains/media/utils/uploadTelemetry';
 import { apiClient } from '@/libs/apis/shared/client';
 import { ApiResponse, MediaByDate, MediaByPinPoint, Result } from '@/libs/apis/shared/types';
 import { toResult } from '@/libs/apis/shared/utils';
 import { exceptTimeFromDateString } from '@/libs/utils/date';
-import { isNative } from '@/platform';
+import { isAndroidWeb, isNative } from '@/platform';
 import { Location } from '@/shared/types/map';
 
 /*
@@ -102,6 +107,23 @@ const putWithWebXhr = (
         webXhr.send.call(xhr, file);
     });
 
+/*
+ * Android 브라우저는 고른 파일을 메모리로 읽은 뒤 보낸다.
+ * Android 13+ Chrome은 사진 선택 창의 프록시 URI를 받는데, 이 URI는 조회할 때마다 수정 시각이 달라질 수 있다.
+ * Chrome은 업로드 직전에 파일이 바뀌었는지 검사해 다르면 ERR_UPLOAD_FILE_CHANGED로 끊고,
+ * JS에는 응답 없는 network 오류로만 보여 재시도해도 같은 파일은 계속 실패한다. 메모리 버퍼는 이 검사를 받지 않는다.
+ * 버퍼를 Blob으로 다시 감싸지 않아 파일당 한 벌만 올라가고, 동시 전송 수만큼만 쌓인다.
+ * 다른 브라우저와 앱(이미 fetch로 읽은 Blob)은 그대로 보낸다.
+ */
+const toUploadBody = async (file: File): Promise<Blob | ArrayBuffer> => {
+    if (!isAndroidWeb()) return file;
+    try {
+        return await file.arrayBuffer();
+    } catch (error) {
+        throw new FileReadError({ cause: error });
+    }
+};
+
 export const mediaAPI = {
     // 핀포인트별 미디어 파일 조회
     fetchMediaByPinPoint: async (tripKey: string, pinPointId: string): Promise<ApiResponse<MediaByPinPoint>> =>
@@ -177,7 +199,7 @@ export const mediaAPI = {
             if (webXhr) {
                 await putWithWebXhr(webXhr, presignedUrl, file, contentType, controller.signal, onProgress);
             } else {
-                await axios.put(presignedUrl, file, {
+                await axios.put(presignedUrl, await toUploadBody(file), {
                     headers: {
                         'Content-Type': contentType,
                     },

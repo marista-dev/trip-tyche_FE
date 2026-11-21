@@ -56,6 +56,7 @@ describe('이벤트 속성 헬퍼', () => {
             fail_network: 2,
             fail_http_4xx: 0,
             fail_http_5xx: 0,
+            fail_file_unreadable: 0,
             fail_unknown: 0,
         });
     });

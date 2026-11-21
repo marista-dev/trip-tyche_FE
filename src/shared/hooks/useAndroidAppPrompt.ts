@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { isNative } from '@/platform';
+import { isAndroidWeb } from '@/platform';
 import { useAppDownloadUrl } from '@/shared/hooks/useAppDownloadUrl';
 
 /*
@@ -19,7 +19,7 @@ import { useAppDownloadUrl } from '@/shared/hooks/useAppDownloadUrl';
 
 const DISMISS_KEY = 'triptyche.androidAppPrompt.dismissed';
 
-export const isAndroidBrowser = () => !isNative() && navigator.userAgent.toLowerCase().includes('android');
+export const isAndroidBrowser = isAndroidWeb;
 
 const wasDismissed = () => {
     try {
