@@ -32,11 +32,11 @@ const Header = ({ title, isBackButton, children, onBack }: HeaderProps) => {
 };
 
 const headerStyle = css`
-    padding: 0 16px;
+    padding: var(--app-safe-top) 16px 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    min-height: 48px;
+    min-height: calc(48px + var(--app-safe-top));
     background: #ffffff;
     border-bottom: 1px solid rgba(0, 0, 0, 0.06);
     box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);

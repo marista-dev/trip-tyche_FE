@@ -175,7 +175,7 @@ const TripTicketActionSheet = ({
                     max-width: 428px;
                     background: ${COLORS.BACKGROUND.WHITE};
                     border-radius: 20px 20px 0 0;
-                    padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+                    padding-bottom: calc(32px + var(--app-safe-bottom));
                     transform: ${show ? 'translateY(0)' : 'translateY(100%)'};
                     transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1);
                     box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.2);

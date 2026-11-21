@@ -384,7 +384,7 @@ const bottomBar = css`
     left: 0;
     right: 0;
     bottom: 0;
-    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    padding: 12px 16px calc(12px + var(--app-safe-bottom));
     background: rgba(255, 255, 255, 0.96);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);

@@ -4,6 +4,16 @@ import { scrollbarStyles } from '@/shared/styles/base/scrollbar';
 import theme from '@/shared/styles/theme';
 
 export const baseStyles = css`
+    /*
+     * safe area. Android edge-to-edge(targetSdk 35+)에서 WebView가 상태바·제스처 바 밑까지 그려지므로
+     * 화면 위·아래에 붙는 UI는 이 값만큼 띄워야 한다. 구형 Android WebView(<140)는 env()가 0이라
+     * Capacitor SystemBars가 주입하는 --safe-area-inset-*을 우선 쓴다.
+     */
+    :root {
+        --app-safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+        --app-safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+    }
+
     *,
     *::before,
     *::after {

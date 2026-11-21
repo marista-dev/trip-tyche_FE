@@ -114,7 +114,7 @@ const BannerCard: React.FC<BannerCardProps> = ({
 
 const card = css`
     position: fixed;
-    top: max(50px, calc(env(safe-area-inset-top) + 12px));
+    top: max(50px, calc(var(--app-safe-top) + 12px));
     left: 12px;
     right: 12px;
     max-width: 404px;

@@ -67,7 +67,7 @@ const editorialHeader = css`
     top: 0;
     left: 0;
     right: 0;
-    padding: 54px 24px 0;
+    padding: max(54px, calc(var(--app-safe-top) + 16px)) 24px 0;
     z-index: 40;
     display: flex;
     align-items: flex-end;
