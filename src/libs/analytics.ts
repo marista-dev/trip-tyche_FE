@@ -111,11 +111,12 @@ export const initAnalytics = (): Promise<void> => {
                 capture_pageview: 'history_change',
                 autocapture: false,
                 disable_session_recording: true,
-                // 아래 자동 수집은 기본값이 아니라 PostHog 프로젝트의 원격 설정을 따른다. 프로젝트에서 켜져도 요소 텍스트(닉네임)나
-                // 예외 메시지가 새지 않도록 코드에서 명시적으로 막는다.
+                // 아래 자동 수집은 기본값이 아니라 PostHog 프로젝트의 원격 설정을 따른다. 프로젝트에서 켜져도 요소 텍스트(닉네임)가
+                // 새지 않도록 클릭·히트맵 수집은 코드에서 막는다.
                 capture_dead_clicks: false,
                 capture_heatmaps: false,
-                capture_exceptions: false,
+                // 처리하지 않은 오류를 $exception으로 받아 오류 추적과 알림에 쓴다. 원격 설정과 무관하게 켠다.
+                capture_exceptions: true,
             });
             registerBaseProperties(posthog);
             client = posthog;

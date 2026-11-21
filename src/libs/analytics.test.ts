@@ -106,7 +106,7 @@ describe('initAnalytics', () => {
                 disable_session_recording: true,
                 capture_dead_clicks: false,
                 capture_heatmaps: false,
-                capture_exceptions: false,
+                capture_exceptions: true,
             }),
         );
     });
