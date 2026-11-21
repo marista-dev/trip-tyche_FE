@@ -4,7 +4,7 @@ import { css } from '@emotion/react';
 import { ChevronRight, Globe, Image as ImageIcon, Plane, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { UserStats } from '@/domains/user/utils/stats';
+import { UserStats } from '@/domains/user/types';
 import BottomSheet from '@/shared/components/common/BottomSheet/BottomSheet';
 import { ROUTES } from '@/shared/constants/route';
 import { COLORS } from '@/shared/constants/style';

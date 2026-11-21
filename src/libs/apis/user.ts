@@ -1,4 +1,4 @@
-import { UserInfo } from '@/domains/user/types';
+import { UserInfo, UserStats } from '@/domains/user/types';
 import { apiClient } from '@/libs/apis/shared/client';
 import { ApiResponse } from '@/libs/apis/shared/types';
 import { isNative } from '@/platform';
@@ -7,6 +7,8 @@ import { saveAccessToken } from '@/platform/native/auth';
 export const userAPI = {
     // 사용자 정보 조회 (userId, nickname, tripsCount, recentTrip)
     fetchUserInfo: async (): Promise<ApiResponse<UserInfo>> => await apiClient.get(`/v1/users/me/summary`),
+    // 마이 페이지 통계 (여행·사진·국가 집계를 서버에서 한 번에 받는다)
+    fetchUserStats: async (): Promise<ApiResponse<UserStats>> => await apiClient.get(`/v1/users/me/stats`),
     // 닉네임을 통한 사용자 검색 (userId, nickname)
     searchUsers: async (nickname: string): Promise<ApiResponse<Pick<UserInfo, 'userId' | 'nickname'>>> =>
         await apiClient.get(`/v1/share/users?nickname=${nickname}`),
