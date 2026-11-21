@@ -32,12 +32,9 @@ import { isIOSWeb } from '@/platform';
 import { pickImagesFromGallery } from '@/platform/native/gallery';
 import Button from '@/shared/components/common/Button';
 import Header from '@/shared/components/common/Header';
-import ConfirmModal from '@/shared/components/common/Modal/ConfirmModal';
 import { ROUTES } from '@/shared/constants/route';
 import { COLORS } from '@/shared/constants/style';
 import { MESSAGE } from '@/shared/constants/ui';
-import { useAppDownloadUrl } from '@/shared/hooks/useAppDownloadUrl';
-import useBrowserCheck from '@/shared/hooks/useBrowserCheck';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
 const stepIndex = (step: ImageUploadStepType): 0 | 1 | 2 => {
@@ -51,9 +48,6 @@ const TripImageUploadPage = () => {
     const [tripForm, setTripForm] = useState<TripInfo>(FORM.INITIAL);
     const [coverPhotoUrl, setCoverPhotoUrl] = useState<string | undefined>();
     const [isDayTrip, setIsDayTrip] = useState(false);
-
-    const { isModalOpen, closeModal } = useBrowserCheck();
-    const downloadUrl = useAppDownloadUrl(isModalOpen);
 
     const isFormComplete = validateFormComplete(tripForm);
     const {
@@ -277,23 +271,6 @@ const TripImageUploadPage = () => {
             <main css={mainStyle}>{renderMainSection()}</main>
 
             <UploadLeaveConfirm guard={uploadGuard} />
-
-            {isModalOpen && (
-                <ConfirmModal
-                    title='사진 위치가 지워질 수 있어요'
-                    description={
-                        '안드로이드 브라우저는 사진을 올릴 때 위치 정보를 제거해요.\n' +
-                        '앱으로 올리면 사진에 담긴 위치가 그대로 지도에 표시됩니다.'
-                    }
-                    confirmText='앱 설치하기'
-                    cancelText='웹으로 계속하기'
-                    confirmModal={() => {
-                        window.open(downloadUrl, '_blank', 'noopener,noreferrer');
-                        closeModal();
-                    }}
-                    closeModal={closeModal}
-                />
-            )}
         </div>
     );
 };
