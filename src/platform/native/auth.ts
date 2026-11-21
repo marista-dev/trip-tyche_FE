@@ -3,6 +3,7 @@ import axios from 'axios';
 
 import { ANALYTICS_EVENTS, consumeLoginProvider, queuePendingEvent } from '@/libs/analytics';
 import { API_BASE_URL } from '@/libs/apis/shared/constants';
+import { isAuthRejection, shareInFlight, type RefreshResult } from '@/libs/apis/shared/tokenRefresh';
 
 /*
  * 네이티브 앱의 인증 토큰 저장소 + 갱신·교환 창구.
@@ -115,8 +116,9 @@ export const exchangeCodeForTokens = async (code: string): Promise<boolean> => {
  * 저장된 refresh 토큰으로 access 토큰을 재발급한다.
  * 앱에는 갱신에 쓸 쿠키가 없으므로 body로 보낸다.
  */
-export const refreshAccessToken = async (): Promise<boolean> => {
-    if (!cachedRefreshToken) return false;
+const requestTokenRefresh = async (): Promise<RefreshResult> => {
+    // 게스트처럼 refresh 토큰이 없으면 다시 시도해도 소용없다
+    if (!cachedRefreshToken) return 'rejected';
 
     try {
         const { data } = await axios.post(`${API_BASE_URL}/v1/auth/token/refresh`, {
@@ -124,12 +126,16 @@ export const refreshAccessToken = async (): Promise<boolean> => {
         });
         const tokens = data?.data;
 
-        if (!tokens?.accessToken) return false;
+        // 200인데 토큰이 없으면 서버 거절이 아니라 캡티브 포털 같은 중간 응답일 수 있다
+        if (!tokens?.accessToken) return 'transient';
 
         await saveTokens({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
-        return true;
+        return 'refreshed';
     } catch (error) {
         console.warn('토큰 갱신 실패: ', error);
-        return false;
+        return isAuthRejection(error) ? 'rejected' : 'transient';
     }
 };
+
+// 앱의 토큰 갱신. 소켓과 HTTP 인터셉터가 같은 요청을 공유한다
+export const refreshAccessTokenResult = shareInFlight(requestTokenRefresh);

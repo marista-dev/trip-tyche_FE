@@ -1,14 +1,14 @@
-import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 import { createGuestRestrictedError } from '@/domains/user/guestPolicy';
 import { useLoginPromptStore } from '@/domains/user/stores/useLoginPromptStore';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import { apiClient } from '@/libs/apis/shared/client';
-import { API_BASE_URL } from '@/libs/apis/shared/constants';
+import { refreshWebSession } from '@/libs/apis/shared/tokenRefresh';
 import { ApiResponse } from '@/libs/apis/shared/types';
 import { isNative } from '@/platform';
 import { APP_VERSION_NAME } from '@/platform/native/appVersion';
-import { clearTokens, getAccessToken, refreshAccessToken } from '@/platform/native/auth';
+import { clearTokens, getAccessToken, refreshAccessTokenResult } from '@/platform/native/auth';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
 interface CustomRequestConfing extends InternalAxiosRequestConfig {
@@ -111,28 +111,20 @@ export const setupResponseInterceptor = (instance: AxiosInstance) => {
                     }
 
                     /*
-                     * 앱에는 갱신할 쿠키가 없다. 현행 /v1/auth/refresh는 refresh 토큰을 쿠키에서만
-                     * 읽으므로(백엔드 M1에서 body 기반 경로가 생긴다), 지금은 토큰을 버리고
-                     * 로그인 화면으로 보낸다.
+                     * 앱에는 갱신할 쿠키가 없어 저장된 refresh 토큰을 body로 보내 갱신하고, 웹은 쿠키로 갱신한다.
+                     * 둘 다 같은 결과 분류를 쓰고, 병렬 401이나 소켓의 갱신과 겹쳐도 요청 하나로 합쳐진다.
                      */
-                    if (isNative()) {
-                        // 앱에는 갱신에 쓸 쿠키가 없으므로 저장된 refresh 토큰을 body로 보낸다.
-                        const refreshed = await refreshAccessToken();
-                        if (refreshed) return apiClient(originalRequest);
+                    const result = isNative() ? await refreshAccessTokenResult() : await refreshWebSession();
+                    if (result === 'refreshed') return apiClient(originalRequest);
 
-                        await clearTokens();
-                        useUserStore.getState().setUnauthenticated();
-                        return Promise.reject(error);
-                    }
+                    // 네트워크 끊김·타임아웃·5xx는 세션이 끝났다는 뜻이 아니다. 세션을 지키고 원래 오류만 돌려준다.
+                    // 다음 요청(앱은 소켓 재연결도)이 갱신을 다시 시도한다
+                    if (result === 'transient') return Promise.reject(error);
 
-                    try {
-                        await axios.post(`${API_BASE_URL}/v1/auth/refresh`, {}, { withCredentials: true });
-                        return apiClient(originalRequest);
-                    } catch {
-                        // 세션 만료 — 라우터 가드가 redirect를 책임진다.
-                        useUserStore.getState().setUnauthenticated();
-                        return Promise.reject(error);
-                    }
+                    // 서버가 갱신을 거절했다(만료·폐기·세션 없음). 앱은 토큰을 버리고, 라우터 가드가 로그인으로 redirect한다
+                    if (isNative()) await clearTokens();
+                    useUserStore.getState().setUnauthenticated();
+                    return Promise.reject(error);
                 }
 
                 // 403은 권한 부족(2009 ACCESS_DENIED)이지 세션 만료가 아니다. 게스트면 로그인 유도 시트를 연다.
