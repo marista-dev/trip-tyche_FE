@@ -17,7 +17,7 @@ interface EstimateTargetTabProps {
 const EstimateTargetTab = ({ photo, active, done, showTime = true, onClick }: EstimateTargetTabProps) => (
     <button type='button' data-target-id={photo.mediaFileId} css={tabStyle(active)} onClick={onClick}>
         <img
-            src={photo.mediaLink}
+            src={photo.thumbnailLink ?? photo.mediaLink}
             alt=''
             css={imgStyle}
             loading='lazy'

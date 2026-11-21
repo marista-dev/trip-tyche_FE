@@ -10,6 +10,7 @@ import { css } from '@emotion/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
+import { routeKeys } from '@/domains/route/queryKeys';
 import { EmptyTripCta, TicketEntryButton } from '@/domains/trip/components/globe/GlobeBottomCard';
 import { groupTripsByCountry } from '@/domains/trip/components/globe/globeGeo';
 import { GlobeHeader, GlobeHint, GlobeLoading } from '@/domains/trip/components/globe/GlobeHud';
@@ -17,9 +18,10 @@ import { markCoversResolved } from '@/domains/trip/components/globe/ticketRing/c
 import { sortLatestFirst, toRingTickets } from '@/domains/trip/components/globe/ticketRing/ringTickets';
 import TicketRingCaption from '@/domains/trip/components/globe/ticketRing/TicketRingCaption';
 import { useHistoryBackClose } from '@/domains/trip/components/globe/ticketRing/useHistoryBackClose';
-import { useTicketRingCovers } from '@/domains/trip/components/globe/ticketRing/useTicketRingCovers';
 import { useGlobeScene } from '@/domains/trip/components/globe/useGlobeScene';
 import { useTripSummaryList } from '@/domains/trip/hooks/queries';
+import { invalidateTripLists } from '@/domains/trip/queryKeys';
+import { getTripCoverUrl } from '@/domains/trip/tripCover';
 import { TripSummary } from '@/domains/trip/types';
 import NicknameSetupOverlay from '@/domains/user/components/NicknameSetupOverlay';
 import { useSummary } from '@/domains/user/hooks/queries';
@@ -89,12 +91,9 @@ const GlobeMapPage = () => {
     /** 링에 올린 나라의 여행(최신순). null이면 링이 닫혀 있다 */
     const [ringTrips, setRingTrips] = useState<TripSummary[] | null>(null);
     const [activeTicket, setActiveTicket] = useState(0);
-    const ringTripKeys = useMemo(() => (ringTrips ?? EMPTY_TRIPS).map((t) => t.tripKey), [ringTrips]);
-    const { coverUrls, photoCounts, settled: coversSettled } = useTicketRingCovers(ringTripKeys);
-    const ringTickets = useMemo(
-        () => toRingTickets(ringTrips ?? EMPTY_TRIPS, nickname, photoCounts),
-        [ringTrips, nickname, photoCounts],
-    );
+    // 표지·사진 수는 여행 목록(summary)에 들어 있어 링을 열 때 사진 목록을 따로 받지 않는다
+    const coverUrls = useMemo(() => (ringTrips ?? EMPTY_TRIPS).map(getTripCoverUrl), [ringTrips]);
+    const ringTickets = useMemo(() => toRingTickets(ringTrips ?? EMPTY_TRIPS, nickname), [ringTrips, nickname]);
 
     const closeRing = () => {
         sceneRef.current?.closeRing();
@@ -117,7 +116,7 @@ const GlobeMapPage = () => {
         const trip = ringTrips?.[index];
         if (!trip) return;
         queryClient.prefetchQuery({
-            queryKey: ['route', trip.tripKey],
+            queryKey: routeKeys.detail(trip.tripKey),
             queryFn: () => toResult(() => routeAPI.fetchTripRoute(trip.tripKey)),
         });
         // 링이 쌓은 히스토리 항목을 여행 페이지로 바꿔 끼운다 — 여행에서 뒤로 오면 바로 지구본
@@ -135,16 +134,17 @@ const GlobeMapPage = () => {
         onGlobeTouchEnd: armCta,
     });
 
-    // 사진 수·커버가 도착하면 링 카드 텍스처를 갈아 끼운다(카드를 만들기 전이면 만들 때 반영)
+    // 링을 열면 표지를 카드에 올린다. 닉네임이 늦게 오는 등 티켓이 바뀌면 텍스처를 갈아 끼운다(카드를 만들기 전이면 만들 때 반영)
     useEffect(() => {
         if (!ringTrips) return;
-        markCoversResolved(coverUrls, photoCounts, coversSettled);
+        markCoversResolved(coverUrls);
         sceneRef.current?.ring.updateTickets(ringTickets, coverUrls);
-    }, [ringTrips, ringTickets, coverUrls, photoCounts, coversSettled, sceneRef]);
+    }, [ringTrips, ringTickets, coverUrls, sceneRef]);
 
     const handleCreateFirst = async () => {
         const result = await toResult(() => tripAPI.createNewTrip());
         if (result.success) {
+            void invalidateTripLists(queryClient);
             // 여행 생성 퍼널 집계. 실패한 생성은 세지 않도록 success 분기 안에서만 보낸다.
             track(ANALYTICS_EVENTS.TRIP_CREATED);
             navigate(ROUTES.PATH.TRIP.NEW(result.data.tripKey!));

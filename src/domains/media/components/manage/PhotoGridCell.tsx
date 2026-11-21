@@ -17,7 +17,7 @@ interface PhotoGridCellProps {
 const PhotoGridCell = ({ photo, selected, selectMode, showTime = false, onToggle }: PhotoGridCellProps) => (
     <button type='button' css={cellStyle(selected)} onClick={() => onToggle(photo)}>
         <img
-            src={photo.mediaLink}
+            src={photo.thumbnailLink ?? photo.mediaLink}
             alt=''
             css={imgStyle}
             loading='lazy'
