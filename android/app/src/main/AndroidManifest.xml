@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- 리프레시 토큰이 Preferences(SharedPreferences)에 저장된다. 자동 백업이 켜져 있으면
+         다른 기기로 복원되어 그대로 로그인 상태가 이전되므로 백업을 끈다. -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
