@@ -8,7 +8,7 @@ import { UploadAbortError, UploadHttpError } from '@/domains/media/utils/uploadT
  * 원본 생성자의 프로토타입은 이미 패치돼 있으므로 인스턴스 메서드가 아니라 보관된 함수를 불러야 한다.
  */
 
-vi.mock('@/platform', () => ({ isNative: () => true }));
+vi.mock('@/platform', () => ({ isNative: () => true, isAndroidWeb: () => false }));
 vi.mock('@/libs/apis/shared/client', () => ({ apiClient: {} }));
 
 const { mediaAPI, isDirectS3Upload } = await import('@/libs/apis/media');
