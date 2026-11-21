@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { notificationKeys } from '@/domains/notification/queryKeys';
 import { notificationAPI } from '@/libs/apis';
 import { toResult } from '@/libs/apis/shared/utils';
 
 export const useNotificationList = (userId: number) => {
     return useQuery({
-        queryKey: ['notification', userId],
+        queryKey: notificationKeys.list(userId),
         queryFn: () => toResult(() => notificationAPI.fetchNotificationList(userId)),
         staleTime: 0,
     });
@@ -13,7 +14,7 @@ export const useNotificationList = (userId: number) => {
 
 export const useNotificationDetail = (notificationId: number) => {
     return useQuery({
-        queryKey: ['notificationId-detail', notificationId],
+        queryKey: notificationKeys.detail(notificationId),
         queryFn: () => toResult(() => notificationAPI.fetchNotificationDetail(notificationId)),
     });
 };

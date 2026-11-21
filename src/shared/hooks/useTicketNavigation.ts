@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
+import { routeKeys } from '@/domains/route/queryKeys';
 import { routeAPI } from '@/libs/apis';
 import { toResult } from '@/libs/apis/shared/utils';
 import { ROUTES } from '@/shared/constants/route';
@@ -28,7 +29,7 @@ export const useTicketNavigation = (tripKey: string) => {
 
     const openTrip = ({ playExitEffect }: OpenTripOptions = {}) => {
         queryClient.prefetchQuery({
-            queryKey: ['route', tripKey],
+            queryKey: routeKeys.detail(tripKey),
             queryFn: () => toResult(() => routeAPI.fetchTripRoute(tripKey)),
         });
         if (playExitEffect) {

@@ -1,5 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { shareKeys } from '@/domains/share/queryKeys';
+import { invalidateTripLists } from '@/domains/trip/queryKeys';
 import { shareAPI } from '@/libs/apis';
 import { toResult } from '@/libs/apis/shared/utils';
 
@@ -10,8 +12,9 @@ export const useShareStatus = () => {
             toResult(() => shareAPI.updateShareStatus(shareId, status)),
         onSuccess: async () => {
             await Promise.all([
-                queryClient.invalidateQueries({ queryKey: ['share'] }),
-                queryClient.invalidateQueries({ queryKey: ['ticket-list'] }),
+                queryClient.invalidateQueries({ queryKey: shareKeys.all }),
+                // 수락한 여행이 지구본에도 바로 보이게
+                invalidateTripLists(queryClient),
             ]);
         },
     });
@@ -22,7 +25,7 @@ export const useShareUnlink = () => {
     return useMutation({
         mutationFn: (shareId: number) => toResult(() => shareAPI.unlinkShared(shareId)),
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ['ticket-list'] });
+            await invalidateTripLists(queryClient);
         },
     });
 };

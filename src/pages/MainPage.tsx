@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 
 import { css, keyframes } from '@emotion/react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Globe, MessageCircleMore, Settings, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { prefetchStubCurl } from '@/domains/trip/components/ticket/stubCurl/loadStubCurl';
 import TripTicket from '@/domains/trip/components/TripTicket';
 import { useTripTicketList } from '@/domains/trip/hooks/queries';
+import { invalidateTripLists } from '@/domains/trip/queryKeys';
 import { getTicketView } from '@/domains/trip/ticketView';
 import { Trip } from '@/domains/trip/types';
 import { useSummary } from '@/domains/user/hooks/queries';
@@ -55,6 +57,7 @@ const MainPage = () => {
 
     const [pendingCheckDone, setPendingCheckDone] = useState(false);
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
 
     useEffect(() => {
         sessionStorage.removeItem(STORAGE_KEYS.IMAGE_DATES);
@@ -69,6 +72,7 @@ const MainPage = () => {
     const createNewTrip = async () => {
         const result = await toResult(() => tripAPI.createNewTrip());
         if (result.success) {
+            void invalidateTripLists(queryClient);
             // 여행 생성 퍼널 집계. 실패한 생성은 세지 않도록 success 분기 안에서만 보낸다.
             track(ANALYTICS_EVENTS.TRIP_CREATED);
             const { tripKey } = result.data;
@@ -179,8 +183,8 @@ const header = css`
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-    padding: 0 20px;
-    height: 54px;
+    padding: var(--app-safe-top) 20px 0;
+    height: calc(54px + var(--app-safe-top));
     display: flex;
     justify-content: space-between;
     align-items: center;

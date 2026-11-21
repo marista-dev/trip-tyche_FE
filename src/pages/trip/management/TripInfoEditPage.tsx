@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { css } from '@emotion/react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import MiniTicketPreview from '@/domains/media/components/upload/MiniTicketPreview';
@@ -9,6 +10,7 @@ import TripInfoForm from '@/domains/trip/components/TripInfoForm';
 import { FORM } from '@/domains/trip/constants';
 import { useTripFormSubmit } from '@/domains/trip/hooks/mutations';
 import { useTripInfo } from '@/domains/trip/hooks/queries';
+import { invalidateTripLists } from '@/domains/trip/queryKeys';
 import { TripInfo } from '@/domains/trip/types';
 import useUserStore from '@/domains/user/stores/useUserStore';
 import { tripAPI } from '@/libs/apis';
@@ -33,6 +35,7 @@ const TripInfoEditPage = () => {
 
     // 주소로 바로 들어오면 state가 없다 — 확정된 여행으로 본다.
     const isDraft = Boolean((location.state as { isDraft?: boolean } | null)?.isDraft);
+    const queryClient = useQueryClient();
     const { mutateAsync, isPending: isSubmitting } = useTripFormSubmit();
 
     const { data: tripInfoResult, isLoading } = useTripInfo(tripKey!);
@@ -63,7 +66,10 @@ const TripInfoEditPage = () => {
         const result = await toResult(() => tripAPI.finalizeTripTicket(tripKey));
         if (result && !result.success) {
             showToast(result.error);
+            return;
         }
+        // 작성 중이던 여행이 발급되어 지구본·티켓 목록에 새로 보여야 한다
+        void invalidateTripLists(queryClient);
     };
 
     const handleTripFormSubmit = async () => {
@@ -144,7 +150,7 @@ const previewHint = css`
 const buttonWrapper = css`
     margin-top: 4px;
     /* 안드로이드 제스처 바에 버튼이 가리지 않게 */
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: var(--app-safe-bottom);
 `;
 
 export default TripInfoEditPage;
