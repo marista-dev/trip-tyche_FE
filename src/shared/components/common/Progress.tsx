@@ -18,7 +18,14 @@ const Progress = ({ title, count, size = 'sm' }: ProgressProps) => {
                 <span>{count}%</span>
             </div>
 
-            <div css={bar}>
+            <div
+                css={bar}
+                role='progressbar'
+                aria-label={title}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(count)}
+            >
                 <div css={getStepProgressFillStyle(count, count === 100, size)} />
             </div>
         </div>

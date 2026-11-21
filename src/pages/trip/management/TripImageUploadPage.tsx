@@ -1,17 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { css } from '@emotion/react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import MiniTicketPreview from '@/domains/media/components/upload/MiniTicketPreview';
 import ProcessingStep from '@/domains/media/components/upload/ProcessingStep';
 import TripCreateCompleteStep from '@/domains/media/components/upload/TripCreateCompleteStep';
 import TripUploadStepper from '@/domains/media/components/upload/TripUploadStepper';
+import UploadLeaveConfirm from '@/domains/media/components/upload/UploadLeaveConfirm';
 import UploadStep from '@/domains/media/components/upload/UploadStep';
 import { useImageUpload } from '@/domains/media/hooks/useImageUpload';
+import { isUploadInProgress, UPLOAD_GUARD_TEXT, useUploadGuard } from '@/domains/media/hooks/useUploadGuard';
 import { useUploadSessionSync } from '@/domains/media/hooks/useUploadSessionSync';
+import { invalidateTripMedia } from '@/domains/media/queryKeys';
 import { ImageUploadStepType } from '@/domains/media/types';
 import { getImageDateFromImage } from '@/domains/media/utils';
+import { describeDuplicates, describeWithoutLocation } from '@/domains/media/utils/uploadMessages';
+import type { PickerReport } from '@/domains/media/utils/uploadValidation';
 import TripInfoForm from '@/domains/trip/components/TripInfoForm';
 import { FORM } from '@/domains/trip/constants';
 import { useTripFormSubmit } from '@/domains/trip/hooks/mutations';
@@ -32,6 +38,7 @@ import { COLORS } from '@/shared/constants/style';
 import { MESSAGE } from '@/shared/constants/ui';
 import { useAppDownloadUrl } from '@/shared/hooks/useAppDownloadUrl';
 import useBrowserCheck from '@/shared/hooks/useBrowserCheck';
+import { useToastStore } from '@/shared/stores/useToastStore';
 
 const stepIndex = (step: ImageUploadStepType): 0 | 1 | 2 => {
     if (step === 'info') return 1;
@@ -49,8 +56,27 @@ const TripImageUploadPage = () => {
     const downloadUrl = useAppDownloadUrl(isModalOpen);
 
     const isFormComplete = validateFormComplete(tripForm);
-    const { images, progress, prepareUploadFiles, uploadImagesToS3, retryFailedUploads, waitForBackgroundUpload } =
-        useImageUpload();
+    const {
+        images,
+        imageCategories,
+        progress,
+        uploadStats,
+        uploadPhase,
+        duplicateCount,
+        prepareUploadFiles,
+        uploadImagesToS3,
+        retryFailedUploads,
+        uploadDuplicates,
+        waitForBackgroundUpload,
+    } = useImageUpload({ source: 'create' });
+    // 정보 입력 중에도 전송은 백그라운드로 돈다. 그동안 화면을 떠나면 남은 사진을 잃는다.
+    const isTransferring = isUploadInProgress(uploadPhase);
+    const uploadGuard = useUploadGuard(isTransferring);
+    // 제외 안내 토스트와 겹치지 않게 정보 입력 화면에 글로 남긴다
+    const withoutLocationNotice = describeWithoutLocation(imageCategories?.withoutLocation.count ?? 0);
+    // 서버가 이 여행에 이미 있다고 알려 와 빼 둔 사진. 누르면 지금 업로드가 끝난 뒤 그 사진만 올린다.
+    const duplicateNotice = describeDuplicates(duplicateCount);
+    const queryClient = useQueryClient();
 
     const userInfo = useUserStore((state) => state.userInfo);
 
@@ -101,9 +127,14 @@ const TripImageUploadPage = () => {
     const handleFinalize = useMemo(
         () => async () => {
             if (!tripKey) return { success: false, error: 'tripKey가 없습니다.' };
-            return await toResult(() => tripAPI.finalizeTripTicket(tripKey));
+            const result = await toResult(() => tripAPI.finalizeTripTicket(tripKey));
+            if (result.success) {
+                // 발급된 티켓이 지구본(장수·커버)·티켓 목록·지도 핀에 바로 보이게
+                void invalidateTripMedia(queryClient, tripKey);
+            }
+            return result;
         },
-        [tripKey],
+        [tripKey, queryClient],
     );
 
     // step3 phase0에서 호출. 매 호출마다 mutateAsync를 새로 발사 → retry 시 자동으로 재시도된다.
@@ -120,32 +151,40 @@ const TripImageUploadPage = () => {
     }, [mutateAsync, tripKey]);
 
     const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const selectedImages = event.target.files;
+        const inputEl = event.target;
+        const selectedImages = inputEl.files;
         if (!selectedImages || selectedImages.length === 0) return;
 
-        await processSelectedImages(Array.from(selectedImages));
+        const accepted = await processSelectedImages(Array.from(selectedImages));
+        // 전부 제외됐으면 첫 화면에 남는다. 같은 파일을 다시 골라도 onChange가 오도록 비운다(올릴 파일이 없어 안전하다).
+        if (!accepted) inputEl.value = '';
     };
 
     // 네이티브 갤러리 피커 — EXIF 원본을 보존해서 File[]로 돌려준다.
     const handleNativePick = async () => {
-        const pickedImages = await pickImagesFromGallery();
-        if (pickedImages.length === 0) return;
-
-        await processSelectedImages(pickedImages);
+        // 영상만 고른 경우도 prepareUploadFiles가 안내한다. 아무 반응이 없으면 앱이 멈춘 것처럼 보인다.
+        const { files, skippedNonImage, locationNotice } = await pickImagesFromGallery();
+        await processSelectedImages(files, { skippedNonImage, notice: locationNotice });
     };
 
-    const processSelectedImages = async (selectedImages: File[]) => {
+    const processSelectedImages = async (selectedImages: File[], pick?: PickerReport) => {
+        const uniqueFiles = await prepareUploadFiles(selectedImages, pick);
+        // 제외 안내는 prepareUploadFiles가 이미 띄웠다. 다시 고를 수 있게 첫 화면에 둔다.
+        if (uniqueFiles.length === 0) return false;
         setStep('processing');
-        const uniqueFiles = await prepareUploadFiles(selectedImages);
         const summary = summarizeUploadFormats(uniqueFiles);
         // S3 업로드는 백그라운드로 진행되며, 정보 입력 화면 진입을 막지 않는다.
         // 실제 업로드 완료는 Step3에서 waitForBackgroundUpload로 추적된다.
         // 신규 등록일 때는 status 전환도 같은 체인에 묶어 실패 시 step3 retry 화면에 surface되도록 한다.
         const postUploadTask = !isEdit ? () => mediaAPI.updateTripStatusToImagesUploaded(tripKey!) : undefined;
-        await uploadImagesToS3(uniqueFiles, postUploadTask);
+        const { started } = await uploadImagesToS3(uniqueFiles, postUploadTask);
         // 업로드가 실제로 시작된 배치만 기록한다(진행 중이면 위에서 던져 이전 배치의 집계를 덮어쓰지 않는다)
         uploadSummaryRef.current = summary;
+        // 정보 입력은 계속할 수 있다. 마지막 단계의 재시도가 URL 발급부터 다시 한다.
+        if (!started)
+            useToastStore.getState().showToast('업로드 준비에 실패했어요. 마지막 단계에서 다시 시도할 수 있어요');
         setStep('info');
+        return true;
     };
 
     const handleTripFormSubmit = () => {
@@ -179,6 +218,15 @@ const TripImageUploadPage = () => {
                                 isDayTrip={isDayTrip}
                             />
                             <p css={previewHint}>↓ 아래를 편집하면 티켓이 실시간으로 바뀌어요</p>
+                            {withoutLocationNotice && <p css={locationNoticeStyle}>{withoutLocationNotice}</p>}
+                            {duplicateNotice && (
+                                <p css={locationNoticeStyle}>
+                                    {duplicateNotice} ·{' '}
+                                    <button type='button' css={noticeActionStyle} onClick={uploadDuplicates}>
+                                        그래도 올리기
+                                    </button>
+                                </p>
+                            )}
                         </div>
                         <TripInfoForm
                             tripForm={tripForm}
@@ -202,6 +250,8 @@ const TripImageUploadPage = () => {
                         ownerNickname={userInfo?.nickname}
                         photoCount={images?.length}
                         onRetryUpload={retryFailedUploads}
+                        uploadPhase={uploadPhase}
+                        uploadStats={uploadStats}
                     />
                 );
         }
@@ -222,7 +272,11 @@ const TripImageUploadPage = () => {
                     <TripUploadStepper step={stepIndex(step)} />
                 </div>
             )}
+            {/* 처리 단계는 자체 안내('화면을 나가지 마세요')가 있다 */}
+            {isTransferring && step !== 'processing' && <p css={uploadHintStyle}>{UPLOAD_GUARD_TEXT.hint}</p>}
             <main css={mainStyle}>{renderMainSection()}</main>
+
+            <UploadLeaveConfirm guard={uploadGuard} />
 
             {isModalOpen && (
                 <ConfirmModal
@@ -284,10 +338,37 @@ const previewHint = css`
     font-weight: 600;
 `;
 
+const locationNoticeStyle = css`
+    text-align: center;
+    margin-top: 4px;
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 600;
+`;
+
+const noticeActionStyle = css`
+    padding: 0;
+    border: none;
+    background: transparent;
+    font: inherit;
+    color: ${COLORS.TEXT.LINK_LIGHT};
+    text-decoration: underline;
+    cursor: pointer;
+`;
+
+const uploadHintStyle = css`
+    padding: 8px 16px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: ${COLORS.TEXT.SECONDARY};
+    background: #fff;
+`;
+
 const buttonWrapper = css`
     margin-top: 20px;
     /* 안드로이드 제스처 바에 버튼이 가리지 않게 */
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: var(--app-safe-bottom);
 `;
 
 export default TripImageUploadPage;

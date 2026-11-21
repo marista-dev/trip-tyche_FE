@@ -1,4 +1,4 @@
-import type { PostHog, Properties } from 'posthog-js';
+import type { CaptureOptions, PostHog, Properties } from 'posthog-js';
 
 import type { UserInfo } from '@/domains/user/types';
 import { isNative } from '@/platform';
@@ -27,6 +27,13 @@ export const ANALYTICS_EVENTS = {
     GUEST_STARTED: 'guest_started',
     TRIP_CREATED: 'trip_created',
     PHOTOS_UPLOADED: 'photos_uploaded',
+    // 업로드 진단용(src/domains/media/utils/uploadChain.ts, hooks/useImageUpload.ts, platform/native/gallery.ts).
+    // 장수·용량·소요 시간·실패 분류만 싣는다. 파일명·tripKey·오류 메시지는 싣지 않는다.
+    // upload_started에 짝이 되는 upload_finished가 없으면 업로드 도중 앱이 죽었거나 사용자가 떠난 것이다.
+    PHOTOS_PICKED: 'photos_picked',
+    UPLOAD_STARTED: 'upload_started',
+    UPLOAD_FINISHED: 'upload_finished',
+    UPLOAD_BACKGROUNDED: 'upload_backgrounded',
     // 성능 진단용(src/libs/perf.ts). 화면 텍스트·URL은 싣지 않고 수치만 보낸다.
     WEBGL_CONTEXT_LOST: 'webgl_context_lost',
     WEBGL_CONTEXT_RESTORED: 'webgl_context_restored',
@@ -141,9 +148,15 @@ export const identifyUser = ({ userId, role, createdAt }: AnalyticsIdentity): vo
     });
 };
 
-export const track = (event: AnalyticsEvent, props?: Properties): void => {
+/** options는 전송 방식만 바꿀 때 쓴다(예: 화면이 가려지는 순간 보내야 하는 이벤트의 send_instantly). */
+export const track = (
+    event: AnalyticsEvent,
+    props?: Properties,
+    options?: Pick<CaptureOptions, 'send_instantly' | 'transport'>,
+): void => {
     if (!initialized) return;
-    withClient((ph) => ph.capture(event, props));
+    // 옵션이 없으면 두 인자로만 부른다. 기존 호출의 capture 시그니처를 바꾸지 않는다.
+    withClient((ph) => (options ? ph.capture(event, props, options) : ph.capture(event, props)));
 };
 
 // 로그아웃에서만 호출한다. 비로그인 방문자도 부팅마다 인증 실패 경로를 타므로 거기서 호출하면 익명 id가 매번 바뀐다.

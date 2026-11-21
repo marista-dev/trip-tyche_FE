@@ -142,8 +142,8 @@ describe('extractMetadataFromImage', () => {
         const files = Array.from({ length: 7 }, (_, i) => new File(['x'], `img${i}.jpg`, { type: 'image/jpeg' }));
         files.forEach((f) => exifFixtures.set(f.name, {}));
 
-        type Progress = { metadata: number; upload: number };
-        let lastProgress: Progress = { metadata: 0, upload: 0 };
+        type Progress = { metadata: number };
+        let lastProgress: Progress = { metadata: 0 };
         const onProgress = vi.fn((action: Progress | ((prev: Progress) => Progress)) => {
             lastProgress = typeof action === 'function' ? action(lastProgress) : action;
         });
