@@ -33,7 +33,7 @@ const PhotoListItem = ({ photo, tone, selected, isFirst, onToggle, primaryLabel,
 
             <div css={thumbStyle}>
                 <img
-                    src={photo.mediaLink}
+                    src={photo.thumbnailLink ?? photo.mediaLink}
                     alt=''
                     css={thumbImgStyle}
                     loading='lazy'

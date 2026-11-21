@@ -116,7 +116,7 @@ const sheetStyle = (maxHeight: string, height?: string) => css`
     overflow-y: auto;
     background-color: ${COLORS.BACKGROUND.WHITE};
     border-radius: 20px 20px 0 0;
-    padding: 14px 20px calc(28px + env(safe-area-inset-bottom, 0px));
+    padding: 14px 20px calc(28px + var(--app-safe-bottom));
     z-index: 1101;
 
     /* 프로그램으로 옮긴 포커스에는 포커스 링을 그리지 않는다 */

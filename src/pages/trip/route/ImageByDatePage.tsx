@@ -250,7 +250,7 @@ const container = css`
 
 const backButtonStyle = css`
     position: absolute;
-    top: 16px;
+    top: calc(16px + var(--app-safe-top));
     left: 16px;
     z-index: 30;
     width: 40px;

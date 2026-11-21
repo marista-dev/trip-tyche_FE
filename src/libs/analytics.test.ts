@@ -241,7 +241,7 @@ describe('track / resetAnalytics', () => {
         expect(posthogMock.register).toHaveBeenCalledWith({ platform: 'web', app_version: APP_VERSION_NAME });
     });
 
-    it('ANALYTICS_EVENTS는 퍼널 네 이벤트와 성능 진단 세 이벤트다', async () => {
+    it('ANALYTICS_EVENTS는 퍼널 네 이벤트, 업로드 진단 네 이벤트, 성능 진단 세 이벤트다', async () => {
         const analytics = await loadAnalytics();
 
         expect(analytics.ANALYTICS_EVENTS).toEqual({
@@ -249,6 +249,10 @@ describe('track / resetAnalytics', () => {
             GUEST_STARTED: 'guest_started',
             TRIP_CREATED: 'trip_created',
             PHOTOS_UPLOADED: 'photos_uploaded',
+            PHOTOS_PICKED: 'photos_picked',
+            UPLOAD_STARTED: 'upload_started',
+            UPLOAD_FINISHED: 'upload_finished',
+            UPLOAD_BACKGROUNDED: 'upload_backgrounded',
             WEBGL_CONTEXT_LOST: 'webgl_context_lost',
             WEBGL_CONTEXT_RESTORED: 'webgl_context_restored',
             TICKET_COVER_TIMING: 'ticket_cover_timing',

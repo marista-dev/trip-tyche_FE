@@ -2,7 +2,14 @@ import { MediaFile } from '@/domains/media/types';
 import { PinPoint } from '@/domains/route/types';
 
 type Success<T> = { success: true; data: T };
-type Error = { success: false; error: string };
+type Error = {
+    success: false;
+    error: string;
+    /** HTTP 상태. 응답 없이 실패(네트워크·시간 초과)했으면 없다. */
+    status?: number;
+    /** 서버 ResultCode(예: 5008 지원하지 않는 형식) */
+    code?: number;
+};
 
 export type Result<T> = Success<T> | Error;
 

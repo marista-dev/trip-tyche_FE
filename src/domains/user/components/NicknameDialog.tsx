@@ -5,8 +5,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Check, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
+import { tripKeys } from '@/domains/trip/queryKeys';
 import { NICKNAME_RULE } from '@/domains/user/constants';
 import { useNickname } from '@/domains/user/hooks/useNickname';
+import { SUMMARY_QUERY_KEY } from '@/domains/user/queryKeys';
 import { userAPI } from '@/libs/apis';
 import { toResult } from '@/libs/apis/shared/utils';
 import { COLORS } from '@/shared/constants/style';
@@ -76,8 +78,8 @@ const NicknameDialog = ({ current, onClose }: NicknameDialogProps) => {
     }, [trimmed, clientValid]);
 
     function handleSuccess() {
-        queryClient.invalidateQueries({ queryKey: ['ticket-list'] });
-        queryClient.invalidateQueries({ queryKey: ['summary'] });
+        queryClient.invalidateQueries({ queryKey: tripKeys.ticketList });
+        queryClient.invalidateQueries({ queryKey: SUMMARY_QUERY_KEY });
         showToast('닉네임이 변경되었습니다');
         onClose();
     }

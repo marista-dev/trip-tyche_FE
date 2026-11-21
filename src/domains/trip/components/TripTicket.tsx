@@ -2,7 +2,6 @@ import { useState } from 'react';
 
 import { css } from '@emotion/react';
 
-import { useTripImages } from '@/domains/media/hooks/queries';
 import ShareModal from '@/domains/share/components/ShareModal';
 import BoardingPassTicket from '@/domains/trip/components/ticket/BoardingPassTicket';
 import DayPassTicket from '@/domains/trip/components/ticket/DayPassTicket';
@@ -12,6 +11,7 @@ import { DAY_PASS_HEIGHT } from '@/domains/trip/components/ticket/ticketGeometry
 import TicketMoreButton from '@/domains/trip/components/ticket/TicketMoreButton';
 import TripTicketActionSheet from '@/domains/trip/components/TripTicketActionSheet';
 import { getTicketView } from '@/domains/trip/ticketView';
+import { getTripCoverUrl } from '@/domains/trip/tripCover';
 import { Trip } from '@/domains/trip/types';
 import { useMemberOnly } from '@/domains/user/hooks/useMemberOnly';
 import { useLoginPromptStore } from '@/domains/user/stores/useLoginPromptStore';
@@ -48,6 +48,7 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
         sharedUsersNicknames,
         shareId,
         confirmed: isCompletedTrip,
+        photoCount,
     } = tripInfo;
 
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -68,10 +69,9 @@ const TripTicket = ({ tripInfo }: { tripInfo: Trip }) => {
     const { isPlaneFlying, openTrip } = useTicketNavigation(tripKey!);
     const { stubRef, play: playStubCurl } = useStubCurl();
 
-    const { data: imagesResult } = useTripImages(tripKey ?? '');
-    const mediaFiles = imagesResult?.success ? imagesResult.data : undefined;
-    const coverPhoto = isCompletedTrip ? mediaFiles?.[0]?.mediaLink : undefined;
-    const photoCountLabel = mediaFiles !== undefined ? `${mediaFiles.length}장` : '—';
+    // 표지·사진 수는 목록 응답에 들어 있어 여행마다 사진 목록을 따로 받지 않는다
+    const coverPhoto = isCompletedTrip ? getTripCoverUrl(tripInfo) : undefined;
+    const photoCountLabel = photoCount !== undefined ? `${photoCount}장` : '—';
 
     if (isCompletedTrip === undefined) return null;
 

@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { NICKNAME_FORM } from '@/domains/user/constants';
 import { useNickname } from '@/domains/user/hooks/useNickname';
+import { SUMMARY_QUERY_KEY } from '@/domains/user/queryKeys';
 import { validateUserNickName } from '@/libs/utils/validate';
 import { COLORS } from '@/shared/constants/style';
 
@@ -20,7 +21,7 @@ const NicknameSetupOverlay = () => {
         isSubmitting,
         error: nicknameError,
         submitNickname,
-    } = useNickname(nicknameInput, () => queryClient.invalidateQueries({ queryKey: ['summary'] }));
+    } = useNickname(nicknameInput, () => queryClient.invalidateQueries({ queryKey: SUMMARY_QUERY_KEY }));
 
     return (
         <div css={nicknameOverlay}>

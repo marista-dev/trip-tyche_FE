@@ -6,7 +6,10 @@ import { useNavigate } from 'react-router-dom';
 import MiniTicketPreview from '@/domains/media/components/upload/MiniTicketPreview';
 import PassportStamp from '@/domains/media/components/upload/PassportStamp';
 import { fadeUp, ink, slamEntry } from '@/domains/media/components/upload/tripUploadAnimations';
+import { isUploadInProgress } from '@/domains/media/hooks/useUploadGuard';
 import { useUploadSessionStore } from '@/domains/media/stores/useUploadSessionStore';
+import type { UploadPhase, UploadStats } from '@/domains/media/utils/uploadChain';
+import { describeUploadError, describeUploadProgress } from '@/domains/media/utils/uploadMessages';
 import { TripInfo } from '@/domains/trip/types';
 import Button from '@/shared/components/common/Button';
 import { ROUTES } from '@/shared/constants/route';
@@ -23,9 +26,13 @@ interface TripCreateCompleteStepProps {
     ownerNickname?: string;
     photoCount?: number;
     onRetryUpload?: () => void;
+    /** 전송 중에는 서버 처리 수 대신 전송 수를 보여 준다. 전송이 끝나기 전에는 처리 수가 0에 머문다. */
+    uploadPhase?: UploadPhase;
+    uploadStats?: UploadStats;
 }
 
-const ERROR_UPLOAD_MSG = '일부 사진 업로드에 실패했습니다. 다시 시도해 주세요.';
+// 업로드 체인이 단계를 알려 주지 않은 실패에만 쓴다(단계별 안내는 describeUploadError)
+const ERROR_UPLOAD_MSG = '사진 업로드에 실패했습니다. 다시 시도해 주세요.';
 const ERROR_FORM_MSG = '여행 정보 저장에 실패했습니다.';
 const ERROR_FINALIZE_MSG = '티켓 발급에 실패했습니다.';
 
@@ -48,6 +55,8 @@ const TripCreateCompleteStep = ({
     ownerNickname,
     photoCount,
     onRetryUpload,
+    uploadPhase,
+    uploadStats,
 }: TripCreateCompleteStepProps) => {
     const [phase, setPhase] = useState<Phase>(0);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -58,7 +67,9 @@ const TripCreateCompleteStep = ({
     const processedCount = useUploadSessionStore((s) => s.processedCount);
     const failedCount = useUploadSessionStore((s) => s.failedCount);
 
-    const displayTotal = totalCount > 0 ? totalCount : (photoCount ?? 0);
+    // 준비 단계가 실패하면 사진 미리보기(photoCount)가 없어 업로드 장수로 채운다
+    const displayTotal = totalCount > 0 ? totalCount : (photoCount ?? uploadStats?.total ?? 0);
+    const transferText = uploadPhase && uploadStats ? describeUploadProgress(uploadPhase, uploadStats) : null;
 
     const stampDate = toStampDate(tripInfo.startDate) || toStampDate();
 
@@ -95,10 +106,11 @@ const TripCreateCompleteStep = ({
                     return;
                 }
                 setPhase(2);
-            } catch {
+            } catch (error) {
                 if (aborted()) return;
-                setErrorMsg(ERROR_UPLOAD_MSG);
-                showToast(ERROR_UPLOAD_MSG);
+                const msg = describeUploadError(error, ERROR_UPLOAD_MSG);
+                setErrorMsg(msg);
+                showToast(msg);
             }
         },
         [waitForBackgroundUpload, onUpdateForm, onFinalize, showToast],
@@ -115,9 +127,10 @@ const TripCreateCompleteStep = ({
     const handleRetry = () => {
         setErrorMsg(null);
         setPhase(0);
-        // 실패한 파일만 재업로드 → 새 bg promise를 ref에 설치한 뒤 runPhases가 그것을 await.
-        // onRetryUpload가 없거나 컨텍스트가 사라진 경우엔 기존 bg promise를 다시 await(= 같은 에러).
-        onRetryUpload?.();
+        // 끝나지 않은 일(URL 발급부터 미전송·미등록·status 전환까지)만 다시 한다 → 새 bg promise를 ref에 설치한 뒤 runPhases가 그것을 await.
+        // 업로드는 끝났고 정보 저장·발급만 실패했다면 다시 할 일이 없어, 성공한 기존 promise를 await하고 다음 단계로 간다.
+        // 온라인 복귀 재시도 등이 이미 돌고 있으면 끊고 새로 띄우지 않는다. runPhases가 그 실행을 기다린다.
+        if (!uploadPhase || !isUploadInProgress(uploadPhase)) onRetryUpload?.();
         void runPhases();
     };
 
@@ -129,10 +142,14 @@ const TripCreateCompleteStep = ({
                         <div key={phase} css={phaseTextWrap}>
                             <div css={kicker}>{phase === 0 ? '티켓 확인 중' : '색상 적용 중'}</div>
                             <h2 css={waitingTitle}>{phase === 0 ? '잠시만 기다려 주세요' : '티켓을 완성하는 중...'}</h2>
-                            {phase === 0 && displayTotal > 0 && (
-                                <p css={progressLine}>
-                                    사진 처리 {processedCount} / {displayTotal}
-                                    {failedCount > 0 && ` · 실패 ${failedCount}`}
+                            {phase === 0 && (transferText || displayTotal > 0) && (
+                                <p css={progressLine} role='status' aria-live='polite'>
+                                    {transferText ?? (
+                                        <>
+                                            사진 처리 {processedCount} / {displayTotal}
+                                            {failedCount > 0 && ` · 실패 ${failedCount}`}
+                                        </>
+                                    )}
                                 </p>
                             )}
                         </div>

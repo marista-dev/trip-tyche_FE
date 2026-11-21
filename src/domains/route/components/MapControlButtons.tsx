@@ -98,7 +98,7 @@ const MapControlButtons = ({
 
 const barStyle = css`
     position: absolute;
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(12px + var(--app-safe-bottom));
     left: 16px;
     right: 16px;
     background: rgba(10, 10, 20, 0.8);

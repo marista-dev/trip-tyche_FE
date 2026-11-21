@@ -14,10 +14,12 @@ import { managePageContainerStyle } from '@/domains/media/components/manage/styl
 import { MANAGE_TOKENS } from '@/domains/media/components/manage/tokens';
 import { FailedImageCard } from '@/domains/media/components/upload/FailedImageCard';
 import IosPickerTip from '@/domains/media/components/upload/IosPickerTip';
-import { useMediaDelete } from '@/domains/media/hooks/mutations';
+import UploadLeaveConfirm from '@/domains/media/components/upload/UploadLeaveConfirm';
+import { useMediaDelete, useMediaReprocess } from '@/domains/media/hooks/mutations';
 import { useTripPhotos } from '@/domains/media/hooks/queries';
 import { usePhotoSelection } from '@/domains/media/hooks/usePhotoSelection';
 import { usePhotoUpload } from '@/domains/media/hooks/usePhotoUpload';
+import { UPLOAD_GUARD_TEXT, useUploadGuard } from '@/domains/media/hooks/useUploadGuard';
 import { useUploadSessionSync } from '@/domains/media/hooks/useUploadSessionSync';
 import { useEstimateStore } from '@/domains/media/stores/useEstimateStore';
 import { useUploadSessionStore } from '@/domains/media/stores/useUploadSessionStore';
@@ -28,6 +30,7 @@ import {
     filterWithoutLocationMediaFile,
     getImageGroupByDate,
 } from '@/domains/media/utils';
+import { describeDuplicates, describeReprocessResult } from '@/domains/media/utils/uploadMessages';
 import { useTripFormSubmit } from '@/domains/trip/hooks/mutations';
 import { useTripInfo } from '@/domains/trip/hooks/queries';
 import { formatPeriod, getTripDays, TripRange } from '@/domains/trip/tripDates';
@@ -93,11 +96,18 @@ const TripImageManagePage = () => {
         openFilePicker: openPicker,
         handleFileSelected,
         isUploading,
+        isTransferring,
         uploadingText,
+        canRetryUpload,
+        retryUpload,
+        duplicateCount,
+        canUploadDuplicates,
+        uploadDuplicates,
         pendingByDate,
         dateConflict,
         resolveDateConflict,
     } = usePhotoUpload(tripKey, { tripRange, onExtendRange: extendTripRange });
+    const uploadGuard = useUploadGuard(isTransferring);
     // 게스트는 사진을 고르기 전에 막는다.
     const openFilePicker = () => requireMember('photo', openPicker);
 
@@ -112,6 +122,24 @@ const TripImageManagePage = () => {
             (item) => item.status === 'UPLOADED' || item.status === 'PROCESSING' || item.status === 'FAILED',
         );
     }, [sessionTripKey, tripKey, sessionImages]);
+    const failedIds = useMemo(
+        () => inProgressItems.filter((item) => item.status === 'FAILED').map((item) => item.mediaFileId),
+        [inProgressItems],
+    );
+
+    const { mutate: reprocess, isPending: isReprocessing } = useMediaReprocess();
+    const retryProcessing = (mediaFileIds: number[]) => {
+        if (isReprocessing || mediaFileIds.length === 0) return;
+        reprocess(
+            { tripKey, mediaFileIds },
+            {
+                onSuccess: (summary) => {
+                    const message = describeReprocessResult(summary);
+                    if (message) showToast(message);
+                },
+            },
+        );
+    };
 
     // 파생 데이터 — 카테고리별 분류 + 날짜 그룹 + pending 머지
     const noLocImages = useMemo(() => filterWithoutLocationMediaFile(allImages) as MediaFile[], [allImages]);
@@ -169,10 +197,23 @@ const TripImageManagePage = () => {
     return (
         <div css={managePageContainerStyle}>
             {(isImagesLoading || isDeleting) && <Indicator text={isDeleting ? '사진 삭제 중...' : undefined} />}
-            {isUploading && (
+            {isUploading && uploadingText && (
                 <div css={uploadChipStyle} role='status' aria-live='polite'>
                     {uploadingText}
+                    {isTransferring && <span css={uploadHintStyle}>{UPLOAD_GUARD_TEXT.hint}</span>}
                 </div>
+            )}
+            {/* 선택 모드에서는 같은 자리에 선택 동작 버튼이 뜬다 */}
+            {canRetryUpload && !selectMode && (
+                <button type='button' css={[uploadChipStyle, retryChipStyle]} onClick={() => void retryUpload()}>
+                    올리지 못한 사진이 있어요 · 다시 시도
+                </button>
+            )}
+            {/* 같은 자리를 쓰므로 재시도가 먼저다. 재시도가 끝나면 이 버튼이 뜬다. */}
+            {canUploadDuplicates && !canRetryUpload && !selectMode && (
+                <button type='button' css={[uploadChipStyle, retryChipStyle]} onClick={() => void uploadDuplicates()}>
+                    {describeDuplicates(duplicateCount)} · 그래도 올리기
+                </button>
             )}
 
             <input ref={fileInputRef} type='file' accept='image/*' multiple hidden onChange={handleFileSelected} />
@@ -222,11 +263,27 @@ const TripImageManagePage = () => {
 
                 {!selectMode && inProgressItems.length > 0 && (
                     <section css={uploadingSectionStyle}>
-                        <h3 css={sectionLabelStyle}>업로드 중</h3>
+                        <div css={sectionHeaderStyle}>
+                            <h3 css={sectionLabelStyle}>업로드 중</h3>
+                            {failedIds.length > 1 && (
+                                <button
+                                    type='button'
+                                    css={sectionActionStyle}
+                                    disabled={isReprocessing}
+                                    onClick={() => retryProcessing(failedIds)}
+                                >
+                                    실패 {failedIds.length}장 다시 처리
+                                </button>
+                            )}
+                        </div>
                         <div css={uploadingGridStyle}>
                             {inProgressItems.map((item) =>
                                 item.status === 'FAILED' ? (
-                                    <FailedImageCard key={item.mediaFileId} item={item} />
+                                    <FailedImageCard
+                                        key={item.mediaFileId}
+                                        item={item}
+                                        onRetry={isReprocessing ? undefined : (id) => retryProcessing([id])}
+                                    />
                                 ) : (
                                     <SwappableImage
                                         key={item.mediaFileId}
@@ -291,6 +348,8 @@ const TripImageManagePage = () => {
                     closeModal={() => setShowDeleteConfirm(false)}
                 />
             )}
+
+            <UploadLeaveConfirm guard={uploadGuard} />
 
             {showDateSheet && (
                 <InlineDatePickSheet
@@ -364,6 +423,28 @@ const sectionLabelStyle = css`
     color: ${MANAGE_TOKENS.text.label};
 `;
 
+const sectionHeaderStyle = css`
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+`;
+
+const sectionActionStyle = css`
+    margin: 0 4px 8px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    font-size: 11px;
+    font-weight: 700;
+    color: ${MANAGE_TOKENS.text.primary};
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    &:disabled {
+        color: ${MANAGE_TOKENS.text.muted};
+        cursor: default;
+    }
+`;
+
 const emptyAddStyle = css`
     width: 100%;
     background: transparent;
@@ -376,7 +457,7 @@ const emptyAddStyle = css`
 const uploadChipStyle = css`
     position: fixed;
     left: 50%;
-    bottom: 24px;
+    bottom: calc(24px + var(--app-safe-bottom));
     transform: translateX(-50%);
     z-index: 60;
     padding: 10px 16px;
@@ -390,6 +471,23 @@ const uploadChipStyle = css`
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
     backdrop-filter: blur(10px);
     pointer-events: none;
+`;
+
+const retryChipStyle = css`
+    border: none;
+    cursor: pointer;
+    pointer-events: auto;
+    -webkit-tap-highlight-color: transparent;
+`;
+
+const uploadHintStyle = css`
+    display: block;
+    margin-top: 2px;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.7);
 `;
 
 const uploadingSectionStyle = css`

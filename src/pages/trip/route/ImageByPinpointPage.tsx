@@ -492,7 +492,7 @@ const bottomGradient = (shown: boolean) => css`
 
 const topChrome = (shown: boolean) => css`
     position: absolute;
-    top: max(20px, env(safe-area-inset-top, 0px));
+    top: max(20px, var(--app-safe-top));
     padding-top: 16px;
     left: 16px;
     right: 16px;
@@ -573,7 +573,7 @@ const topRightGroup = css`
 const topRightCloseButton = css`
     ${closeButtonBase};
     position: absolute;
-    top: max(20px, env(safe-area-inset-top, 0px));
+    top: max(20px, var(--app-safe-top));
     margin-top: 16px;
     right: 16px;
     z-index: 10;
@@ -621,7 +621,7 @@ const thumbStripWrap = (shown: boolean) => css`
     position: absolute;
     left: 0;
     right: 0;
-    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(20px + var(--app-safe-bottom));
     padding: 8px 20px;
     display: flex;
     gap: 6px;

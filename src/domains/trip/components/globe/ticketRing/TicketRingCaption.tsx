@@ -54,7 +54,7 @@ const wrap = css`
     position: absolute;
     left: 0;
     right: 0;
-    bottom: calc(30px + env(safe-area-inset-bottom));
+    bottom: calc(30px + var(--app-safe-bottom));
     z-index: 40;
     padding: 0 22px;
     text-align: center;

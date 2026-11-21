@@ -59,10 +59,11 @@ export function useUploadSessionSync(
         initialSyncDoneRef.current = false;
 
         const runSync = async () => {
+            const requestedAt = Date.now();
             const result = await mediaAPI.fetchUploadStatus(tripKey);
             if (cancelled) return;
             if (result.success) {
-                syncImages(result.data);
+                syncImages(tripKey, result.data, requestedAt);
             }
             const pending = pendingEventsRef.current;
             pendingEventsRef.current = [];
@@ -84,10 +85,12 @@ export function useUploadSessionSync(
     useEffect(() => {
         if (!enabled || !tripKey) return;
         const unregister = addStompConnectListener(() => {
+            // 응답이 오기 전에 등록된 묶음을 지우지 않게 조회 시각을 넘긴다
+            const requestedAt = Date.now();
             mediaAPI
                 .fetchUploadStatus(tripKey)
                 .then((result) => {
-                    if (result.success) syncImages(result.data);
+                    if (result.success) syncImages(tripKey, result.data, requestedAt);
                 })
                 .catch((err) => console.error('[useUploadSessionSync] reconnect sync failed', err));
         });

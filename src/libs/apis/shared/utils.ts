@@ -33,7 +33,12 @@ export const toResult = async <T, R = T>(
             onError?.();
             // 네트워크 단절(ERR_NETWORK)처럼 응답 자체가 없는 경우 errorResponse가 undefined가 되므로
             // .message 직접 접근하면 TypeError로 toResult 자체가 reject되어 unhandled rejection 발생.
-            return { success: false, error: errorResponse?.message ?? errorMessage ?? MESSAGE.ERROR.UNKNOWN };
+            return {
+                success: false,
+                error: errorResponse?.message ?? errorMessage ?? MESSAGE.ERROR.UNKNOWN,
+                status: error.response?.status,
+                code: errorResponse?.code,
+            };
         }
         return { success: false, error: errorMessage ?? MESSAGE.ERROR.UNKNOWN };
     } finally {

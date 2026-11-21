@@ -1,7 +1,9 @@
 import { Capacitor } from '@capacitor/core';
 import { FilePicker, type PickedFile } from '@capawesome/capacitor-file-picker';
 
+import { ANALYTICS_EVENTS, track } from '@/libs/analytics';
 import { runWithPool } from '@/libs/utils/async';
+import { toMb } from '@/libs/utils/image';
 
 /*
  * 네이티브 갤러리에서 원본 이미지를 고른다.
@@ -46,7 +48,11 @@ const toFile = async (picked: PickedFile): Promise<File | null> => {
         const response = await fetch(Capacitor.convertFileSrc(picked.path));
         const blob = await response.blob();
 
-        return new File([blob], picked.name, { type: picked.mimeType || blob.type });
+        // 중복 판별 키와 날짜별 미리보기 묶음이 lastModified를 쓴다. 지정하지 않으면 '지금'으로 찍혀 전부 한 날로 몰린다.
+        return new File([blob], picked.name, {
+            type: picked.mimeType || blob.type,
+            ...(picked.modifiedAt ? { lastModified: picked.modifiedAt } : {}),
+        });
     } catch (error) {
         console.error(`${picked.name} 파일 변환 실패: `, error);
         return null;
@@ -55,8 +61,21 @@ const toFile = async (picked: PickedFile): Promise<File | null> => {
 
 const IMAGE_MIME_PREFIX = 'image/';
 
-export const pickImagesFromGallery = async (): Promise<File[]> => {
-    await ensureMediaLocationPermission();
+// 권한이 꺼진 사용자가 매번 같은 안내를 보지 않도록 앱 실행당 한 번만 알린다.
+let hasNotifiedLocationDenied = false;
+const LOCATION_DENIED_MESSAGE =
+    '사진 위치 접근이 꺼져 있어 지도에 핀이 찍히지 않아요. 설정 > 앱 > 트립티케 > 권한에서 허용해 주세요.';
+
+/*
+ * skippedNonImage: 영상·녹음 등 이미지가 아니라 걸러낸 선택 수. 호출부가 사용자에게 알릴 수 있게 돌려준다.
+ * locationNotice: 위치 권한 안내. 직접 띄우면 곧이어 뜨는 제외 안내 토스트에 덮이므로 호출부가 합쳐 띄운다.
+ */
+export const pickImagesFromGallery = async (): Promise<{
+    files: File[];
+    skippedNonImage: number;
+    locationNotice: string | null;
+}> => {
+    const locationGranted = await ensureMediaLocationPermission();
 
     /*
      * pickImages가 아니라 pickFiles를 쓰는 이유 — 이 앱에서 가장 중요한 선택이다.
@@ -70,12 +89,39 @@ export const pickImagesFromGallery = async (): Promise<File[]> => {
      * documents provider는 이미지를 문서로 취급해 위치 메타데이터를 그대로 넘긴다.
      * 대신 UI가 갤러리 격자가 아닌 파일 브라우저라 덜 예쁘지만, GPS 보존이 앱의 존재 이유다.
      */
+    const pickStartedAt = Date.now();
     const { files } = await FilePicker.pickFiles({ limit: 0 });
+    const pickMs = Date.now() - pickStartedAt;
 
     // 모든 파일 타입으로 열었으므로 이미지가 아닌 선택은 걸러낸다.
     const imageFiles = files.filter((file) => (file.mimeType ?? '').startsWith(IMAGE_MIME_PREFIX));
 
+    const convertStartedAt = Date.now();
     const converted = await runWithPool(imageFiles, FILE_CONVERSION_CONCURRENCY, toFile);
+    const result = converted.filter((file): file is File => file !== null);
 
-    return converted.filter((file): file is File => file !== null);
+    // 취소(0장)는 보내지 않는다. 장수·시간만 싣고 파일명·형식 목록은 싣지 않는다.
+    if (files.length > 0) {
+        track(ANALYTICS_EVENTS.PHOTOS_PICKED, {
+            picked_count: files.length,
+            image_count: imageFiles.length,
+            // 영상·녹음 등 이미지가 아니라 버린 파일 수
+            non_image_count: files.length - imageFiles.length,
+            convert_failed_count: imageFiles.length - result.length,
+            location_permission: locationGranted ? 'granted' : 'denied',
+            // 선택 창이 열린 뒤 돌아올 때까지. 사용자가 고르는 시간과 플러그인이 메타데이터를 읽는 시간이 섞여 있다.
+            pick_ms: pickMs,
+            convert_ms: Date.now() - convertStartedAt,
+            picked_mb: toMb(files.reduce((sum, file) => sum + (file.size ?? 0), 0)),
+        });
+    }
+
+    // 사진을 실제로 골랐을 때만 알린다. 선택 창을 닫기만 한 사용자에게까지 띄우지 않는다.
+    let locationNotice: string | null = null;
+    if (!locationGranted && imageFiles.length > 0 && !hasNotifiedLocationDenied) {
+        hasNotifiedLocationDenied = true;
+        locationNotice = LOCATION_DENIED_MESSAGE;
+    }
+
+    return { files: result, skippedNonImage: files.length - imageFiles.length, locationNotice };
 };

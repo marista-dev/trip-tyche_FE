@@ -61,8 +61,8 @@ const headerStyle = css`
     display: flex;
     align-items: center;
     gap: 8px;
-    min-height: 54px;
-    padding: 8px 16px;
+    min-height: calc(54px + var(--app-safe-top));
+    padding: calc(8px + var(--app-safe-top)) 16px 8px;
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);

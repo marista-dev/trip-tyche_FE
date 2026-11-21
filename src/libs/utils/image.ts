@@ -27,10 +27,10 @@ const METADATA_EXTRACTION_CONCURRENCY = 4;
 // 파일당 EXIF를 정확히 1회만 읽고(extractMetadataFromExif), 동시에 시작되는 워커 수를
 // METADATA_EXTRACTION_CONCURRENCY로 제한한다. runWithPool은 결과를 인덱스 위치에 직접 쓰므로
 // 완료 순서가 뒤섞여도 반환 배열의 순서는 입력 순서(images)와 항상 동일하게 유지된다.
-// ⚠️ 이 순서는 useImageUpload에서 presignedUrls/fileArray와 인덱스로 매칭되므로 절대 깨서는 안 된다.
+// ⚠️ 이 순서는 업로드 체인(uploadChain.ts)에서 presignedUrls/fileArray와 인덱스로 매칭되므로 절대 깨서는 안 된다.
 export const extractMetadataFromImage = async (
     images: readonly File[],
-    onProgress?: Dispatch<SetStateAction<{ metadata: number; upload: number }>>,
+    onProgress?: Dispatch<SetStateAction<{ metadata: number }>>,
 ): Promise<ClientImageFile[]> => {
     if (images.length === 0) return [];
 
@@ -59,6 +59,9 @@ export const extractMetadataFromImage = async (
     });
 };
 
+/** 바이트 → 소수 첫째 자리 MB. 분석 이벤트의 용량 속성용 */
+export const toMb = (bytes: number) => Math.round(bytes / 1e5) / 10;
+
 const HEIC_EXTENSION = /\.(heic|heif)$/i;
 
 /**
@@ -75,6 +78,6 @@ export const summarizeUploadFormats = (files: File[]) => {
         heic_count: heic,
         jpeg_count: jpeg,
         other_count: files.length - heic - jpeg,
-        total_mb: Math.round(files.reduce((sum, f) => sum + f.size, 0) / 1e5) / 10,
+        total_mb: toMb(files.reduce((sum, f) => sum + f.size, 0)),
     };
 };

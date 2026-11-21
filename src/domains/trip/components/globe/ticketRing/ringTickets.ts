@@ -7,13 +7,9 @@ import { TripSummary } from '@/domains/trip/types';
 export const sortLatestFirst = (list: TripSummary[]) =>
     [...list].sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
 
-/** @param photoCounts list와 같은 순서의 사진 수. 아직 모르면 null */
-export const toRingTickets = (
-    list: TripSummary[],
-    passenger: string,
-    photoCounts: (number | null)[] = [],
-): RingTicket[] =>
-    list.map((trip, i) => {
+/** 사진 수는 목록 응답의 photoCount. 응답에 없으면 null(카드에 '—') */
+export const toRingTickets = (list: TripSummary[], passenger: string): RingTicket[] =>
+    list.map((trip) => {
         const completed = Boolean(trip.startDate);
         return {
             tripKey: trip.tripKey,
@@ -21,6 +17,6 @@ export const toRingTickets = (
             view: getTicketView(trip, { completed }),
             completed,
             passenger,
-            photoCount: photoCounts[i] ?? null,
+            photoCount: trip.photoCount ?? null,
         };
     });

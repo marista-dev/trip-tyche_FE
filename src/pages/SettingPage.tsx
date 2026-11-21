@@ -44,12 +44,12 @@ const SettingPage = () => {
 
     const comingSoon = () => showToast(COMING_SOON);
 
-    // 로드 실패 시 '0'을 보여주면 '데이터 없음'과 구분되지 않으므로 '–'로 표시한다.
-    const displayStat = (value: number, needsMedia = false) =>
-        isError || (needsMedia && isLoading) ? '–' : String(value);
+    // 로딩 중·실패 시 '0'을 보여주면 '데이터 없음'과 구분되지 않으므로 '–'로 표시한다.
+    // 통계가 한 번의 응답으로 오므로 항목별로 나누지 않고 한꺼번에 처리한다.
+    const displayStat = (value: number) => (isError || isLoading ? '–' : String(value));
     const statItems: { id: StatView; label: string; value: string }[] = [
         { id: 'trips', label: '여행', value: displayStat(stats.tripsCount) },
-        { id: 'photos', label: '사진', value: displayStat(stats.totalPhotos, true) },
+        { id: 'photos', label: '사진', value: displayStat(stats.totalPhotos) },
         { id: 'countries', label: '국가', value: displayStat(stats.countriesCount) },
     ];
 

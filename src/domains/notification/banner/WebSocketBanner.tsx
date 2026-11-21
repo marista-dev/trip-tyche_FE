@@ -4,7 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import BannerCard from './BannerCard';
 import { BannerMessage } from './types';
 import { useBannerStore } from './useBannerStore';
+import { notificationKeys } from '@/domains/notification/queryKeys';
 import { useShareStatus } from '@/domains/share/hooks/mutations';
+import { SUMMARY_QUERY_KEY } from '@/domains/user/queryKeys';
 import { ROUTES } from '@/shared/constants/route';
 import { queryClient } from '@/shared/providers/TanStackProvider';
 import { useToastStore } from '@/shared/stores/useToastStore';
@@ -50,10 +52,10 @@ const WebSocketBanner: React.FC = () => {
         dismiss();
     };
 
+    // 공유·여행 목록은 useShareStatus가 갱신한다. 배너에서 처리한 초대는 알림·요약 수에도 반영해야 한다.
     const invalidateAfterShareAction = () => {
-        queryClient.invalidateQueries({ queryKey: ['summary'] });
-        queryClient.invalidateQueries({ queryKey: ['notification'] });
-        queryClient.invalidateQueries({ queryKey: ['ticket-list'] });
+        queryClient.invalidateQueries({ queryKey: SUMMARY_QUERY_KEY });
+        queryClient.invalidateQueries({ queryKey: notificationKeys.all });
     };
 
     const runShareMutation = async (status: 'APPROVED' | 'REJECTED', successMsg: string) => {

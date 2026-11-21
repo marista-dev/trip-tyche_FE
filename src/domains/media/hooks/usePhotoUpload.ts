@@ -4,6 +4,10 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { PendingPhoto } from '@/domains/media/components/manage/DateGroupSection';
 import { useImageUpload } from '@/domains/media/hooks/useImageUpload';
+import { isUploadInProgress } from '@/domains/media/hooks/useUploadGuard';
+import { invalidateTripMedia } from '@/domains/media/queryKeys';
+import { describeDuplicates, describeUploadError, describeUploadProgress } from '@/domains/media/utils/uploadMessages';
+import type { PickerReport } from '@/domains/media/utils/uploadValidation';
 import { getDateBounds, getDatesOutside, toDateString, toPhotoDays, TripRange } from '@/domains/trip/tripDates';
 import { ANALYTICS_EVENTS, track } from '@/libs/analytics';
 import { summarizeUploadFormats } from '@/libs/utils/image';
@@ -11,7 +15,10 @@ import { isIOSWeb, isNative } from '@/platform';
 import { pickImagesFromGallery } from '@/platform/native/gallery';
 import { useToastStore } from '@/shared/stores/useToastStore';
 
-type UploadPhase = 'idle' | 'extracting' | 'uploading';
+const UPLOAD_ERROR_FALLBACK = '사진 추가 중 문제가 발생했어요. 다시 시도해주세요.';
+
+// 이 화면의 흐름 단계. 실제 전송 단계(useImageUpload의 uploadPhase)와 달리 날짜 확인 시트를 기다리는 시간도 포함한다.
+type FlowPhase = 'idle' | 'extracting' | 'uploading';
 
 /** 기간 밖에 찍힌 사진이 있을 때 물을 내용 */
 export interface DateConflict {
@@ -40,6 +47,7 @@ interface UsePhotoUploadOptions {
  *  - 숨김 파일 input ref + 파일 picker 오픈
  *  - 파일 선택 즉시 placeholder(blob 미리보기 + recordDate 기반 날짜 그룹) 생성
  *  - prepareUploadFiles → uploadImagesToS3 → waitForBackgroundUpload → invalidate 시퀀스
+ *  - 실패하면 남은 사진을 다시 올리는 동작을 노출하고, 재시도(수동·온라인 복귀)가 성공하면 목록을 다시 받아 알린다
  *  - blob URL revoke를 double rAF로 지연 (DOM 제거 후 회수)
  *  - 진행 phase별 텍스트 노출
  *
@@ -51,8 +59,37 @@ interface UsePhotoUploadOptions {
 export const usePhotoUpload = (tripKey: string, { tripRange, onExtendRange }: UsePhotoUploadOptions = {}) => {
     const queryClient = useQueryClient();
     const { showToast } = useToastStore();
-    const { prepareUploadFiles, extractMetadata, uploadImagesToS3, waitForBackgroundUpload, progress } =
-        useImageUpload();
+    const invalidatePhotos = () => invalidateTripMedia(queryClient, tripKey);
+    const {
+        prepareUploadFiles,
+        extractMetadata,
+        uploadImagesToS3,
+        retryFailedUploads,
+        uploadDuplicates: startDuplicateUpload,
+        waitForBackgroundUpload,
+        progress,
+        uploadStats,
+        uploadPhase: transferPhase,
+        duplicateCount,
+        imageCategories,
+    } = useImageUpload({
+        source: 'manage',
+        // 첫 실행이 실패해 processFiles는 이미 끝났다. 수동·온라인 복귀 재시도가 나머지를 올린 경우다.
+        onRecovered: () => {
+            void invalidatePhotos();
+            showToast('사진이 추가되었어요');
+        },
+    });
+    // 성공 토스트를 띄울 때는 이미 렌더가 끝나 있으므로, 이번 업로드의 분류를 effect로 옮겨 둔 값을 읽는다.
+    const withoutLocationRef = useRef(0);
+    const duplicateCountRef = useRef(0);
+    useEffect(() => {
+        withoutLocationRef.current = imageCategories?.withoutLocation.count ?? 0;
+    }, [imageCategories]);
+    useEffect(() => {
+        duplicateCountRef.current = duplicateCount;
+    }, [duplicateCount]);
+    const isTransferring = isUploadInProgress(transferPhase);
 
     // processFiles가 이 Promise로 사용자의 선택을 기다린다.
     const [dateConflict, setDateConflict] = useState<DateConflict | null>(null);
@@ -79,16 +116,18 @@ export const usePhotoUpload = (tripKey: string, { tripRange, onExtendRange }: Us
     useEffect(() => () => settleConflict('cancel'), []);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [uploadPhase, setUploadPhase] = useState<UploadPhase>('idle');
+    const [uploadPhase, setUploadPhase] = useState<FlowPhase>('idle');
     const [pendingByDate, setPendingByDate] = useState<Record<string, PendingPhoto[]>>({});
 
     // 네이티브에서는 EXIF 원본을 보존하는 갤러리 피커를, 웹에서는 기존 file input을 쓴다.
     const openFilePicker = async () => {
-        if (uploadPhase !== 'idle') return;
+        // 온라인 복귀 재시도가 도는 중에도 새 업로드는 시작할 수 없다(uploadImagesToS3가 거부한다).
+        if (uploadPhase !== 'idle' || isTransferring) return;
 
         if (isNative()) {
-            const pickedFiles = await pickImagesFromGallery();
-            if (pickedFiles.length > 0) await processFiles(pickedFiles);
+            // 영상만 고른 경우도 prepareUploadFiles가 안내한다. 아무 반응이 없으면 앱이 멈춘 것처럼 보인다.
+            const { files, skippedNonImage, locationNotice } = await pickImagesFromGallery();
+            await processFiles(files, undefined, { skippedNonImage, notice: locationNotice });
             return;
         }
 
@@ -110,13 +149,21 @@ export const usePhotoUpload = (tripKey: string, { tripRange, onExtendRange }: Us
     };
 
     // 파일 출처(웹 input / 네이티브 피커)와 무관한 공통 업로드 시퀀스.
-    const processFiles = async (fileArray: File[], resetInput?: () => void) => {
+    const processFiles = async (fileArray: File[], resetInput?: () => void, pick?: PickerReport) => {
+        // 중복·형식·용량 검사는 즉시 끝난다. 제외할 사진의 미리보기를 잠깐 띄웠다 지우지 않게 먼저 거른다.
+        const uniqueFiles = await prepareUploadFiles(fileArray, pick);
+        if (uniqueFiles.length === 0) {
+            // 제외 안내는 prepareUploadFiles가 이미 띄웠다
+            resetInput?.();
+            return;
+        }
+
         const createdUrls: string[] = [];
 
         // INSTANT: extractMetaData가 끝나기 전에 미리보기 placeholder를 그리드에 즉시 띄움.
         const initialPending: Record<string, PendingPhoto[]> = {};
         const stampBatch = Date.now();
-        fileArray.forEach((file, idx) => {
+        uniqueFiles.forEach((file, idx) => {
             const stamp = Number.isFinite(file.lastModified) ? file.lastModified : Date.now();
             const dateKey = toDateString(new Date(stamp));
             let previewUrl: string;
@@ -134,7 +181,6 @@ export const usePhotoUpload = (tripKey: string, { tripRange, onExtendRange }: Us
         setUploadPhase('extracting');
 
         try {
-            const uniqueFiles = await prepareUploadFiles(fileArray);
             // 기간이 있으면 올리기 전에 날짜를 확인해야 해서 EXIF를 먼저 읽는다. 없으면 업로드가 presign과 함께 읽는다.
             const metadata = tripRange ? await extractMetadata(uniqueFiles) : undefined;
 
@@ -160,17 +206,31 @@ export const usePhotoUpload = (tripKey: string, { tripRange, onExtendRange }: Us
             }
 
             setUploadPhase('uploading');
-            // uploadImagesToS3는 백그라운드 chain을 띄우고 즉시 return → waitForBackgroundUpload로
-            // 실제 S3 PUT + metadata POST 완료까지 await.
+            // uploadImagesToS3는 준비·URL 발급이 끝나면 돌아온다. 전송·등록이 끝날 때까지는 waitForBackgroundUpload로 기다린다.
             await uploadImagesToS3(uniqueFiles, undefined, metadata);
             await waitForBackgroundUpload();
 
-            await queryClient.invalidateQueries({ queryKey: ['trip-images', tripKey] });
+            await invalidatePhotos();
             // 장수·형식·용량만 보낸다. 파일명·tripKey는 식별 정보라 속성에 넣지 않는다.
             track(ANALYTICS_EVENTS.PHOTOS_UPLOADED, { ...summarizeUploadFormats(uniqueFiles), ios_web: isIOSWeb() });
-            showToast(`${uniqueFiles.length}장의 사진이 추가되었어요`);
-        } catch {
-            showToast('사진 추가 중 문제가 발생했어요. 다시 시도해주세요.');
+            // 제외 안내와 겹치지 않게 위치 없는 사진 안내는 마지막 토스트에 붙인다. 카드가 바로 아래에 생긴다.
+            const withoutLocation = withoutLocationRef.current;
+            // 이미 있는 사진은 올리지 않았다. '그래도 올리기'는 화면의 버튼으로 연다.
+            const duplicates = duplicateCountRef.current;
+            const added = uniqueFiles.length - duplicates;
+            showToast(
+                [
+                    added > 0 && `${added}장의 사진이 추가되었어요`,
+                    describeDuplicates(duplicates),
+                    withoutLocation > 0 && `${withoutLocation}장은 위치 정보가 없어 '위치 정보 없음'에 모아뒀어요`,
+                ]
+                    .filter(Boolean)
+                    .join('. '),
+            );
+        } catch (error) {
+            // 50장 단위로 등록되므로 실패해도 앞서 등록된 묶음은 서버에 있다. 그 사진들을 목록에 보인다.
+            void invalidatePhotos();
+            showToast(describeUploadError(error, UPLOAD_ERROR_FALLBACK));
         } finally {
             setUploadPhase('idle');
             setPendingByDate({});
@@ -185,22 +245,55 @@ export const usePhotoUpload = (tripKey: string, { tripRange, onExtendRange }: Us
         }
     };
 
-    // 시트 뒤에 '분석 중 100%'가 남지 않게 숨긴다.
+    // 끝내지 못한 일이 남은 채 흐름이 끝났다. 온라인 복귀를 기다리지 않고 직접 다시 시도할 수 있게 한다.
+    const canRetryUpload = uploadPhase === 'idle' && transferPhase === 'failed';
+    const retryUpload = async () => {
+        if (!canRetryUpload) return;
+        retryFailedUploads();
+        try {
+            // 성공하면 onRecovered가 목록을 갱신하고 알린다
+            await waitForBackgroundUpload();
+        } catch (error) {
+            void invalidatePhotos();
+            showToast(describeUploadError(error, UPLOAD_ERROR_FALLBACK));
+        }
+    };
+
+    // 중복으로 빠진 사진을 그래도 올린다. 성공하면 onRecovered가 목록을 갱신하고 알린다.
+    const canUploadDuplicates = uploadPhase === 'idle' && !isTransferring && duplicateCount > 0;
+    const uploadDuplicates = async () => {
+        if (!canUploadDuplicates) return;
+        startDuplicateUpload();
+        try {
+            await waitForBackgroundUpload();
+        } catch (error) {
+            void invalidatePhotos();
+            showToast(describeUploadError(error, UPLOAD_ERROR_FALLBACK));
+        }
+    };
+
+    // 시트 뒤에 '분석 중 100%'가 남지 않게 숨긴다. 재시도(수동·온라인 복귀)는 processFiles 밖에서 돌아 전송 단계만 본다.
     const uploadingText = dateConflict
         ? undefined
         : uploadPhase === 'extracting'
           ? `사진 정보를 분석 중... ${Math.round(progress?.metadata ?? 0)}%`
-          : uploadPhase === 'uploading'
-            ? `사진 업로드 중... ${Math.round(progress?.upload ?? 0)}%`
-            : undefined;
+          : (describeUploadProgress(transferPhase, uploadStats) ??
+            (uploadPhase === 'uploading' ? '사진 업로드 중…' : undefined));
 
     return {
         fileInputRef,
         openFilePicker,
         handleFileSelected,
         uploadPhase,
-        isUploading: uploadPhase !== 'idle',
+        isUploading: uploadPhase !== 'idle' || isTransferring,
+        /** 실제 전송 중. 화면 이탈 차단·꺼짐 방지(useUploadGuard)에 쓴다. */
+        isTransferring,
         uploadingText,
+        canRetryUpload,
+        retryUpload,
+        duplicateCount,
+        canUploadDuplicates,
+        uploadDuplicates,
         pendingByDate,
         dateConflict,
         resolveDateConflict,
