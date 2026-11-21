@@ -1,4 +1,3 @@
-import useUserStore from '@/domains/user/stores/useUserStore';
 import ConfirmModal from '@/shared/components/common/Modal/ConfirmModal';
 import { useAndroidAppPrompt } from '@/shared/hooks/useAndroidAppPrompt';
 
@@ -8,11 +7,10 @@ import { useAndroidAppPrompt } from '@/shared/hooks/useAndroidAppPrompt';
  * 안드로이드 브라우저는 사진 업로드 시 EXIF의 GPS를 제거해, 이 서비스의 핵심인
  * '사진 위치로 지도에 핀 찍기'가 동작하지 않는다. 앱에서는 원본 EXIF를 읽을 수 있다.
  *
- * 로그인 직후에 뜬다. 가입 전에 설치를 요구하면 이탈하기 때문이다.
+ * 첫 화면에서 바로 뜬다. 사진을 올리기 전에 앱으로 옮겨 가야 위치가 남는다.
  */
 const AndroidAppPrompt = () => {
-    const status = useUserStore((s) => s.status);
-    const { isOpen, downloadUrl, dismiss } = useAndroidAppPrompt(status === 'authenticated');
+    const { isOpen, downloadUrl, dismiss } = useAndroidAppPrompt();
 
     if (!isOpen) return null;
 
