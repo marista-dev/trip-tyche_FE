@@ -9,8 +9,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
  */
 
 let androidWeb = true;
+// 조회가 끝나기 전(null)과 끝난 뒤를 바꿔 가며 본다. 조회는 열 자격이 있을 때만 한다.
+let resolvedUrl: string | null = 'https://download';
 vi.mock('@/platform', () => ({ isAndroidWeb: () => androidWeb }));
-vi.mock('@/shared/hooks/useAppDownloadUrl', () => ({ useAppDownloadUrl: () => 'https://download' }));
+vi.mock('@/shared/hooks/useAppDownloadUrl', () => ({
+    useAppDownloadUrl: (enabled: boolean) => (enabled ? resolvedUrl : null),
+}));
 
 const { useAndroidAppPrompt } = await import('@/shared/hooks/useAndroidAppPrompt');
 
@@ -31,11 +35,19 @@ const mount = () => {
 afterEach(() => {
     sessionStorage.clear();
     androidWeb = true;
+    resolvedUrl = 'https://download';
 });
 
 describe('useAndroidAppPrompt', () => {
-    it('안드로이드 웹이면 바로 연다', () => {
-        expect(mount().prompt.isOpen).toBe(true);
+    it('안드로이드 웹이면 다운로드 주소를 받는 대로 연다', () => {
+        const { prompt } = mount();
+        expect(prompt.isOpen).toBe(true);
+        expect(prompt.downloadUrl).toBe('https://download');
+    });
+
+    it('다운로드 주소를 받기 전에는 열지 않는다(누르면 홈페이지로 가지 않게)', () => {
+        resolvedUrl = null;
+        expect(mount().prompt.isOpen).toBe(false);
     });
 
     it('안드로이드 웹이 아니면 열지 않는다', () => {

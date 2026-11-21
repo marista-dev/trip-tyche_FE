@@ -25,17 +25,19 @@ const wasDismissed = () => {
 };
 
 export const useAndroidAppPrompt = () => {
-    const [isOpen, setIsOpen] = useState(false);
+    const [isEligible, setIsEligible] = useState(false);
 
     useEffect(() => {
         if (!isAndroidWeb() || wasDismissed()) return;
-        setIsOpen(true);
+        setIsEligible(true);
     }, []);
 
-    const downloadUrl = useAppDownloadUrl(isOpen);
+    // 접속 직후라 주소 조회가 끝나기 전에 누를 수 있다. 주소를 받은 뒤에 연다.
+    const downloadUrl = useAppDownloadUrl(isEligible);
+    const isOpen = isEligible && downloadUrl !== null;
 
     const dismiss = () => {
-        setIsOpen(false);
+        setIsEligible(false);
         try {
             sessionStorage.setItem(DISMISS_KEY, 'true');
         } catch {
@@ -43,5 +45,5 @@ export const useAndroidAppPrompt = () => {
         }
     };
 
-    return { isOpen, downloadUrl, dismiss };
+    return { isOpen, downloadUrl: downloadUrl ?? '', dismiss };
 };
